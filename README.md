@@ -1,5 +1,7 @@
 <div align="center">
 
+  <img src="assets/branding-banner.png" alt="Atify Official Branding" width="100%" style="border-radius: 12px; margin-bottom: 20px;" />
+
   <h1>🌊 Atify</h1>
 
   <p align="center">
@@ -10,6 +12,7 @@
 
   <p align="center">
     <a href="#-features"><b>Features</b></a> •
+    <a href="#-screenshots"><b>Screenshots</b></a> •
     <a href="#-download"><b>Download</b></a> •
     <a href="#-android-auto-setup"><b>Android Auto</b></a> •
     <a href="#-earthy-palette"><b>Design</b></a> •
@@ -24,13 +27,35 @@
     <img src="https://img.shields.io/badge/Architecture-MVVM-6F8067?style=for-the-badge&labelColor=18251F&logo=kotlin" alt="MVVM Architecture" />
     <img src="https://img.shields.io/badge/Toolkit-Jetpack_Compose-6F8067?style=for-the-badge&logo=jetpack-compose&labelColor=18251F" alt="Jetpack Compose" />
     <img src="https://img.shields.io/badge/Android_Auto-Supported-6F8067?style=for-the-badge&logo=android-auto&labelColor=18251F" alt="Android Auto" />
-    <img src="https://img.shields.io/badge/Android-8.0%2B-6F8067?style=for-the-badge&logo=android&labelColor=18251F" alt="Android 8.0+" />
+    <img src="https://img.shields.io/badge/Android-8.0%2B-6F8067?style=for-the-badge&logo=android&labelColor=18251F" alt="Android Auto" />
     <img src="https://img.shields.io/badge/License-GPLv3-6F8067?style=for-the-badge&labelColor=18251F" alt="License: GPLv3" />
   </div>
 
 </div>
 
 <hr />
+
+## 📱 Visual Preview
+
+<div align="center">
+  <img src="assets/preview-mockup.jpg" alt="Atify Mobile and Android Auto Preview" width="100%" style="border-radius: 12px; margin-bottom: 24px;" />
+</div>
+
+<div align="center">
+
+### 📸 App Screenshots
+
+| Home & Browse | Now Playing (Spotify Style) | Playlist & Lyrics | Queue Management |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshot-home.png" width="220" /> | <img src="assets/screenshot-music.png" width="220" /> | <img src="assets/screenshot-playlist.png" width="220" /> | <img src="assets/screenshot-queue.png" width="220" /> |
+
+| Library Grid | Search & Genres | Audio Settings | Song Options |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshot-your-library.png" width="220" /> | <img src="assets/screenshot-search.png" width="220" /> | <img src="assets/screenshot-settings-1.png" width="220" /> | <img src="assets/screenshot-song-settings.png" width="220" /> |
+
+</div>
+
+---
 
 ## 🌟 Highlights
 
