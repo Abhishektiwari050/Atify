@@ -24,3 +24,5 @@ hs_err_*.log
 /.idea/*
 /.github/git-commit-instructions.md
 /app/build/
+
+scratch/
