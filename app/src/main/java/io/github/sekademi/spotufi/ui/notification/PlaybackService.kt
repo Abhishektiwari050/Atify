@@ -354,7 +354,7 @@ class PlaybackService : MediaLibraryService() {
             browser: MediaSession.ControllerInfo,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<MediaItem>> =
-            Futures.immediateFuture(LibraryResult.ofItem(folder(ROOT, "spotui"), params))
+            Futures.immediateFuture(LibraryResult.ofItem(folder(ROOT, "Atify", MediaMetadata.MEDIA_TYPE_FOLDER_MIXED), params))
 
         override fun onGetChildren(
             session: MediaLibrarySession,
@@ -375,6 +375,31 @@ class PlaybackService : MediaLibraryService() {
             trackById[mediaId]?.let { LibraryResult.ofItem(playable(it), null) }
                 ?: LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE),
         )
+
+        override fun onSearch(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            params: LibraryParams?,
+        ): ListenableFuture<LibraryResult<Void>> = future {
+            val results = lastSuccess(repository.searchSongs(query)).orEmpty()
+            registerTracks("search/$query", results)
+            session.notifySearchResultChanged(browser, query, results.size, params)
+            LibraryResult.ofVoid(params)
+        }
+
+        override fun onGetSearchResult(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?,
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = future {
+            val results = lastSuccess(repository.searchSongs(query)).orEmpty()
+            val items = registerTracks("search/$query", results)
+            LibraryResult.ofItemList(ImmutableList.copyOf(items), params)
+        }
 
         // A browsed track was tapped in the car: queue the list it came from and
         // play through our own engine (streams are resolved lazily per track, so
@@ -406,10 +431,10 @@ class PlaybackService : MediaLibraryService() {
 
     private suspend fun childrenOf(parentId: String): List<MediaItem> = when {
         parentId == ROOT -> listOf(
-            folder(NODE_LIKED, "Liked Songs"),
-            folder(NODE_DOWNLOADS, "Downloads"),
-            folder(NODE_PLAYLISTS, "Playlists"),
-            folder(NODE_ALBUMS, "Albums"),
+            folder(NODE_LIKED, "Liked Songs", MediaMetadata.MEDIA_TYPE_FOLDER_MIXED),
+            folder(NODE_DOWNLOADS, "Downloads", MediaMetadata.MEDIA_TYPE_FOLDER_MIXED),
+            folder(NODE_PLAYLISTS, "Playlists", MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS),
+            folder(NODE_ALBUMS, "Albums", MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS),
         )
         parentId == NODE_LIKED ->
             registerTracks(NODE_LIKED, lastSuccess(repository.provideLikedSongs()).orEmpty())
@@ -421,12 +446,13 @@ class PlaybackService : MediaLibraryService() {
         parentId == NODE_PLAYLISTS ->
             libraryEntries().filter {
                 it.isPlaylist && it.spotifyId != Api.LIKED_SONGS_ID && it.spotifyId != Api.DOWNLOADS_ID
-            }.map { folder("playlist/${it.spotifyId}", it.name, it.coverUri) }
+            }.map { folder("playlist/${it.spotifyId}", it.name, MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS, it.coverUri) }
         parentId == NODE_ALBUMS ->
             libraryEntries().filter { !it.isPlaylist }.map {
                 folder(
                     "album/${android.net.Uri.encode(it.name)}/${android.net.Uri.encode(it.artists)}",
                     it.name,
+                    MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS,
                     it.coverUri,
                 )
             }
@@ -460,7 +486,7 @@ class PlaybackService : MediaLibraryService() {
         return songs.map { playable(it) }
     }
 
-    private fun folder(id: String, title: String, coverUri: String = ""): MediaItem =
+    private fun folder(id: String, title: String, mediaType: Int = MediaMetadata.MEDIA_TYPE_FOLDER_MIXED, coverUri: String = ""): MediaItem =
         MediaItem.Builder()
             .setMediaId(id)
             .setMediaMetadata(
@@ -468,6 +494,7 @@ class PlaybackService : MediaLibraryService() {
                     .setTitle(title)
                     .setIsBrowsable(true)
                     .setIsPlayable(false)
+                    .setMediaType(mediaType)
                     .apply { if (coverUri.isNotBlank()) setArtworkUri(android.net.Uri.parse(coverUri)) }
                     .build(),
             )
@@ -483,6 +510,7 @@ class PlaybackService : MediaLibraryService() {
                     .setAlbumTitle(song.album)
                     .setIsBrowsable(false)
                     .setIsPlayable(true)
+                    .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
                     .apply { if (song.coverUri.isNotBlank()) setArtworkUri(android.net.Uri.parse(song.coverUri)) }
                     .build(),
             )

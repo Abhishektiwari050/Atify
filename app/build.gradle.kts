@@ -36,7 +36,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.sekademi.spotufi"
+        applicationId = "com.atify.music"
         minSdk = 26
         targetSdk = 34
         versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: getGitVersionCode()

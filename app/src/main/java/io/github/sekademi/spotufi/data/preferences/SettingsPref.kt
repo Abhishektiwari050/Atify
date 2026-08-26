@@ -34,7 +34,7 @@ private const val KEY_IGNORE_BATTERY_OPT = "ignore_battery_optimization"
 private const val KEY_UPDATE_REPO_URL = "update_repo_url"
 const val DEFAULT_UPDATE_REPO_URL = "https://github.com/fr0stb1rd/spotufi"
 private const val KEY_DOWNLOAD_FOLDER = "download_folder_name"
-const val DEFAULT_DOWNLOAD_FOLDER = "Spotufi"
+const val DEFAULT_DOWNLOAD_FOLDER = "Atify"
 
 /** Off (0s) … 12s. 0 disables crossfade. */
 const val CROSSFADE_MIN_MS = 0

@@ -391,7 +391,7 @@ fun SettingsScreen(navController: NavController) {
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "Spotufi ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                        "Atify ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
                         color = Color(0xFFB3B3B3),
                         fontSize = 12.sp,
                     )
@@ -429,7 +429,7 @@ fun SettingsScreen(navController: NavController) {
                             is UpdateCheckState.Idle             -> "Tap to check for a new version"
                             is UpdateCheckState.Checking         -> "Checking…"
                             is UpdateCheckState.UpToDate         -> "You're up to date ✓"
-                            is UpdateCheckState.UpdateAvailable  -> "Spotufi ${s.info.version} is available!"
+                            is UpdateCheckState.UpdateAvailable  -> "Atify ${s.info.version} is available!"
                         },
                         color = when (updateCheckState) {
                             is UpdateCheckState.UpdateAvailable -> AppPalette

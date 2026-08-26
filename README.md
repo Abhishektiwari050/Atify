@@ -2,12 +2,12 @@
 
   <img src="app/src/main/ic_launcher-playstore.png" width="160" height="160" alt="Spotufi Logo" style="border-radius: 22%">
 
-  <h1>Spotufi</h1>
+  <h1>Atify</h1>
 
   <p align="center">
-    <strong>Multi-source Android music player with lossless FLAC, YouTube matching, and Spotify sync.</strong>
+    <strong>Your music. Your atmosphere. Multi-source Android music player with lossless FLAC, Spotify sync, and Android Auto.</strong>
     <br />
-    <em>Connect your real Spotify account. Lossless FLAC via public TIDAL backends, YouTube audio matching, offline downloads, crossfade, and DJ mixing.</em>
+    <em>Connect your Spotify account. Stream Bit-Perfect FLAC, YouTube audio matching, offline downloads, crossfade, and full Android Auto car dashboard support.</em>
   </p>
 
   <p align="center">
@@ -20,23 +20,11 @@
     <a href="#license"><b>License</b></a>
   </p>
 
-  <div align="center">
-    <img src="https://img.shields.io/github/v/release/fr0stb1rd/spotufi?style=for-the-badge&color=1DB954&labelColor=1e1e2e&logo=github" alt="Latest Version" />
-    <img src="https://img.shields.io/github/downloads/fr0stb1rd/spotufi/total?style=for-the-badge&color=1DB954&labelColor=1e1e2e&logo=github" alt="Downloads" />
-    <img src="https://img.shields.io/github/stars/fr0stb1rd/spotufi?style=for-the-badge&color=1DB954&labelColor=1e1e2e&logo=github" alt="Stars" />
-    <img src="https://img.shields.io/badge/Architecture-MVVM-1DB954?style=for-the-badge&labelColor=1e1e2e&logo=kotlin" alt="MVVM Architecture" />
-    <img src="https://img.shields.io/badge/Language-Kotlin-7f52ff?style=for-the-badge&logo=kotlin&color=1DB954&labelColor=1e1e2e" alt="Kotlin Language" />
-    <img src="https://img.shields.io/badge/Toolkit-Jetpack_Compose-4285f4?style=for-the-badge&logo=jetpack-compose&color=1DB954&labelColor=1e1e2e" alt="Jetpack Compose" />
-    <img src="https://img.shields.io/badge/Design-Material_3-000000?style=for-the-badge&logo=material-design&color=1DB954&labelColor=1e1e2e" alt="Material Design 3" />
-    <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&color=1DB954&labelColor=1e1e2e" alt="Android 8.0+" />
-    <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge&color=1DB954&labelColor=1e1e2e&logo=gnu" alt="License: GPLv3" />
-  </div>
-
 </div>
 
 <hr />
 
-**Spotufi** is a multi-source Android music player that combines Spotify syncing, lossless FLAC streaming (TIDAL monochrome DASH), and YouTube audio matching into one app. Play without a Spotify account, download for offline, export to MP3/FLAC, and enjoy DJ-style crossfade with tri-state repeat.
+**Atify** is an open-source, multi-source Android music player that combines Spotify library sync, lossless FLAC streaming, and YouTube audio matching into a unified experience with native Android Auto dashboard support. Play without subscription costs, download for offline driving, export to FLAC, and enjoy DJ-style crossfade.
 
 ---
 
