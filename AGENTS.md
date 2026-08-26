@@ -1,7 +1,6 @@
-# Spotufi - Agent Guide
+# Atify - Agent Guide
 
-Multi-source Android music player. Jetpack Compose + Material 3, MVVM, Kotlin 2.4.0.
-Spotify clone with lossless FLAC streaming (TIDAL monochrome DASH), YouTube audio matching, downloads, crossfade, and tri-state repeat.
+Multi-source Android music player with lossless FLAC streaming, YouTube audio matching, Spotify library sync, and native Android Auto car dashboard support. Jetpack Compose + Material 3, MVVM, Kotlin 2.4.0.
 
 ## Build
 
