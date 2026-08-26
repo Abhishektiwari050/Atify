@@ -32,7 +32,7 @@ private const val KEY_VIDEO_FALLBACK = "video_fallback_enabled"
 private const val KEY_LIBRARY_GRID = "library_grid_view"
 private const val KEY_IGNORE_BATTERY_OPT = "ignore_battery_optimization"
 private const val KEY_UPDATE_REPO_URL = "update_repo_url"
-const val DEFAULT_UPDATE_REPO_URL = "https://github.com/fr0stb1rd/spotufi"
+const val DEFAULT_UPDATE_REPO_URL = "https://github.com/Abhishektiwari050/Atify"
 private const val KEY_DOWNLOAD_FOLDER = "download_folder_name"
 const val DEFAULT_DOWNLOAD_FOLDER = "Atify"
 
