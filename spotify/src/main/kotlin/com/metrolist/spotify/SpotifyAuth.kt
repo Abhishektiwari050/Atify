@@ -34,8 +34,7 @@ object SpotifyAuth {
     // the default (instead of the passwordless "magic link" flow); allow_signup=1
     // keeps the "Sign up" link so the full web signup works from the same page.
     const val LOGIN_URL =
-        "https://accounts.spotify.com/en/login?continue=https%3A%2F%2Fopen.spotify.com%2F" +
-            "&method=password&allow_password=1&allow_signup=1"
+        "https://accounts.spotify.com/en/login?continue=https%3A%2F%2Fopen.spotify.com%2F"
 
     // Direct entry to Spotify's web signup flow.
     const val SIGNUP_URL = "https://www.spotify.com/signup"
