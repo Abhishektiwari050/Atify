@@ -289,7 +289,7 @@ fun SettingsScreen(navController: NavController) {
                     focusedPlaceholderColor = Color(0xFF666666),
                     unfocusedPlaceholderColor = Color(0xFF666666),
                 ),
-                placeholder = { Text("https://github.com/Owner/Repo") },
+                placeholder = { Text("https://github.com/Abhishektiwari050/Atify") },
                 trailingIcon = {
                     Icon(
                         imageVector = Icons.Filled.Refresh,

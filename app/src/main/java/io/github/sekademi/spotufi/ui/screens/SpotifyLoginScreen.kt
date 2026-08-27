@@ -6,6 +6,7 @@ import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -201,11 +202,10 @@ private fun LoginForm(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(72.dp))
-        Icon(
+        Image(
             painter = painterResource(id = R.drawable.logo),
-            contentDescription = "Spotify",
-            tint = Color(SPOTIFY_GREEN),
-            modifier = Modifier.size(56.dp),
+            contentDescription = "Atify",
+            modifier = Modifier.size(64.dp),
         )
         Spacer(Modifier.height(28.dp))
         Text(

@@ -128,19 +128,19 @@ fun LibraryScreen(navController: NavController) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Crafted with ♥ for ",
+                    text = "Maintained with ❤️ by ",
                     color = Color.Gray,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                 )
                 val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
                 Text(
-                    text = "Atify",
+                    text = "Antishake",
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable {
-                        uriHandler.openUri("https://github.com/Abhishektiwari050/Atify")
+                        uriHandler.openUri("https://github.com/Abhishektiwari050")
                     }
                 )
             }

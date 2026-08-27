@@ -65,7 +65,7 @@ fun UpdatePrompt() {
                     RenderMarkdown(info.releaseBody)
                 } else {
                     Text(
-                        "A new version of Spotufi is available.",
+                        "A new version of Atify is available.",
                         color = Color(0xFFB3B3B3),
                     )
                 }

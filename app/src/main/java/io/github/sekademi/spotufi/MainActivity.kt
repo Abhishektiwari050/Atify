@@ -53,9 +53,6 @@ class MainActivity : ComponentActivity() {
             SpotuiTheme {
                 // A surface container using the 'background' color from the theme
                     App()
-
-                // New-release check (GitHub): prompts Upgrade / Dismiss / Don't show again.
-                io.github.sekademi.spotufi.ui.components.UpdatePrompt()
             }
         }
 

@@ -21,7 +21,7 @@ import java.net.URLEncoder
  */
 object LyricsApi {
     private const val BASE = "https://lrclib.net/api"
-    private const val UA = "SpotufiSpotifyClone (https://github.com/)"
+    private const val UA = "AtifyMusic (https://github.com/Abhishektiwari050/Atify)"
 
     private class Miss(val at: Long = System.currentTimeMillis())
     private const val MISS_RETRY_MS = 120_000L

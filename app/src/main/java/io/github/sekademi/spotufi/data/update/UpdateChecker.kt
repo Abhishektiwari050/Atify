@@ -59,10 +59,12 @@ object UpdateChecker {
 
         val tag = "v$version"
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: ""
-        val apkUrl = listOf(abi, "universal").firstNotNullOfOrNull { a ->
-            "https://github.com/$repoPath/releases/download/$tag/app-$a-release.apk"
-                .takeIf { urlExists(it) }
-        } ?: "$repoUrl/releases/tag/$tag"
+        val apkUrl = listOf(
+            "https://github.com/$repoPath/releases/download/$tag/Atify-arm64-v8a.apk",
+            "https://github.com/$repoPath/releases/download/$tag/Atify-universal.apk",
+            "https://github.com/$repoPath/releases/download/$tag/app-$abi-release.apk",
+            "https://github.com/$repoPath/releases/download/$tag/app-universal-release.apk",
+        ).firstOrNull { urlExists(it) } ?: "$repoUrl/releases/tag/$tag"
 
         return UpdateInfo(
             version = version,
@@ -81,6 +83,20 @@ object UpdateChecker {
         }
     }
 
-    private fun isNewer(remote: String, installed: String): Boolean =
-        remote != installed
+    private fun isNewer(remote: String, installed: String): Boolean {
+        val cleanRemote = remote.removePrefix("v").trim()
+        val cleanInstalled = installed.removePrefix("v").removeSuffix("-debug").trim()
+        if (cleanRemote == cleanInstalled) return false
+        return runCatching {
+            val rParts = cleanRemote.split('.').map { it.toIntOrNull() ?: 0 }
+            val iParts = cleanInstalled.split('.').map { it.toIntOrNull() ?: 0 }
+            for (i in 0 until maxOf(rParts.size, iParts.size)) {
+                val r = rParts.getOrElse(i) { 0 }
+                val inst = iParts.getOrElse(i) { 0 }
+                if (r > inst) return true
+                if (r < inst) return false
+            }
+            false
+        }.getOrDefault(false)
+    }
 }
