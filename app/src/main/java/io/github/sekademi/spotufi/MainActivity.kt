@@ -60,6 +60,26 @@ class MainActivity : ComponentActivity() {
         // setContent so the Compose content view doesn't replace/orphan it (an
         // orphaned WebView gets a 0×0 viewport and Spotify won't render/navigate).
         io.github.sekademi.spotufi.di.SpotifyWebPlayer.attach(this)
+
+        handleDeepLink(intent)
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: android.content.Intent?) {
+        val data = intent?.data ?: return
+        val rawSpDc = data.getQueryParameter("sp_dc") ?: data.getQueryParameter("cookie")
+        if (!rawSpDc.isNullOrBlank()) {
+            val spDc = com.metrolist.spotify.CookieSanitizer.sanitizeSpDc(rawSpDc) ?: rawSpDc.trim()
+            if (spDc.isNotBlank()) {
+                io.github.sekademi.spotufi.data.api.SpotifySession.setSpDc(this, spDc)
+                io.github.sekademi.spotufi.di.SpotifyWebPlayer.refreshLogin(this)
+            }
+        }
     }
 
     override fun onDestroy() {

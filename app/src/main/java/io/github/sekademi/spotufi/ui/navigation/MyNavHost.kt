@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.dialog
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
 import androidx.compose.ui.window.DialogProperties
 import io.github.sekademi.spotufi.ui.screens.AlbumScreen
 import io.github.sekademi.spotufi.ui.screens.ArtistReleasesScreen
@@ -83,8 +84,21 @@ fun MyNavHost(
         popEnterTransition = { fadeIn(animationSpec = tween(150)) },
         popExitTransition = { fadeOut(animationSpec = tween(150)) },
     ){
-        composable(Routes.Login.route){
-            SpotifyLoginScreen(navHostController)
+        composable(
+            route = Routes.Login.route,
+            deepLinks = listOf(
+                navDeepLink { uriPattern = "spotufi://login?sp_dc={sp_dc}" },
+                navDeepLink { uriPattern = "spotufi://callback?sp_dc={sp_dc}" },
+                navDeepLink { uriPattern = "atify://login?sp_dc={sp_dc}" },
+                navDeepLink { uriPattern = "atify://callback?sp_dc={sp_dc}" },
+                navDeepLink { uriPattern = "spotufi://login" },
+                navDeepLink { uriPattern = "spotufi://callback" },
+                navDeepLink { uriPattern = "atify://login" },
+                navDeepLink { uriPattern = "atify://callback" }
+            )
+        ) { navBackStackEntry ->
+            val deepLinkSpDc = navBackStackEntry.arguments?.getString("sp_dc")
+            SpotifyLoginScreen(navHostController, initialSpDc = deepLinkSpDc)
         }
         composable(Routes.Home.route){
             HomeScreen(navHostController)

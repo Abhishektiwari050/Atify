@@ -1,8 +1,6 @@
 package io.github.sekademi.spotufi.ui.screens
 
-import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -20,10 +18,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,13 +32,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -74,10 +65,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -86,15 +75,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
+import androidx.webkit.UserAgentMetadata
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
+import com.metrolist.spotify.CookieSanitizer
 import com.metrolist.spotify.Spotify
 import com.metrolist.spotify.SpotifyAuth
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.SpotifySession
+import io.github.sekademi.spotufi.ui.components.CustomTabsHelper
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.theme.AtifyDark
 import io.github.sekademi.spotufi.ui.theme.AtifySage
 import io.github.sekademi.spotufi.ui.theme.AtifySand
-import io.github.sekademi.spotufi.ui.theme.AtifyRust
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -103,10 +96,67 @@ import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "SpotifyLogin"
+private const val DESKTOP_USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+private const val LOGIN_URL =
+    "https://accounts.spotify.com/en/login?continue=https%3A%2F%2Fopen.spotify.com%2F"
 
-@SuppressLint("SetJavaScriptEnabled")
+private val DESKTOP_HEADERS = mapOf(
+    "Sec-CH-UA" to "\"Google Chrome\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "Sec-CH-UA-Mobile" to "?0",
+    "Sec-CH-UA-Platform" to "\"Windows\"",
+    "Accept-Language" to "en-US,en;q=0.9",
+    "Upgrade-Insecure-Requests" to "1"
+)
+
+private const val VIEWPORT_OVERRIDE_JS = """
+    (function() {
+        try {
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (!meta) {
+                meta = document.createElement('meta');
+                meta.name = 'viewport';
+                document.head.appendChild(meta);
+            }
+            meta.setAttribute('content', 'width=1280, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes');
+        } catch(e) {}
+    })();
+"""
+
+private const val ANTI_BOT_SPOOF_JS = """
+    (function() {
+        try {
+            if (navigator.userAgentData) {
+                Object.defineProperty(navigator, 'userAgentData', {
+                    configurable: true,
+                    get: function() {
+                        return {
+                            brands: [
+                                {brand: 'Google Chrome', version: '131'},
+                                {brand: 'Chromium', version: '131'},
+                                {brand: 'Not_A Brand', version: '24'}
+                            ],
+                            mobile: false,
+                            platform: 'Windows'
+                        };
+                    }
+                });
+            }
+            Object.defineProperty(navigator, 'webdriver', {
+                configurable: true,
+                get: function() { return undefined; }
+            });
+            Object.defineProperty(window.screen, 'width', { configurable: true, get: function() { return 1280; } });
+            Object.defineProperty(window.screen, 'availWidth', { configurable: true, get: function() { return 1280; } });
+        } catch(e) {}
+    })();
+"""
+
 @Composable
-fun SpotifyLoginScreen(navController: NavController) {
+fun SpotifyLoginScreen(
+    navController: NavController,
+    initialSpDc: String? = null
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Web Login, 1 = Cookie (sp_dc)
@@ -115,7 +165,7 @@ fun SpotifyLoginScreen(navController: NavController) {
     var statusMessage by remember { mutableStateOf("") }
     var hasError by remember { mutableStateOf(false) }
 
-    var cookieInput by remember { mutableStateOf("") }
+    var cookieInput by remember { mutableStateOf(initialSpDc.orEmpty()) }
     var cookieError by remember { mutableStateOf<String?>(null) }
 
     var loadProgress by remember { mutableFloatStateOf(0.1f) }
@@ -129,6 +179,27 @@ fun SpotifyLoginScreen(navController: NavController) {
         io.github.sekademi.spotufi.di.SpotifyWebPlayer.refreshLogin(context)
         navController.navigate(Routes.Home.route) {
             popUpTo(Routes.Login.route) { inclusive = true }
+        }
+    }
+
+    // Handle initial deep-link sp_dc if provided
+    LaunchedEffect(initialSpDc) {
+        if (!initialSpDc.isNullOrBlank()) {
+            val sanitized = CookieSanitizer.sanitizeSpDc(initialSpDc) ?: initialSpDc.trim()
+            if (sanitized.isNotBlank()) {
+                cookieInput = sanitized
+                if (tokenFetchStarted.compareAndSet(false, true)) {
+                    finishLogin(
+                        webViewRef, context as Activity, scope,
+                        spDc = sanitized,
+                        setProcessing = { isProcessing = it },
+                        setStatus = { statusMessage = it },
+                        setError = { hasError = it },
+                        tokenFetchStarted = tokenFetchStarted,
+                        onSuccess = navigateToHome,
+                    )
+                }
+            }
         }
     }
 
@@ -262,7 +333,7 @@ fun SpotifyLoginScreen(navController: NavController) {
                 .background(AtifyDark)
         ) {
             if (selectedTab == 0) {
-                // WEB LOGIN TAB
+                // WEB LOGIN TAB (1280px Desktop Viewport Emulation)
                 Box(modifier = Modifier.fillMaxSize()) {
                     AndroidView(
                         modifier = Modifier.fillMaxSize(),
@@ -277,26 +348,73 @@ fun SpotifyLoginScreen(navController: NavController) {
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
                                 setBackgroundColor(android.graphics.Color.parseColor("#121212"))
+                                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                                 cookieManager.setAcceptThirdPartyCookies(this, true)
 
-                                settings.apply {
+                                val webSettings = this.settings
+                                webSettings.apply {
                                     javaScriptEnabled = true
                                     domStorageEnabled = true
-                                    databaseEnabled = true
                                     loadWithOverviewMode = true
                                     useWideViewPort = true
+                                    setSupportZoom(true)
+                                    builtInZoomControls = true
+                                    displayZoomControls = false
                                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                     setSupportMultipleWindows(false)
                                     javaScriptCanOpenWindowsAutomatically = true
                                     allowContentAccess = true
-                                    allowFileAccess = true
+                                    allowFileAccess = false
                                     cacheMode = WebSettings.LOAD_DEFAULT
-                                    // Use default system user agent so Google & Spotify accept the browser
+                                    userAgentString = DESKTOP_USER_AGENT
+                                }
+
+                                if (WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
+                                    val metadata = UserAgentMetadata.Builder()
+                                        .setPlatform("Windows")
+                                        .setPlatformVersion("10.0.0")
+                                        .setArchitecture("x86")
+                                        .setModel("")
+                                        .setMobile(false)
+                                        .setBitness(64)
+                                        .setFullVersion("131.0.6778.86")
+                                        .setBrandVersionList(
+                                            listOf(
+                                                UserAgentMetadata.BrandVersion.Builder()
+                                                    .setBrand("Google Chrome")
+                                                    .setMajorVersion("131")
+                                                    .setFullVersion("131.0.6778.86")
+                                                    .build(),
+                                                UserAgentMetadata.BrandVersion.Builder()
+                                                    .setBrand("Chromium")
+                                                    .setMajorVersion("131")
+                                                    .setFullVersion("131.0.6778.86")
+                                                    .build(),
+                                                UserAgentMetadata.BrandVersion.Builder()
+                                                    .setBrand("Not_A Brand")
+                                                    .setMajorVersion("24")
+                                                    .setFullVersion("24.0.0.0")
+                                                    .build()
+                                            )
+                                        )
+                                        .build()
+                                    WebSettingsCompat.setUserAgentMetadata(webSettings, metadata)
+                                }
+
+                                if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                                    WebSettingsCompat.setAlgorithmicDarkeningAllowed(webSettings, false)
+                                }
+                                if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                                    WebSettingsCompat.setForceDark(webSettings, WebSettingsCompat.FORCE_DARK_OFF)
                                 }
 
                                 webChromeClient = object : WebChromeClient() {
                                     override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                         loadProgress = newProgress / 100f
+                                        if (newProgress >= 30) {
+                                            view?.evaluateJavascript(VIEWPORT_OVERRIDE_JS, null)
+                                            view?.evaluateJavascript(ANTI_BOT_SPOOF_JS, null)
+                                        }
                                         if (newProgress >= 80) isWebLoading = false
                                     }
                                 }
@@ -306,12 +424,16 @@ fun SpotifyLoginScreen(navController: NavController) {
                                         Log.d(TAG, "Web starting: $url")
                                         webError = null
                                         isWebLoading = true
+                                        view?.evaluateJavascript(ANTI_BOT_SPOOF_JS, null)
+                                        view?.evaluateJavascript(VIEWPORT_OVERRIDE_JS, null)
                                     }
 
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         Log.d(TAG, "Web finished: $url")
                                         isWebLoading = false
                                         loadProgress = 1f
+                                        view?.evaluateJavascript(ANTI_BOT_SPOOF_JS, null)
+                                        view?.evaluateJavascript(VIEWPORT_OVERRIDE_JS, null)
                                         val spDc = extractSpotifyDcCookie()
                                         if (!spDc.isNullOrBlank() && tokenFetchStarted.compareAndSet(false, true)) {
                                             finishLogin(
@@ -339,16 +461,41 @@ fun SpotifyLoginScreen(navController: NavController) {
                                     }
 
                                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                        val url = request?.url?.toString() ?: return false
+                                        if (url.startsWith("spotufi://") || url.startsWith("atify://")) {
+                                            val spDc = request.url?.getQueryParameter("sp_dc") ?: request.url?.getQueryParameter("cookie")
+                                            if (!spDc.isNullOrBlank()) {
+                                                if (tokenFetchStarted.compareAndSet(false, true)) {
+                                                    finishLogin(
+                                                        this@apply, context as Activity, scope,
+                                                        spDc = spDc,
+                                                        setProcessing = { isProcessing = it },
+                                                        setStatus = { statusMessage = it },
+                                                        setError = { hasError = it },
+                                                        tokenFetchStarted = tokenFetchStarted,
+                                                        onSuccess = navigateToHome,
+                                                    )
+                                                }
+                                                return true
+                                            }
+                                        }
                                         return false
                                     }
                                 }
 
-                                loadUrl("https://accounts.spotify.com/en/login?continue=https%3A%2F%2Fopen.spotify.com%2F")
+                                loadUrl(LOGIN_URL, DESKTOP_HEADERS)
+                            }
+                        },
+                        onRelease = { wv ->
+                            runCatching {
+                                wv.stopLoading()
+                                wv.removeAllViews()
+                                wv.destroy()
                             }
                         }
                     )
 
-                    // Floating "I have Logged In" Action Bar at Bottom of Web Tab
+                    // Floating Action Bar at Bottom of Web Tab
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -365,11 +512,16 @@ fun SpotifyLoginScreen(navController: NavController) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                "Logged in successfully?",
-                                color = Color.White,
-                                fontSize = 13.sp
-                            )
+                            OutlinedButton(
+                                onClick = {
+                                    CustomTabsHelper.openCustomTab(context, LOGIN_URL)
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AtifySand)
+                            ) {
+                                Text("Open in CCT", fontSize = 12.sp)
+                            }
+
                             Button(
                                 onClick = {
                                     val spDc = extractSpotifyDcCookie()
@@ -414,11 +566,21 @@ fun SpotifyLoginScreen(navController: NavController) {
                                 onClick = {
                                     webError = null
                                     isWebLoading = true
-                                    webViewRef?.loadUrl("https://accounts.spotify.com/en/login?continue=https%3A%2F%2Fopen.spotify.com%2F")
+                                    webViewRef?.loadUrl(LOGIN_URL, DESKTOP_HEADERS)
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = AtifySage)
                             ) {
                                 Text("Retry Web View")
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    CustomTabsHelper.openCustomTab(context, LOGIN_URL)
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AtifySand)
+                            ) {
+                                Text("Open in Chrome Custom Tab", fontSize = 13.sp)
                             }
                             Spacer(Modifier.height(12.dp))
                             TextButton(onClick = { selectedTab = 1 }) {
@@ -515,8 +677,12 @@ fun SpotifyLoginScreen(navController: NavController) {
                                         if (clip != null && clip.itemCount > 0) {
                                             val text = clip.getItemAt(0).text?.toString().orEmpty().trim()
                                             if (text.isNotBlank()) {
-                                                cookieInput = text
+                                                val sanitized = CookieSanitizer.sanitizeSpDc(text) ?: text
+                                                cookieInput = sanitized
                                                 cookieError = null
+                                                if (sanitized != text) {
+                                                    Toast.makeText(context, "Sanitized sp_dc from clipboard", Toast.LENGTH_SHORT).show()
+                                                }
                                             } else {
                                                 Toast.makeText(context, "Clipboard is empty", Toast.LENGTH_SHORT).show()
                                             }
@@ -531,7 +697,7 @@ fun SpotifyLoginScreen(navController: NavController) {
 
                                 Button(
                                     onClick = {
-                                        val clean = cookieInput.trim()
+                                        val clean = CookieSanitizer.sanitizeSpDc(cookieInput) ?: cookieInput.trim()
                                         if (clean.isBlank()) {
                                             cookieError = "Please paste a valid sp_dc cookie"
                                             return@Button
@@ -560,7 +726,7 @@ fun SpotifyLoginScreen(navController: NavController) {
 
                     Spacer(Modifier.height(20.dp))
 
-                    // Helpful instructions accordion / card
+                    // Instructions Card with Chrome Custom Tab launcher
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF141F1A)),
@@ -578,14 +744,13 @@ fun SpotifyLoginScreen(navController: NavController) {
 
                             OutlinedButton(
                                 onClick = {
-                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://accounts.spotify.com/en/login?continue=https%3A%2F%2Fopen.spotify.com%2F"))
-                                    context.startActivity(browserIntent)
+                                    CustomTabsHelper.openCustomTab(context, LOGIN_URL)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AtifySand)
                             ) {
-                                Text("Open Spotify in External Chrome Browser", fontSize = 12.sp)
+                                Text("Open Spotify in Chrome Custom Tab", fontSize = 12.sp)
                             }
                         }
                     }
@@ -629,6 +794,7 @@ fun SpotifyLoginScreen(navController: NavController) {
  */
 private fun extractSpotifyDcCookie(): String? {
     val cookieManager = CookieManager.getInstance() ?: return null
+    cookieManager.flush()
     val targetUrls = listOf(
         "https://accounts.spotify.com",
         "https://open.spotify.com",
@@ -644,7 +810,7 @@ private fun extractSpotifyDcCookie(): String? {
             if (trimmed.startsWith("sp_dc=")) {
                 val value = trimmed.substringAfter("sp_dc=").trim()
                 if (value.isNotBlank()) {
-                    return value
+                    return CookieSanitizer.sanitizeSpDc(value) ?: value
                 }
             }
         }
@@ -663,7 +829,8 @@ private fun finishLogin(
     tokenFetchStarted: AtomicBoolean,
     onSuccess: () -> Unit,
 ) {
-    if (spDc.isBlank()) {
+    val cleanSpDc = CookieSanitizer.sanitizeSpDc(spDc) ?: spDc.trim()
+    if (cleanSpDc.isBlank()) {
         setProcessing(true)
         setError(true)
         setStatus("Invalid login cookie. Please try again.")
@@ -676,11 +843,27 @@ private fun finishLogin(
     setStatus("Connecting to Spotify…")
     view?.stopLoading()
 
+    // Sync CookieManager across all 5 Spotify domains
+    val cookieManager = CookieManager.getInstance()
+    cookieManager.setAcceptCookie(true)
+    val domains = listOf(
+        "https://.spotify.com",
+        "https://accounts.spotify.com",
+        "https://open.spotify.com",
+        "https://api.spotify.com",
+        "https://spotify.com"
+    )
+    val cookieAttrs = "sp_dc=$cleanSpDc; Domain=.spotify.com; Path=/; Secure; SameSite=Lax"
+    for (domain in domains) {
+        cookieManager.setCookie(domain, cookieAttrs)
+    }
+    cookieManager.flush()
+
     scope.launch(Dispatchers.IO) {
-        SpotifySession.setSpDc(activity, spDc)
+        SpotifySession.setSpDc(activity, cleanSpDc)
         var lastError: Throwable? = null
         repeat(3) { attempt ->
-            val result = SpotifyAuth.fetchAccessToken(spDc)
+            val result = SpotifyAuth.fetchAccessToken(cleanSpDc)
             result.onSuccess { token ->
                 Spotify.accessToken = token.accessToken
                 withContext(Dispatchers.Main) { setStatus("Authenticated!") }

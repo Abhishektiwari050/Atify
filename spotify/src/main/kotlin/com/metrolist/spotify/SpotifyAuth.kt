@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.crypto.Mac
@@ -39,22 +40,22 @@ object SpotifyAuth {
     // Direct entry to Spotify's web signup flow.
     const val SIGNUP_URL = "https://www.spotify.com/signup"
 
-    private val json = Json {
+    internal val json = Json {
         isLenient = true
         ignoreUnknownKeys = true
     }
 
     @Serializable
-    private data class Nuance(val s: String, val v: Int)
+    internal data class Nuance(val s: String, val v: Int)
 
     @Serializable
-    private data class GistFile(val content: String)
+    internal data class GistFile(val content: String)
 
     @Serializable
-    private data class GistFiles(val files: Map<String, GistFile>)
+    internal data class GistFiles(val files: Map<String, GistFile>)
 
     @Serializable
-    private data class ServerTimeResponse(val serverTime: Long)
+    internal data class ServerTimeResponse(val serverTime: Long)
 
     /**
      * Fetches an internal web-player access token using session cookies and TOTP.
@@ -68,6 +69,14 @@ object SpotifyAuth {
         spDc: String,
         spKey: String = "",
     ): Result<SpotifyInternalToken> = runCatching {
+        val cleanSpDc = CookieSanitizer.sanitizeSpDc(spDc)
+            ?: throw Spotify.SpotifyException(400, "sp_dc cookie is missing or invalid")
+        val cleanSpKey = if (spKey.isNotBlank()) {
+            CookieSanitizer.sanitizeSpKey(spKey) ?: spKey.trim()
+        } else {
+            CookieSanitizer.sanitizeSpKey(spDc).orEmpty()
+        }
+
         val nuance = fetchNuance()
         val serverTimeSec = fetchServerTime()
         val totp = generateTotp(nuance.s, serverTimeSec)
@@ -82,9 +91,9 @@ object SpotifyAuth {
         }
 
         val cookieHeader = buildString {
-            append("sp_dc=$spDc")
-            if (spKey.isNotEmpty()) {
-                append("; sp_key=$spKey")
+            append("sp_dc=$cleanSpDc")
+            if (cleanSpKey.isNotEmpty()) {
+                append("; sp_key=$cleanSpKey")
             }
         }
 
@@ -139,10 +148,10 @@ object SpotifyAuth {
      * @param secret Base32-encoded shared secret
      * @param serverTimeSec Spotify server time in seconds since epoch
      */
-    private fun generateTotp(secret: String, serverTimeSec: Long): String {
+    internal fun generateTotp(secret: String, serverTimeSec: Long): String {
         val key = base32Decode(secret)
         val interval = 30L
-        val timeStep = floor(serverTimeSec.toDouble() / interval).toLong()
+        val timeStep = serverTimeSec / interval
 
         val timeBytes = ByteArray(8)
         var value = timeStep
@@ -165,22 +174,23 @@ object SpotifyAuth {
         return otp.toString().padStart(6, '0')
     }
 
-    private fun base32Decode(input: String): ByteArray {
+    internal fun base32Decode(input: String): ByteArray {
         val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
         val cleaned = input.uppercase().replace("=", "")
 
-        val output = mutableListOf<Byte>()
+        val output = ByteArrayOutputStream()
         var buffer = 0
         var bitsLeft = 0
 
         for (c in cleaned) {
             val value = alphabet.indexOf(c)
             if (value < 0) continue
-            buffer = (buffer shl 5) or value
+            buffer = (buffer shl 5) or (value and 0x1F)
             bitsLeft += 5
             if (bitsLeft >= 8) {
                 bitsLeft -= 8
-                output.add(((buffer shr bitsLeft) and 0xFF).toByte())
+                output.write((buffer shr bitsLeft) and 0xFF)
+                buffer = buffer and ((1 shl bitsLeft) - 1)
             }
         }
 
