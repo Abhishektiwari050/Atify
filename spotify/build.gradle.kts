@@ -16,3 +16,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
 }
+
+tasks.test {
+    useJUnit()
+}

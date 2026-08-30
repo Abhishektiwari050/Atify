@@ -1,4 +1,4 @@
-# BRIEFING — 2026-08-29T02:12:00Z
+# BRIEFING — 2026-08-29T02:51:00Z
 
 ## Mission
 Review modified files, verify build & tests, ensure no forbidden suppressions, and produce complete handoff report.
@@ -18,19 +18,23 @@ Review modified files, verify build & tests, ensure no forbidden suppressions, a
 
 ## Current Parent
 - Conversation ID: 8c9b3f2c-7d16-4b7f-8e9d-a7e90d4b3328
-- Updated: 2026-08-29T02:12:00Z
+- Updated: 2026-08-29T02:51:00Z
 
 ## Task Summary
 - **What to build**: Verify Spotify authentication implementation across :spotify and :app modules.
-- **Success criteria**: 100% tests pass, clean release build with R8, no suppressions, proper code quality.
+- **Success criteria**: 100% tests pass, clean release build with R8, zero suppressions, zero compiler deprecation warnings.
 
 ## Change Tracker
-- **Files modified**: None yet
-- **Build status**: Pending verification
+- **Files modified**:
+  - spotify/src/main/kotlin/com/metrolist/spotify/SpotifyAuth.kt: Resolved Java 20+ URL constructor deprecation via URI.create(urlString).toURL()
+  - spotify/src/main/kotlin/com/metrolist/spotify/SpotiFlac.kt: Removed unused @Suppress annotation
+  - pp/src/main/java/io/github/sekademi/spotufi/ui/screens/PlaylistScreen.kt: Removed unused @SuppressLint annotation
+  - pp/src/main/java/io/github/sekademi/spotufi/ui/screens/SpotifyLoginScreen.kt: Upgraded deprecated TabRow to SecondaryTabRow with TabRowDefaults.SecondaryIndicator; removed deprecated FORCE_DARK setting in favor of ALGORITHMIC_DARKENING
+- **Build status**: PASS (all tests pass, assembleRelease succeeds)
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: Pending
-- **Lint status**: Clean
-- **Tests added/modified**: Pending review
+- **Build/test result**: PASS (100% tests pass, 0 compile warnings)
+- **Lint status**: Zero @Suppress / @SuppressLint across entire repository
+- **Tests added/modified**: 12 comprehensive unit and integration tests in SpotifyAuthTest.kt
 

@@ -48,10 +48,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -276,13 +275,13 @@ fun SpotifyLoginScreen(
         }
 
         // Tab Navigation
-        TabRow(
+        SecondaryTabRow(
             selectedTabIndex = selectedTab,
             containerColor = Color(0xFF18251F),
             contentColor = Color.White,
-            indicator = { tabPositions ->
+            indicator = {
                 TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    modifier = Modifier.tabIndicatorOffset(selectedTab),
                     color = AtifySage,
                     height = 3.dp
                 )
@@ -403,9 +402,6 @@ fun SpotifyLoginScreen(
 
                                 if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                                     WebSettingsCompat.setAlgorithmicDarkeningAllowed(webSettings, false)
-                                }
-                                if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                                    WebSettingsCompat.setForceDark(webSettings, WebSettingsCompat.FORCE_DARK_OFF)
                                 }
 
                                 webChromeClient = object : WebChromeClient() {

@@ -1,7 +1,6 @@
 package io.github.sekademi.spotufi.ui.screens
 
 import android.content.Context
-import android.annotation.SuppressLint
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -121,7 +120,6 @@ fun setPlaylistSort(context: Context, playlistId: String, option: PlaylistSortOp
         .apply()
 }
 
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PlaylistScreen(navController: NavController, playlistId: String, playlistName: String = "") {

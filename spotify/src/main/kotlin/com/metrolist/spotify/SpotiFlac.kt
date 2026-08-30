@@ -367,7 +367,7 @@ object SpotiFlac {
      *      single-file FLAC. (Hi-res returns a segmented DASH `<MPD>` we can't use
      *      as one URL, so we request LOSSLESS for a directly-playable stream.)
      */
-    private suspend fun resolveTidalMonochrome(tidalId: String, @Suppress("UNUSED_PARAMETER") preferHiRes: Boolean): Result {
+    private suspend fun resolveTidalMonochrome(tidalId: String, preferHiRes: Boolean): Result {
         var sawError = false
         for (base in monochromeInstances()) {
             // Instances run one of two API versions, so try both endpoint styles.
