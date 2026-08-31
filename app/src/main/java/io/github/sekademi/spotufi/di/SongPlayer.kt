@@ -192,10 +192,20 @@ object SongPlayer {
                         androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain(filter),
                     ).build()
         }
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 2_500,
+                /* maxBufferMs = */ 30_000,
+                /* bufferForPlaybackMs = */ 500,
+                /* bufferForPlaybackAfterRebufferMs = */ 1_000,
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
         val p = ExoPlayer.Builder(context)
             .setMediaSourceFactory(
                 androidx.media3.exoplayer.source.DefaultMediaSourceFactory(StreamResolver.cacheDataSourceFactory(context)),
             )
+            .setLoadControl(loadControl)
             .setRenderersFactory(renderers)
             .setAudioAttributes(buildAudioAttributes(), handleAudioFocus)
             .setHandleAudioBecomingNoisy(handleAudioFocus)
@@ -326,6 +336,13 @@ object SongPlayer {
                     updateResolveStatus(false)
                 }
                 startPositionWatch()
+
+                val currentQueue = boundState?.queue?.value.orEmpty()
+                val currentIndex = currentQueue.indexOfFirst { it.url == song }
+                if (currentIndex in 0 until currentQueue.lastIndex) {
+                    val nextSong = currentQueue[currentIndex + 1]
+                    prefetch(nextSong.url, appContext)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "playSong failed for query: $song", e)
                 boundState?.updateResolveError(e.message ?: "Playback failed")
@@ -338,14 +355,26 @@ object SongPlayer {
         if (song.isBlank()) return
         val appContext = context.applicationContext
         if (webPlaybackActive()) return
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             val url = runCatching { resolveStreamUrl(song, appContext) }.getOrNull()
             if (url != null) StreamResolver.cacheIntro(url, appContext)
         }
     }
 
-    fun prefetchList(songs: List<String>, context: Context, count: Int = 4) {
-        // Intentionally no-op: don't resolve streams for whole result lists.
+    fun prefetchList(songs: List<String>, context: Context, count: Int = 2) {
+        if (songs.isEmpty() || webPlaybackActive()) return
+        val appContext = context.applicationContext
+        val targets = songs.filter { it.isNotBlank() }.take(count)
+        scope.launch(Dispatchers.IO) {
+            targets.forEach { song ->
+                if (streamCache[song] == null && io.github.sekademi.spotufi.data.preferences.getCachedStream(appContext, song) == null) {
+                    val url = runCatching { StreamResolver.resolveStreamUrl(song, appContext, forPlayback = false) }.getOrNull()
+                    if (url != null) {
+                        StreamResolver.cacheIntro(url, appContext)
+                    }
+                }
+            }
+        }
     }
 
     fun play() {

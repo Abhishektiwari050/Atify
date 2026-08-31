@@ -74,10 +74,14 @@ object StreamResolver {
         }
     }
 
-    fun invalidateResolvedStream(song: String) {
+    fun invalidateResolvedStream(song: String, context: Context? = null) {
         streamCache.remove(song)
         sourceCache.remove(song)
         qualityCache.remove(song)
+        context?.let {
+            io.github.sekademi.spotufi.data.preferences.clearCachedStream(it, song)
+            io.github.sekademi.spotufi.data.preferences.clearCachedVideoId(it, song)
+        }
     }
 
     fun buildSpotifyPlayQuery(spotifyTrackId: String, title: String, artist: String): String {
@@ -159,10 +163,20 @@ object StreamResolver {
             }
             return it
         }
+        io.github.sekademi.spotufi.data.preferences.getCachedStream(appContext, song)?.let { (url, src, q) ->
+            streamCache[song] = url
+            sourceCache[song] = src
+            qualityCache[song] = q
+            if (forPlayback) {
+                currentSource = src
+                currentQuality = q
+            }
+            return url
+        }
         val quality = io.github.sekademi.spotufi.data.preferences.currentStreamingQuality(appContext)
         if (losslessStreaming && quality.lossless) {
             (trackIdRegistry[song] ?: spotifyTrackIdForPlayback(song))?.let { spotifyId ->
-                val r = kotlinx.coroutines.withTimeoutOrNull(8_000) {
+                val r = kotlinx.coroutines.withTimeoutOrNull(1_800) {
                     com.metrolist.spotify.SpotiFlac.resolve(
                         spotifyId,
                         isrc = null,
@@ -180,6 +194,14 @@ object StreamResolver {
                         streamCache[song] = r.track.url
                         sourceCache[song] = "Lossless • ${r.track.provider}"
                         qualityCache[song] = flacQuality
+                        io.github.sekademi.spotufi.data.preferences.setCachedStream(
+                            appContext,
+                            song,
+                            r.track.url,
+                            "Lossless • ${r.track.provider}",
+                            flacQuality,
+                            43200,
+                        )
                         return r.track.url
                     }
                     is com.metrolist.spotify.SpotiFlac.Result.Cooldown ->
@@ -207,42 +229,49 @@ object StreamResolver {
         streamCache[song] = playback.streamUrl
         sourceCache[song] = "YouTube"
         qualityCache[song] = ytQuality
+        io.github.sekademi.spotufi.data.preferences.setCachedStream(
+            appContext,
+            song,
+            playback.streamUrl,
+            "YouTube",
+            ytQuality,
+            playback.streamExpiresInSeconds,
+        )
         return playback.streamUrl
     }
 
-    private suspend fun ensureSpotifyMatchMetadata(query: String): CandidateScorer.TrackMatchMetadata? {
+    private fun ensureSpotifyMatchMetadata(query: String): CandidateScorer.TrackMatchMetadata? {
         val currentMeta = metadataRegistry[query]
-        val hasUsefulMeta = currentMeta?.let {
-            it.title.isNotBlank() && it.artist.isNotBlank() && it.album.isNotBlank()
-        } ?: false
-        if (hasUsefulMeta && durationRegistry[query] != null && explicitRegistry.containsKey(query)) {
+        if (currentMeta != null && currentMeta.title.isNotBlank() && currentMeta.artist.isNotBlank()) {
             return currentMeta
         }
 
-        val spotifyId = trackIdRegistry[query] ?: spotifyTrackIdForPlayback(query) ?: return currentMeta
-        val track = runCatching { com.metrolist.spotify.Spotify.track(spotifyId).getOrNull() }
-            .onFailure { Log.w(TAG, "Spotify metadata repair failed for $spotifyId", it) }
-            .getOrNull()
-            ?: return currentMeta
-
-        val repaired = CandidateScorer.TrackMatchMetadata(
-            title = track.name,
-            artist = track.artists.joinToString(", ") { it.name },
-            album = track.album?.name ?: currentMeta?.album.orEmpty(),
-        )
-        metadataRegistry[query] = repaired
-        trackIdRegistry[query] = spotifyId
-        explicitRegistry[query] = track.explicit
-        if (track.durationMs > 0) durationRegistry[query] = track.durationMs
-        return repaired
+        val searchText = searchTextForPlayback(query)
+        if (searchText.isNotBlank()) {
+            val synthesized = CandidateScorer.TrackMatchMetadata(
+                title = searchText.substringBeforeLast(" - ").ifBlank { searchText },
+                artist = searchText.substringAfterLast(" - ", ""),
+                album = "",
+            )
+            metadataRegistry[query] = synthesized
+            return synthesized
+        }
+        return currentMeta
     }
 
     private suspend fun resolveVideoCandidates(
         query: String,
+        appContext: Context,
         filter: YouTube.SearchFilter = YouTube.SearchFilter.FILTER_SONG,
     ): List<String> {
         val searchText = searchTextForPlayback(query)
         if (searchText.length == 11 && !searchText.contains(' ')) return listOf(searchText)
+
+        val cacheKey = "$query|$filter"
+        io.github.sekademi.spotufi.data.preferences.getCachedVideoIds(appContext, cacheKey)?.let { cachedIds ->
+            if (cachedIds.isNotEmpty()) return cachedIds
+        }
+
         val hits = YouTube.search(searchText, filter)
             .onFailure { Log.w(TAG, "resolveVideoId: YouTube search failed for: $searchText", it) }
             .getOrNull()
@@ -334,7 +363,11 @@ object StreamResolver {
                         "alt=${it.unexpectedAlternates.joinToString("/")}"
                 } ?: "${ordered.count { verified(it) }} verified/${ordered.size}"),
         )
-        return ordered.map { it.id }.distinct()
+        val resultIds = ordered.map { it.id }.distinct()
+        if (resultIds.isNotEmpty()) {
+            io.github.sekademi.spotufi.data.preferences.setCachedVideoIds(appContext, cacheKey, resultIds.take(3))
+        }
+        return resultIds
     }
 
     suspend fun resolveYtPlayback(
@@ -359,13 +392,13 @@ object StreamResolver {
             }
             return null
         }
-        tryIds(resolveVideoCandidates(query).take(3))?.let { return it }
+        tryIds(resolveVideoCandidates(query, appContext).take(3))?.let { return it }
         if (!io.github.sekademi.spotufi.data.preferences.isVideoFallbackEnabled(appContext)) {
             Log.w(TAG, "song candidates exhausted and video fallback disabled for: ${searchTextForPlayback(query)}")
             return null
         }
         Log.w(TAG, "song candidates exhausted, trying video search for: ${searchTextForPlayback(query)}")
-        tryIds(resolveVideoCandidates(query, YouTube.SearchFilter.FILTER_VIDEO).take(3))?.let { return it }
+        tryIds(resolveVideoCandidates(query, appContext, YouTube.SearchFilter.FILTER_VIDEO).take(3))?.let { return it }
         Log.e(TAG, "All YouTube candidates failed for: ${searchTextForPlayback(query)}")
         return null
     }
