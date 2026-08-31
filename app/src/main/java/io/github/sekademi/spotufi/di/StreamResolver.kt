@@ -227,6 +227,30 @@ object StreamResolver {
                 }
             }
         }
+        val searchTitle = searchTextForPlayback(song)
+        val expDurMs = durationRegistry[song] ?: 0
+        val saavnTrack = runCatching {
+            io.github.sekademi.spotufi.data.api.JioSaavnResolver.resolve(searchTitle, expDurMs)
+        }.getOrNull()
+        if (saavnTrack != null) {
+            Log.d(TAG, "JioSaavn 320k match: ${saavnTrack.title} by ${saavnTrack.artist} for: $song")
+            if (forPlayback) {
+                currentSource = "JioSaavn • 320k"
+                currentQuality = saavnTrack.quality
+            }
+            streamCache[song] = saavnTrack.streamUrl
+            sourceCache[song] = "JioSaavn • 320k"
+            qualityCache[song] = saavnTrack.quality
+            io.github.sekademi.spotufi.data.preferences.setCachedStream(
+                appContext,
+                song,
+                saavnTrack.streamUrl,
+                "JioSaavn • 320k",
+                saavnTrack.quality,
+                86400,
+            )
+            return saavnTrack.streamUrl
+        }
         if (!youtubeEnabled) {
             Log.w(TAG, "YouTube fallback disabled — no stream for: $song")
             return null
