@@ -67,7 +67,7 @@ object SongPlayer {
             io.github.sekademi.spotufi.data.preferences.clearCachedVideoId(ctx, song)
             io.github.sekademi.spotufi.data.preferences.clearCachedStream(ctx, song)
         }
-        StreamResolver.invalidateResolvedStream(song)
+        StreamResolver.invalidateResolvedStream(song, appCtx)
     }
     fun buildSpotifyPlayQuery(spotifyTrackId: String, title: String, artist: String) = StreamResolver.buildSpotifyPlayQuery(spotifyTrackId, title, artist)
     fun searchTextForPlayback(song: String) = StreamResolver.searchTextForPlayback(song)

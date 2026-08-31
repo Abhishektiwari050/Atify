@@ -81,6 +81,7 @@ object StreamResolver {
         context?.let {
             io.github.sekademi.spotufi.data.preferences.clearCachedStream(it, song)
             io.github.sekademi.spotufi.data.preferences.clearCachedVideoId(it, song)
+            io.github.sekademi.spotufi.data.preferences.clearTrackQualityProfile(it, song)
         }
     }
 
@@ -173,8 +174,11 @@ object StreamResolver {
             }
             return url
         }
+        val qualityProfile = io.github.sekademi.spotufi.data.preferences.getTrackQualityProfile(appContext, song)
+        val isLosslessKnownUnavailable = qualityProfile?.losslessAvailability == io.github.sekademi.spotufi.data.preferences.LosslessAvailability.UNAVAILABLE
+
         val quality = io.github.sekademi.spotufi.data.preferences.currentStreamingQuality(appContext)
-        if (losslessStreaming && quality.lossless) {
+        if (losslessStreaming && quality.lossless && !isLosslessKnownUnavailable) {
             (trackIdRegistry[song] ?: spotifyTrackIdForPlayback(song))?.let { spotifyId ->
                 val r = kotlinx.coroutines.withTimeoutOrNull(1_800) {
                     com.metrolist.spotify.SpotiFlac.resolve(
@@ -202,12 +206,24 @@ object StreamResolver {
                             flacQuality,
                             43200,
                         )
+                        io.github.sekademi.spotufi.data.preferences.flagLosslessAvailable(
+                            appContext,
+                            song,
+                            r.track.provider,
+                            flacQuality,
+                        )
                         return r.track.url
                     }
                     is com.metrolist.spotify.SpotiFlac.Result.Cooldown ->
                         Log.d(TAG, "lossless on cooldown, using YouTube for: $song")
-                    null -> Log.w(TAG, "lossless timed out, using YouTube for: $song")
-                    else -> Log.w(TAG, "lossless miss ($r), using YouTube for: $song")
+                    null -> {
+                        Log.w(TAG, "lossless timed out, flagging unavailable & using YouTube for: $song")
+                        io.github.sekademi.spotufi.data.preferences.flagLosslessUnavailable(appContext, song)
+                    }
+                    else -> {
+                        Log.w(TAG, "lossless miss ($r), flagging unavailable & using YouTube for: $song")
+                        io.github.sekademi.spotufi.data.preferences.flagLosslessUnavailable(appContext, song)
+                    }
                 }
             }
         }
@@ -386,11 +402,29 @@ object StreamResolver {
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
                 ).fold(
-                    onSuccess = { return it },
+                    onSuccess = { playback ->
+                        val codec = playback.format.mimeType
+                            .substringAfter("codecs=\"", "").substringBefore('"').substringBefore('.')
+                            .uppercase()
+                        val ytQuality = listOf(codec, "${playback.format.bitrate / 1000} kbps")
+                            .filter { it.isNotBlank() }.joinToString(" ")
+                        io.github.sekademi.spotufi.data.preferences.flagBestVideoMatch(
+                            appContext,
+                            query,
+                            videoId,
+                            ytQuality,
+                        )
+                        return playback
+                    },
                     onFailure = { Log.w(TAG, "stream failed for $videoId (${it.message}) — trying next candidate for: ${searchTextForPlayback(query)}") },
                 )
             }
             return null
+        }
+        val qualityProfile = io.github.sekademi.spotufi.data.preferences.getTrackQualityProfile(appContext, query)
+        val bestKnownVideoId = qualityProfile?.bestVideoId
+        if (!bestKnownVideoId.isNullOrBlank()) {
+            tryIds(listOf(bestKnownVideoId))?.let { return it }
         }
         tryIds(resolveVideoCandidates(query, appContext).take(3))?.let { return it }
         if (!io.github.sekademi.spotufi.data.preferences.isVideoFallbackEnabled(appContext)) {
