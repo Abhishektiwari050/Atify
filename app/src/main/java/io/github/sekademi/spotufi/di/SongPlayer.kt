@@ -11,7 +11,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
-import java.text.Normalizer
+import android.graphics.Bitmap
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.toBitmap
+import java.io.ByteArrayOutputStream
 import kotlin.math.abs
 import kotlin.math.PI
 import kotlin.math.cos
@@ -112,6 +117,7 @@ object SongPlayer {
     @Volatile private var metaTitle: String = ""
     @Volatile private var metaArtist: String = ""
     @Volatile private var metaCover: String = ""
+    @Volatile private var metaArtworkData: ByteArray? = null
     @Volatile private var currentRequest: String = ""
     @Volatile private var loadedQuery: String? = null
     @Volatile private var playWhenResolved = true
@@ -119,7 +125,45 @@ object SongPlayer {
     fun setNowPlayingMeta(title: String, artist: String, coverUri: String) {
         metaTitle = title
         metaArtist = artist
-        metaCover = coverUri
+        if (metaCover != coverUri) {
+            metaCover = coverUri
+            metaArtworkData = null
+            val ctx = appCtx
+            if (ctx != null && coverUri.isNotBlank()) {
+                val request = ImageRequest.Builder(ctx)
+                    .data(coverUri)
+                    .allowHardware(false)
+                    .target(
+                        onSuccess = { result ->
+                            runCatching {
+                                val bitmap = result.toBitmap()
+                                val stream = ByteArrayOutputStream()
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+                                val bytes = stream.toByteArray()
+                                metaArtworkData = bytes
+                                updatePlayerArtwork(bytes, coverUri)
+                            }
+                        }
+                    )
+                    .build()
+                ctx.imageLoader.enqueue(request)
+            }
+        }
+    }
+
+    private fun updatePlayerArtwork(bytes: ByteArray, coverUri: String) {
+        scope.launch(Dispatchers.Main) {
+            val p = player ?: return@launch
+            val currentItem = p.currentMediaItem ?: return@launch
+            val newMetadata = currentItem.mediaMetadata.buildUpon()
+                .setArtworkData(bytes, androidx.media3.common.MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                .apply { if (coverUri.isNotBlank()) setArtworkUri(android.net.Uri.parse(coverUri)) }
+                .build()
+            val newItem = currentItem.buildUpon()
+                .setMediaMetadata(newMetadata)
+                .build()
+            p.replaceMediaItem(p.currentMediaItemIndex, newItem)
+        }
     }
 
     // ── Stream resolution (delegates to StreamResolver with caching) ──
@@ -148,7 +192,10 @@ object SongPlayer {
         val metadata = androidx.media3.common.MediaMetadata.Builder()
             .setTitle(metaTitle)
             .setArtist(metaArtist)
-            .apply { if (metaCover.isNotBlank()) setArtworkUri(android.net.Uri.parse(metaCover)) }
+            .apply {
+                if (metaCover.isNotBlank()) setArtworkUri(android.net.Uri.parse(metaCover))
+                metaArtworkData?.let { setArtworkData(it, androidx.media3.common.MediaMetadata.PICTURE_TYPE_FRONT_COVER) }
+            }
             .build()
         return MediaItem.Builder()
             .setUri(streamUrl)
