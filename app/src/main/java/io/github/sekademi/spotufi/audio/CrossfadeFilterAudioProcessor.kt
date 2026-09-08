@@ -14,7 +14,7 @@ import java.nio.ByteOrder
  * - [enabled], [cutoffFrequencyHz] and [filterType] are runtime-mutable (thread-safe).
  * - When [enabled] is false the audio passes through unmodified (near-zero overhead).
  * - Coefficient recalculation is lazy: only when cutoff or filter type changes.
- * - Supports PCM 16-bit (mono and stereo).
+ * - Supports PCM 16-bit and PCM 32-bit float (mono and stereo).
  */
 @UnstableApi
 class CrossfadeFilterAudioProcessor : BaseAudioProcessor() {
@@ -53,13 +53,17 @@ class CrossfadeFilterAudioProcessor : BaseAudioProcessor() {
 
     private var sampleRate = 0
     private var channelCount = 0
+    private var encoding = C.ENCODING_PCM_16BIT
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
+        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT &&
+            inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT
+        ) {
             return AudioProcessor.AudioFormat.NOT_SET
         }
         sampleRate = inputAudioFormat.sampleRate
         channelCount = inputAudioFormat.channelCount
+        encoding = inputAudioFormat.encoding
         coefficientsDirty = true
         return inputAudioFormat
     }
@@ -92,10 +96,19 @@ class CrossfadeFilterAudioProcessor : BaseAudioProcessor() {
 
         val output = replaceOutputBuffer(remaining)
         inputBuffer.order(ByteOrder.nativeOrder())
+        output.order(ByteOrder.nativeOrder())
 
-        when (channelCount) {
-            1 -> processMonoBlock(inputBuffer, output)
-            2 -> processStereoBlock(inputBuffer, output)
+        when (encoding) {
+            C.ENCODING_PCM_16BIT -> when (channelCount) {
+                1 -> processMono16(inputBuffer, output)
+                2 -> processStereo16(inputBuffer, output)
+                else -> copyBuffer(inputBuffer, output, remaining)
+            }
+            C.ENCODING_PCM_FLOAT -> when (channelCount) {
+                1 -> processMonoFloat(inputBuffer, output)
+                2 -> processStereoFloat(inputBuffer, output)
+                else -> copyBuffer(inputBuffer, output, remaining)
+            }
             else -> copyBuffer(inputBuffer, output, remaining)
         }
 
@@ -115,7 +128,7 @@ class CrossfadeFilterAudioProcessor : BaseAudioProcessor() {
         src.position(pos + size)
     }
 
-    private fun processMonoBlock(input: ByteBuffer, output: ByteBuffer) {
+    private fun processMono16(input: ByteBuffer, output: ByteBuffer) {
         while (input.remaining() >= 2) {
             val sample = input.short.toDouble() / Short.MAX_VALUE
             val filtered = filter.processSampleMono(sample)
@@ -123,13 +136,31 @@ class CrossfadeFilterAudioProcessor : BaseAudioProcessor() {
         }
     }
 
-    private fun processStereoBlock(input: ByteBuffer, output: ByteBuffer) {
+    private fun processStereo16(input: ByteBuffer, output: ByteBuffer) {
         while (input.remaining() >= 4) {
             val left = input.short.toDouble() / Short.MAX_VALUE
             val right = input.short.toDouble() / Short.MAX_VALUE
-            val (filteredL, filteredR) = filter.processStereo(left, right)
-            output.putShort((filteredL.coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort())
-            output.putShort((filteredR.coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort())
+            val out = filter.processStereo(left, right)
+            output.putShort((out[0].coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort())
+            output.putShort((out[1].coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort())
+        }
+    }
+
+    private fun processMonoFloat(input: ByteBuffer, output: ByteBuffer) {
+        while (input.remaining() >= 4) {
+            val sample = input.float.toDouble()
+            val filtered = filter.processSampleMono(sample)
+            output.putFloat(filtered.coerceIn(-1.0, 1.0).toFloat())
+        }
+    }
+
+    private fun processStereoFloat(input: ByteBuffer, output: ByteBuffer) {
+        while (input.remaining() >= 8) {
+            val left = input.float.toDouble()
+            val right = input.float.toDouble()
+            val out = filter.processStereo(left, right)
+            output.putFloat(out[0].coerceIn(-1.0, 1.0).toFloat())
+            output.putFloat(out[1].coerceIn(-1.0, 1.0).toFloat())
         }
     }
 

@@ -214,16 +214,16 @@ object StreamResolver {
                         )
                         return r.track.url
                     }
+                    is com.metrolist.spotify.SpotiFlac.Result.NotFound -> {
+                        Log.w(TAG, "lossless not found on any provider, flagging unavailable for: $song")
+                        io.github.sekademi.spotufi.data.preferences.flagLosslessUnavailable(appContext, song)
+                    }
                     is com.metrolist.spotify.SpotiFlac.Result.Cooldown ->
                         Log.d(TAG, "lossless on cooldown, using YouTube for: $song")
-                    null -> {
-                        Log.w(TAG, "lossless timed out, flagging unavailable & using YouTube for: $song")
-                        io.github.sekademi.spotufi.data.preferences.flagLosslessUnavailable(appContext, song)
-                    }
-                    else -> {
-                        Log.w(TAG, "lossless miss ($r), flagging unavailable & using YouTube for: $song")
-                        io.github.sekademi.spotufi.data.preferences.flagLosslessUnavailable(appContext, song)
-                    }
+                    null ->
+                        Log.w(TAG, "lossless resolution timed out, temporarily using YouTube for: $song")
+                    is com.metrolist.spotify.SpotiFlac.Result.Error ->
+                        Log.w(TAG, "lossless error (${r.message}), temporarily using YouTube for: $song")
                 }
             }
         }
@@ -424,7 +424,10 @@ object StreamResolver {
         val qualityProfile = io.github.sekademi.spotufi.data.preferences.getTrackQualityProfile(appContext, query)
         val bestKnownVideoId = qualityProfile?.bestVideoId
         if (!bestKnownVideoId.isNullOrBlank()) {
-            tryIds(listOf(bestKnownVideoId))?.let { return it }
+            val playback = tryIds(listOf(bestKnownVideoId))
+            if (playback != null) return playback
+            Log.w(TAG, "Cached bestVideoId $bestKnownVideoId failed for: $query — purging")
+            io.github.sekademi.spotufi.data.preferences.clearBestVideoMatch(appContext, query)
         }
         tryIds(resolveVideoCandidates(query, appContext).take(3))?.let { return it }
         if (!io.github.sekademi.spotufi.data.preferences.isVideoFallbackEnabled(appContext)) {
@@ -457,10 +460,36 @@ object StreamResolver {
             )
             .setAllowCrossProtocolRedirects(true)
         val upstream = androidx.media3.datasource.DefaultDataSource.Factory(context, http)
+        val cacheKeyFactory = androidx.media3.datasource.cache.CacheKeyFactory { dataSpec ->
+            if (dataSpec.key != null) return@CacheKeyFactory dataSpec.key!!
+            val uri = dataSpec.uri
+            val host = uri.host.orEmpty()
+            if (host.contains("googlevideo.com")) {
+                val id = uri.getQueryParameter("id")
+                val itag = uri.getQueryParameter("itag")
+                if (!id.isNullOrBlank()) {
+                    return@CacheKeyFactory "googlevideo_${id}_${itag ?: "default"}"
+                }
+            }
+            uri.toString()
+        }
         return androidx.media3.datasource.cache.CacheDataSource.Factory()
             .setCache(mediaCache(context))
             .setUpstreamDataSourceFactory(upstream)
+            .setCacheKeyFactory(cacheKeyFactory)
             .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    }
+
+    fun getMediaCacheSizeBytes(context: Context): Long =
+        runCatching { mediaCache(context).cacheSpace }.getOrDefault(0L)
+
+    fun clearMediaCache(context: Context) {
+        runCatching {
+            val cache = mediaCache(context)
+            cache.keys.toList().forEach { key ->
+                runCatching { cache.removeResource(key) }
+            }
+        }
     }
 
     fun cacheIntro(url: String, appContext: Context) {

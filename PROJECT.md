@@ -29,17 +29,17 @@
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Desktop Viewport Emulation & Clean WebView Rendering | SpotifyLoginScreen WebView config, 1280px viewport, desktop UA/Client Hints, dark mode fixes, rule compliance | None | PLANNED |
-| M2 | Chrome Custom Tabs & Deep-Link Authentication | androidx.browser dependency, CustomTabsHelper, AndroidManifest intent-filters, MainActivity/MyNavHost deep-link handling | None | PLANNED |
-| M3 | Instant Cookie Auto-Capture & Multi-Domain Sync | CookieSanitizer, 1-tap clipboard assist, multi-domain CookieManager sync, instant auth trigger | M1 | PLANNED |
-| M4 | Automated Test Verification & Integration Tests | SpotifyAuth offline unit tests, RFC 6238 TOTP vectors, CookieSanitizer tests, :spotify:test passing | M3 | PLANNED |
-| M5 | Final Verification & Forensic Integrity Audit | Full test suite execution, release APK build with R8, Reviewer, Challenger, and Auditor gating | M1, M2, M3, M4 | PLANNED |
+| M1 | Desktop Viewport Emulation & Clean WebView Rendering | SpotifyLoginScreen WebView config, 1280px viewport, desktop UA/Client Hints, dark mode fixes, rule compliance | None | DONE |
+| M2 | Chrome Custom Tabs & Deep-Link Authentication | androidx.browser dependency, CustomTabsHelper, AndroidManifest intent-filters, MainActivity/MyNavHost deep-link handling | None | DONE |
+| M3 | Instant Cookie Auto-Capture & Multi-Domain Sync | CookieSanitizer, 1-tap clipboard assist, multi-domain CookieManager sync, instant auth trigger | M1 | DONE |
+| M4 | Automated Test Verification & Integration Tests | SpotifyAuth offline unit tests, RFC 6238 TOTP vectors, CookieSanitizer tests, :spotify:test passing | M3 | DONE |
+| M5 | Final Verification & Forensic Integrity Audit | Full test suite execution, release APK build with R8, Reviewer, Challenger, and Auditor gating | M1, M2, M3, M4 | DONE |
 
 ## Interface Contracts
 ### `CookieSanitizer`
-- `fun sanitizeSpDc(rawInput: String): String?`
-- `fun sanitizeSpKey(rawInput: String): String?`
-- `fun extractCookies(rawInput: String): Map<String, String>`
+- `fun sanitizeSpDc(rawInput: String?): String?`
+- `fun sanitizeSpKey(rawInput: String?): String?`
+- `fun extractCookies(rawInput: String?): Map<String, String>`
 
 ### `CustomTabsHelper`
 - `fun openCustomTab(context: Context, url: String)`

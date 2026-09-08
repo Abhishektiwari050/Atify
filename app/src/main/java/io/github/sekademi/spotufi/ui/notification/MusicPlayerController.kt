@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.di.SongPlayer
-import io.github.sekademi.spotufi.ui.screens.CustomSlider
+import io.github.sekademi.spotufi.ui.screens.player.CustomSlider
 
 @Composable
 fun MusicPlayerController(
@@ -128,17 +128,6 @@ fun MusicPlayerController(
             contentDescription = "Background Image"
         )
 
-//        GlideImage(
-//            modifier = Modifier
-//                .size(170.dp)
-//                .align(Alignment.BottomEnd)
-//                .border(BorderStroke(1.dp, Color.Black))
-//                .background(Color.Green)
-//                .zIndex(-2f),
-//            model = R.drawable.album,
-//            contentDescription = " ",
-//
-//            )
         Box(
             modifier = Modifier
                 .height(170.dp)

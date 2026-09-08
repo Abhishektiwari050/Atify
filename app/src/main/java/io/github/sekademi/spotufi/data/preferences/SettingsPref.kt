@@ -35,6 +35,7 @@ private const val KEY_UPDATE_REPO_URL = "update_repo_url"
 const val DEFAULT_UPDATE_REPO_URL = "https://github.com/Abhishektiwari050/Atify"
 private const val KEY_DOWNLOAD_FOLDER = "download_folder_name"
 const val DEFAULT_DOWNLOAD_FOLDER = "Atify"
+private const val KEY_VOLUME_NORMALIZATION = "volume_normalization_enabled"
 
 /** Off (0s) … 12s. 0 disables crossfade. */
 const val CROSSFADE_MIN_MS = 0
@@ -140,3 +141,9 @@ fun currentStreamingQuality(c: Context): StreamQuality {
     val cm = c.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     return if (cm.isActiveNetworkMetered) getCellularQuality(c) else getWifiQuality(c)
 }
+
+fun isVolumeNormalizationEnabled(c: Context): Boolean =
+    prefs(c).getBoolean(KEY_VOLUME_NORMALIZATION, true)
+
+fun setVolumeNormalizationEnabled(c: Context, enabled: Boolean) =
+    prefs(c).edit().putBoolean(KEY_VOLUME_NORMALIZATION, enabled).apply()

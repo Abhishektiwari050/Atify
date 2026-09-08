@@ -57,7 +57,7 @@ fun ShowScreen(navController: NavController, showId: String, showName: String = 
     val episodesState by vm.episodes.collectAsState()
     val show by vm.show.collectAsState()
     val episodes = (episodesState as? Response.Success)?.data.orEmpty()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
 
     LazyColumn(
         modifier = Modifier

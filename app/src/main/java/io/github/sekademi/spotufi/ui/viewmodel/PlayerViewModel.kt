@@ -89,10 +89,6 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
 
     val playingArtist by mutableStateOf(currentSongSinger.value)
 
-    init {
-        fetchSongs()
-    }
-
 
     //val songsResponse = (songs.value as Response.Success).data
 
@@ -315,5 +311,19 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
     }
     fun updateLikeState(likeState : Boolean){
         currentSongState.updateLikeState(likeState)
+    }
+}
+
+/**
+ * Returns an Activity-scoped [PlayerViewModel] singleton so every screen in the
+ * navigation hierarchy observes and controls the exact same playback state.
+ */
+@androidx.compose.runtime.Composable
+fun sharedPlayerViewModel(): PlayerViewModel {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return if (context is androidx.lifecycle.ViewModelStoreOwner) {
+        androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(context)
+    } else {
+        androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
     }
 }

@@ -73,7 +73,10 @@ import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.data.entity.AlbumsModel
 import io.github.sekademi.spotufi.di.Palette
 import io.github.sekademi.spotufi.di.SongPlayer
+import io.github.sekademi.spotufi.ui.components.EmptyStateView
+import io.github.sekademi.spotufi.ui.components.ErrorRetryView
 import io.github.sekademi.spotufi.ui.components.Loader
+import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import io.github.sekademi.spotufi.ui.components.SwipeToQueueBox
@@ -187,8 +190,16 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
             .fillMaxSize()
             .background(Color(AppBackground.toArgb()))
     ) {
-        if (songsResp is Response.Loading && playlistResp is Response.Loading) {
-            Loader()
+        if (songsResp is Response.Loading || playlistResp is Response.Loading) {
+            TrackListShimmer(count = 7)
+            return@Surface
+        }
+        if (songsResp is Response.Error || playlistResp is Response.Error) {
+            ErrorRetryView(
+                title = "Couldn't load playlist",
+                subtitle = "Please check your network connection and try again",
+                onRetry = { playlistViewModel.loadPlaylist(playlistId) }
+            )
             return@Surface
         }
 
@@ -220,7 +231,7 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
                 )
             }
         ) {
-            val playerViewModel: PlayerViewModel = hiltViewModel()
+            val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -486,62 +497,71 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
                     }
                 }
 
-                itemsIndexed(filteredSongs, key = { _, song -> song.id }) { index, song ->
-                    val currentColor = if (song.id == playlistViewModel.currentSongId.value)
-                        Color(AppPalette.toArgb()) else Color.White
-
-                    SwipeToQueueBox(song = song, onAddToQueue = { playerViewModel.addToQueue(it) }) {
-                    Row(
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp, 8.dp)
-                            .combinedClickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onLongClick = { menuSong = song },
-                                onClick = {
-                                    playlistViewModel.updateQueue(filteredSongs)
-                                    SongPlayer.playSong(song.url, context)
-                                    playlistViewModel.updateSongState(
-                                        song.coverUri,
-                                        song.title,
-                                        song.singer,
-                                        true,
-                                        song.id,
-                                        index,
-                                        playlist.name
-                                    )
-                                },
-                            )
-                    ) {
-                        AsyncImage(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(4.dp)),
-                            model = song.coverUri,
-                            error = painterResource(R.drawable.placeholder),
-                            contentScale = ContentScale.Crop,
-                            contentDescription = ""
+                if (filteredSongs.isEmpty()) {
+                    item {
+                        EmptyStateView(
+                            title = if (searchQuery.isNotBlank()) "No matching songs" else "Playlist is empty",
+                            subtitle = if (searchQuery.isNotBlank()) "No songs found for \"$searchQuery\"" else "Add tracks to this playlist to get started"
                         )
-                        Column(modifier = Modifier.padding(start = 12.dp).width(280.dp)) {
-                            Text(
-                                text = song.title,
-                                color = currentColor,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = song.singer,
-                                color = Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1
-                            )
-                        }
                     }
+                } else {
+                    itemsIndexed(filteredSongs, key = { _, song -> song.id }) { index, song ->
+                        val currentColor = if (song.id == playlistViewModel.currentSongId.value)
+                            Color(AppPalette.toArgb()) else Color.White
+
+                        SwipeToQueueBox(song = song, onAddToQueue = { playerViewModel.addToQueue(it) }) {
+                        Row(
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp, 8.dp)
+                                .combinedClickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onLongClick = { menuSong = song },
+                                    onClick = {
+                                        playlistViewModel.updateQueue(filteredSongs)
+                                        SongPlayer.playSong(song.url, context)
+                                        playlistViewModel.updateSongState(
+                                            song.coverUri,
+                                            song.title,
+                                            song.singer,
+                                            true,
+                                            song.id,
+                                            index,
+                                            playlist.name
+                                        )
+                                    },
+                                )
+                        ) {
+                            AsyncImage(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                model = song.coverUri,
+                                error = painterResource(R.drawable.placeholder),
+                                contentScale = ContentScale.Crop,
+                                contentDescription = ""
+                            )
+                            Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+                                Text(
+                                    text = song.title,
+                                    color = currentColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = song.singer,
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        }
                     }
                 }
 

@@ -73,6 +73,9 @@ import io.github.sekademi.spotufi.data.preferences.getDownloadFolderName
 import io.github.sekademi.spotufi.data.preferences.setDownloadFolderName
 import io.github.sekademi.spotufi.data.preferences.resetDownloadFolderName
 import io.github.sekademi.spotufi.data.preferences.DEFAULT_DOWNLOAD_FOLDER
+import io.github.sekademi.spotufi.data.preferences.isVolumeNormalizationEnabled
+import io.github.sekademi.spotufi.data.preferences.setVolumeNormalizationEnabled
+import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import kotlinx.coroutines.launch
@@ -91,6 +94,7 @@ fun SettingsScreen(navController: NavController) {
     var batteryOptExempt by remember { mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimization(context)) }
     var updateRepoUrl by remember { mutableStateOf(getUpdateRepoUrl(context)) }
     var downloadFolderName by remember { mutableStateOf(getDownloadFolderName(context)) }
+    var cacheSizeBytes by remember { mutableStateOf(io.github.sekademi.spotufi.di.StreamResolver.getMediaCacheSizeBytes(context)) }
 
     val batteryOptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -131,7 +135,180 @@ fun SettingsScreen(navController: NavController) {
                 // (account / log out) isn't hidden under the bar.
                 .padding(bottom = 200.dp)
         ) {
-            SectionTitle("Background playback")
+            // ── 1. Playback & audio ──
+            SectionTitle("Playback & audio")
+            QualityPicker(
+                title = "Streaming over Wi-Fi",
+                selected = wifiQ,
+            ) { wifiQ = it; setWifiQuality(context, it) }
+
+            QualityPicker(
+                title = "Streaming over cellular",
+                selected = cellQ,
+            ) { cellQ = it; setCellularQuality(context, it) }
+
+            SettingsSwitchRow(
+                title = "Allow video fallback",
+                subtitle = "Use regular YouTube videos only after Music song results fail",
+                checked = videoFallback,
+            ) {
+                videoFallback = it
+                setVideoFallbackEnabled(context, it)
+            }
+
+            var volumeNormalization by remember { mutableStateOf(isVolumeNormalizationEnabled(context)) }
+            SettingsSwitchRow(
+                title = "Normalize volume",
+                subtitle = "Set the same volume level for all songs",
+                checked = volumeNormalization,
+            ) {
+                volumeNormalization = it
+                setVolumeNormalizationEnabled(context, it)
+                SongPlayer.exoPlayer?.audioSessionId?.let { id ->
+                    SongPlayer.updateVolumeNormalization(context, id)
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Crossfade", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(
+                    if (crossfadeMs <= 0f) "Off" else "${(crossfadeMs / 1000f).let { String.format("%.0f", it) }}s",
+                    color = if (crossfadeMs <= 0f) Color(0xFFB3B3B3) else AppPalette,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                "Blend the end of a song into the start of the next",
+                color = Color(0xFFB3B3B3),
+                fontSize = 13.sp,
+            )
+            Slider(
+                value = crossfadeMs,
+                onValueChange = { crossfadeMs = it },
+                onValueChangeFinished = { setCrossfadeMs(context, crossfadeMs.toInt()) },
+                valueRange = 0f..CROSSFADE_MAX_MS.toFloat(),
+                steps = (CROSSFADE_MAX_MS / 1000) - 1, // 1-second stops
+                colors = SliderDefaults.colors(
+                    thumbColor = AppPalette,
+                    activeTrackColor = AppPalette,
+                    inactiveTrackColor = Color(0xFF333333),
+                ),
+            )
+
+            // Live lossless-server status
+            var losslessStatus by remember { mutableStateOf("Lossless servers: checking\u2026") }
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                val up = try { com.metrolist.spotify.SpotiFlac.upLosslessProviders() } catch (_: Exception) { null }
+                losslessStatus = when {
+                    up == null -> "Lossless servers: status unavailable"
+                    up.isEmpty() -> "Lossless servers: 0/3 up \u2014 streaming (YouTube)"
+                    else -> "Lossless servers: ${up.size}/3 up (${up.sorted().joinToString(", ")})"
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                Text(
+                    losslessStatus,
+                    color = Color(0xFFB3B3B3),
+                    fontSize = 12.sp,
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ── 2. Storage & downloads ──
+            SectionTitle("Storage & downloads")
+            QualityPicker(
+                title = "Download quality",
+                selected = dlQ,
+            ) { dlQ = it; setDownloadQuality(context, it) }
+
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Download folder name",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Subfolder inside Music/ for exported downloads",
+                color = Color(0xFFB3B3B3),
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = downloadFolderName,
+                onValueChange = {
+                    downloadFolderName = it
+                    setDownloadFolderName(context, it)
+                },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = AppPalette,
+                    unfocusedBorderColor = Color(0xFF333333),
+                    cursorColor = AppPalette,
+                    focusedPlaceholderColor = Color(0xFF666666),
+                    unfocusedPlaceholderColor = Color(0xFF666666),
+                ),
+                placeholder = { Text(DEFAULT_DOWNLOAD_FOLDER) },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = "Reset to default",
+                        tint = if (downloadFolderName != DEFAULT_DOWNLOAD_FOLDER) AppPalette else Color(0xFF444444),
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .clickable {
+                                downloadFolderName = DEFAULT_DOWNLOAD_FOLDER
+                                resetDownloadFolderName(context)
+                            }
+                    )
+                },
+            )
+
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF1A1A20))
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Streaming cache", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "${String.format(java.util.Locale.US, "%.1f", cacheSizeBytes / (1024f * 1024f))} MB cached",
+                        color = Color(0xFFB3B3B3),
+                        fontSize = 12.sp,
+                    )
+                }
+                Text(
+                    "Clear",
+                    color = AppPalette,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable {
+                            io.github.sekademi.spotufi.di.StreamResolver.clearMediaCache(context)
+                            cacheSizeBytes = io.github.sekademi.spotufi.di.StreamResolver.getMediaCacheSizeBytes(context)
+                            android.widget.Toast.makeText(context, "Streaming cache cleared", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ── 3. Power & background ──
+            SectionTitle("Power & background")
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -181,84 +358,8 @@ fun SettingsScreen(navController: NavController) {
             }
 
             Spacer(Modifier.height(12.dp))
-            SectionTitle("Audio quality")
-            QualityPicker(
-                title = "Streaming over Wi-Fi",
-                selected = wifiQ,
-            ) { wifiQ = it; setWifiQuality(context, it) }
 
-            QualityPicker(
-                title = "Streaming over cellular",
-                selected = cellQ,
-            ) { cellQ = it; setCellularQuality(context, it) }
-
-            QualityPicker(
-                title = "Download quality",
-                selected = dlQ,
-            ) { dlQ = it; setDownloadQuality(context, it) }
-
-            // Live lossless-server status (spotbye). Lossless only resolves when a
-            // server is up; otherwise playback goes straight to YouTube.
-            var losslessStatus by remember { mutableStateOf("Lossless servers: checking\u2026") }
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                val up = try { com.metrolist.spotify.SpotiFlac.upLosslessProviders() } catch (_: Exception) { null }
-                losslessStatus = when {
-                    up == null -> "Lossless servers: status unavailable"
-                    up.isEmpty() -> "Lossless servers: 0/3 up \u2014 streaming (YouTube)"
-                    else -> "Lossless servers: ${up.size}/3 up (${up.sorted().joinToString(", ")})"
-                }
-            }
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-                Text(
-                    losslessStatus,
-                    color = Color(0xFFB3B3B3),
-                    fontSize = 12.sp,
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-            SectionTitle("Matching")
-            SettingsSwitchRow(
-                title = "Allow video fallback",
-                subtitle = "Use regular YouTube videos only after Music song results fail",
-                checked = videoFallback,
-            ) {
-                videoFallback = it
-                setVideoFallbackEnabled(context, it)
-            }
-
-            Spacer(Modifier.height(12.dp))
-            SectionTitle("Crossfade")
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Crossfade", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text(
-                    if (crossfadeMs <= 0f) "Off" else "${(crossfadeMs / 1000f).let { String.format("%.0f", it) }}s",
-                    color = if (crossfadeMs <= 0f) Color(0xFFB3B3B3) else AppPalette,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Text(
-                "Blend the end of a song into the start of the next",
-                color = Color(0xFFB3B3B3),
-                fontSize = 13.sp,
-            )
-            Slider(
-                value = crossfadeMs,
-                onValueChange = { crossfadeMs = it },
-                onValueChangeFinished = { setCrossfadeMs(context, crossfadeMs.toInt()) },
-                valueRange = 0f..CROSSFADE_MAX_MS.toFloat(),
-                steps = (CROSSFADE_MAX_MS / 1000) - 1, // 1-second stops
-                colors = SliderDefaults.colors(
-                    thumbColor = AppPalette,
-                    activeTrackColor = AppPalette,
-                    inactiveTrackColor = Color(0xFF333333),
-                ),
-            )
-            Spacer(Modifier.height(12.dp))
+            // ── 4. Updates ──
             SectionTitle("Updates")
             Text(
                 "Update source repository",
@@ -304,51 +405,7 @@ fun SettingsScreen(navController: NavController) {
                     )
                 },
             )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Download folder name",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                "Subfolder inside Music/ for exported downloads",
-                color = Color(0xFFB3B3B3),
-                fontSize = 12.sp,
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = downloadFolderName,
-                onValueChange = {
-                    downloadFolderName = it
-                    setDownloadFolderName(context, it)
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = AppPalette,
-                    unfocusedBorderColor = Color(0xFF333333),
-                    cursorColor = AppPalette,
-                    focusedPlaceholderColor = Color(0xFF666666),
-                    unfocusedPlaceholderColor = Color(0xFF666666),
-                ),
-                placeholder = { Text(DEFAULT_DOWNLOAD_FOLDER) },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = "Reset to default",
-                        tint = if (downloadFolderName != DEFAULT_DOWNLOAD_FOLDER) AppPalette else Color(0xFF444444),
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clickable {
-                                downloadFolderName = DEFAULT_DOWNLOAD_FOLDER
-                                resetDownloadFolderName(context)
-                            }
-                    )
-                },
-            )
+
             Spacer(Modifier.height(12.dp))
             SectionTitle("Account")
             Text(

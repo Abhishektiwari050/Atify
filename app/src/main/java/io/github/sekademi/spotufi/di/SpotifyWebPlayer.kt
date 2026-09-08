@@ -68,21 +68,21 @@ object SpotifyWebPlayer {
     private val pollHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val pollRunnable = object : Runnable {
         override fun run() {
-            val wv = webView
-            if (wv != null) {
-                wv.evaluateJavascript(progressJs()) { r ->
-                    // r is "pos|dur|playing" in seconds (or -1 fields when unknown).
-                    val s = r?.trim('"') ?: ""
-                    val parts = s.split("|")
-                    if (parts.size == 3) {
-                        parts[0].toDoubleOrNull()?.let { if (it >= 0) positionMs = (it * 1000).toLong() }
-                        parts[1].toDoubleOrNull()?.let { if (it >= 0) durationMs = (it * 1000).toLong() }
-                        isPlaying = parts[2] == "1"
-                        onStateChanged?.invoke()
-                    }
+            val wv = webView ?: return
+            wv.evaluateJavascript(progressJs()) { r ->
+                // r is "pos|dur|playing" in seconds (or -1 fields when unknown).
+                val s = r?.trim('"') ?: ""
+                val parts = s.split("|")
+                if (parts.size == 3) {
+                    parts[0].toDoubleOrNull()?.let { if (it >= 0) positionMs = (it * 1000).toLong() }
+                    parts[1].toDoubleOrNull()?.let { if (it >= 0) durationMs = (it * 1000).toLong() }
+                    isPlaying = parts[2] == "1"
+                    onStateChanged?.invoke()
                 }
             }
-            pollHandler.postDelayed(this, 500)
+            if (webView != null) {
+                pollHandler.postDelayed(this, 500)
+            }
         }
     }
 
@@ -309,8 +309,12 @@ object SpotifyWebPlayer {
         this.positionMs = positionMs.coerceIn(0, dur)
     }
 
-    fun release() {
-        webView?.let { wv ->
+    fun detach(activity: Activity? = null) {
+        pollHandler.removeCallbacksAndMessages(null)
+        val wv = webView ?: return
+        val matchesActivity = activity == null || wv.context === activity ||
+            (wv.context as? android.content.ContextWrapper)?.baseContext === activity
+        if (matchesActivity) {
             wv.post {
                 runCatching {
                     wv.stopLoading()
@@ -318,9 +322,16 @@ object SpotifyWebPlayer {
                     wv.destroy()
                 }
             }
+            webView = null
+            pageReady = false
+            commandReady = false
+            activated = false
+            isPlaying = false
         }
-        webView = null
-        pageReady = false
+    }
+
+    fun release() {
+        detach(null)
     }
 
     private fun eval(js: String) {

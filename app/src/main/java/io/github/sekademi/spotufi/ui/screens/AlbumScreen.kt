@@ -68,6 +68,9 @@ import io.github.sekademi.spotufi.data.preferences.removeLikedAlbumId
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.di.Palette
 import io.github.sekademi.spotufi.di.SongPlayer
+import io.github.sekademi.spotufi.ui.components.EmptyStateView
+import io.github.sekademi.spotufi.ui.components.ErrorRetryView
+import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.ui.components.LikedSongsScreen
 import io.github.sekademi.spotufi.ui.components.Loader
 import io.github.sekademi.spotufi.ui.components.Snackbar
@@ -108,11 +111,16 @@ fun AlbumScreen(navController: NavController, albumName: String, artist: String 
         val songsResponse = (songs as? Response.Success)?.data.orEmpty()
 
         when {
-            albums is Response.Loading && songs is Response.Loading -> {
-                Log.d("homeMain", "loading..-albums")
-                Loader()
+            albums is Response.Loading || songs is Response.Loading -> {
+                TrackListShimmer(count = 7)
             }
-
+            albums is Response.Error || songs is Response.Error -> {
+                ErrorRetryView(
+                    title = "Couldn't load album",
+                    subtitle = "Please check your network connection and try again",
+                    onRetry = { albumViewModel.loadAlbumSongs(albumName, artist) }
+                )
+            }
             else -> {
                 Log.d("homeMain", "albums ready")
                 if (albumName == "Liked Songs"){
@@ -252,8 +260,6 @@ fun SumUpAlbumScreen(
                         modifier = Modifier.size(230.dp),
                         model = album[0].coverUri,
                         error = painterResource(R.drawable.placeholder),
-                        //loading = painterResource(R.drawable.album),
-                        //contentScale = ContentScale.Crop,
                         contentDescription = "",
                     )
                 }
@@ -305,7 +311,6 @@ fun SumUpAlbumScreen(
                                 ,
                                 model = album[0].coverUri,
                                 error = painterResource(R.drawable.placeholder),
-                                //loading = painterResource(R.drawable.album),
                                 contentScale = ContentScale.Crop,
                                 contentDescription = "",
                             )
@@ -449,7 +454,7 @@ fun SumUpAlbumScreen(
 //            Spacer(modifier = Modifier.padding(25.dp))
 
             if(albumSongs.isNotEmpty()){
-                val playerViewModel: PlayerViewModel = hiltViewModel()
+                val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
                 repeat(albumSongs.size) {song ->
 
 
@@ -494,7 +499,7 @@ fun SumUpAlbumScreen(
                         Row(
                             horizontalArrangement = Arrangement.Start,
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.width(200.dp)
+                            modifier = Modifier.weight(1f)
                         ) {
 //                        AsyncImage(
 //                            modifier = Modifier.size(60.dp),

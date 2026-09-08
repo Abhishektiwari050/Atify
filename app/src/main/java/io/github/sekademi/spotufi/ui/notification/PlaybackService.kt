@@ -22,8 +22,10 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import io.github.sekademi.spotufi.MainActivity
 import io.github.sekademi.spotufi.R
+import androidx.compose.runtime.snapshotFlow
 import io.github.sekademi.spotufi.data.api.Api
 import io.github.sekademi.spotufi.data.api.Response
+import io.github.sekademi.spotufi.data.api.SpotifySync
 import io.github.sekademi.spotufi.data.entity.SongsModel
 import io.github.sekademi.spotufi.di.CurrentSongState
 import io.github.sekademi.spotufi.di.RepeatMode
@@ -65,9 +67,15 @@ class PlaybackService : MediaLibraryService() {
     private var showingWeb = false
 
     private val playerListener = object : Player.Listener {
+        private var lastErrorSongId: Int? = null
+
         override fun onPlaybackStateChanged(playbackState: Int) {
             currentSongState.updateBufferingState(playbackState == Player.STATE_BUFFERING)
+            if (playbackState == Player.STATE_READY) {
+                lastErrorSongId = null
+            }
             if (playbackState == Player.STATE_ENDED) {
+                lastErrorSongId = null
                 if (SongPlayer.isCrossfadeActive()) {
                     // Ignore the old player's STATE_ENDED event during an active crossfade.
                     // The crossfade routine itself handles the transition and promotes the new player.
@@ -122,8 +130,18 @@ class PlaybackService : MediaLibraryService() {
             val curId = currentSongState.songId.value
             val cur = queue.indexOfFirst { it.id == curId }
             if (cur >= 0) {
-                SongPlayer.invalidateResolvedStream(queue[cur].url)
+                val failedSong = queue[cur]
+                SongPlayer.invalidateResolvedStream(failedSong.url)
+
+                // First failure on this song: retry once with fresh stream resolution
+                if (lastErrorSongId != curId) {
+                    lastErrorSongId = curId
+                    android.util.Log.w("PlaybackService", "Retrying with fresh stream resolution for: ${failedSong.title}")
+                    SongPlayer.playSong(failedSong.url, applicationContext)
+                    return
+                }
             }
+            lastErrorSongId = null
             advance(forward = true)
         }
     }
@@ -132,7 +150,7 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
         SongPlayer.ensureCreated(this)
 
-        // explicitly order notification buttons to put the close button on the right
+        // explicitly order notification buttons: [Like] [Playback Controls] [Close]
         val notificationProvider = object : DefaultMediaNotificationProvider(this) {
             override fun getMediaButtons(
                 session: MediaSession,
@@ -141,16 +159,23 @@ class PlaybackService : MediaLibraryService() {
                 showPauseButton: Boolean
             ): ImmutableList<CommandButton> {
                 val buttons = super.getMediaButtons(session, playerCommands, customLayout, showPauseButton)
+                val likeBtn = buttons.find { it.sessionCommand?.customAction == "ACTION_TOGGLE_LIKE" }
                 val closeBtn = buttons.find { it.sessionCommand?.customAction == "ACTION_CLOSE" }
-                return if (closeBtn != null) {
-                    val filtered = buttons.filter { it != closeBtn }
-                    ImmutableList.builder<CommandButton>().addAll(filtered).add(closeBtn).build()
-                } else {
-                    buttons
-                }
+                val coreButtons = buttons.filter { it != likeBtn && it != closeBtn }
+                val builder = ImmutableList.builder<CommandButton>()
+                if (likeBtn != null) builder.add(likeBtn)
+                builder.addAll(coreButtons)
+                if (closeBtn != null) builder.add(closeBtn)
+                return builder.build()
             }
         }
         setMediaNotificationProvider(notificationProvider)
+
+        lifecycleScope.launch {
+            snapshotFlow { currentSongState.songId.value }.collect {
+                mediaSession?.let { session -> updateSessionCustomLayout(session) }
+            }
+        }
 
         // Let the player advance the in-app queue itself during a crossfade.
         SongPlayer.initCrossfade(this, currentSongState)
@@ -230,6 +255,30 @@ class PlaybackService : MediaLibraryService() {
         override fun seekToPreviousMediaItem() = advance(forward = false)
     }
 
+    @Volatile private var radioLoading = false
+
+    private fun maybeExtendRadio(queueSongs: List<SongsModel>, cur: Int) {
+        if (radioLoading || cur < queueSongs.size - 2) return
+        val seeds = queueSongs.takeLast(5)
+            .mapNotNull { it.spotifyTrackId.ifBlank { null } }
+            .distinct()
+        if (seeds.isEmpty()) return
+        radioLoading = true
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val recs = repository.provideRecommendations(seeds)
+                val existing = currentSongState.queue.value
+                val existingIds = existing.map { it.id }.toSet()
+                val fresh = recs.filter { it.id !in existingIds }
+                if (fresh.isNotEmpty()) currentSongState.updateQueue(existing + fresh)
+            } catch (e: Exception) {
+                android.util.Log.w("PlaybackService", "Autoplay radio extension failed: ${e.message}")
+            } finally {
+                radioLoading = false
+            }
+        }
+    }
+
     /** Advance the in-app queue one step in the given direction and start it. */
     private fun advance(forward: Boolean) {
         val queue = currentSongState.queue.value
@@ -241,13 +290,39 @@ class PlaybackService : MediaLibraryService() {
         
         val nextIdx: Int
         if (forward) {
+            maybeExtendRadio(queue, cur)
             if (cur < queue.size - 1) {
                 nextIdx = cur + 1
             } else {
                 if (currentSongState.repeat.value == RepeatMode.ALL) {
                     nextIdx = 0
                 } else {
-                    return // do nothing at the end of the queue
+                    // At end of queue with repeat OFF: fetch recommendations to continue playback seamlessly
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val seeds = queue.takeLast(5)
+                            .mapNotNull { it.spotifyTrackId.ifBlank { null } }
+                            .distinct()
+                        if (seeds.isNotEmpty()) {
+                            val recs = runCatching { repository.provideRecommendations(seeds) }.getOrNull()
+                            if (!recs.isNullOrEmpty()) {
+                                val existing = currentSongState.queue.value
+                                val existingIds = existing.map { it.id }.toSet()
+                                val fresh = recs.filter { it.id !in existingIds }
+                                if (fresh.isNotEmpty()) {
+                                    val newQueue = existing + fresh
+                                    currentSongState.updateQueue(newQueue)
+                                    val nextSong = fresh[0]
+                                    val newIdx = existing.size
+                                    currentSongState.updateSongState(
+                                        nextSong.coverUri, nextSong.title, nextSong.singer,
+                                        true, nextSong.id, newIdx, nextSong.album
+                                    )
+                                    SongPlayer.playSong(nextSong.url, applicationContext)
+                                }
+                            }
+                        }
+                    }
+                    return
                 }
             }
         } else {
@@ -289,14 +364,16 @@ class PlaybackService : MediaLibraryService() {
         ): MediaSession.ConnectionResult {
             val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
                 .add(SessionCommand("ACTION_CLOSE", Bundle.EMPTY))
+                .add(SessionCommand("ACTION_TOGGLE_LIKE", Bundle.EMPTY))
                 .add(SessionCommand("ACTION_NONE", Bundle.EMPTY))
                 .build()
 
-            val emptyButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
-                .setDisplayName(" ")
-                .setSessionCommand(SessionCommand("ACTION_NONE", Bundle.EMPTY))
-                .setCustomIconResId(R.drawable.ic_transparent)
-                .setEnabled(false)
+            val curId = currentSongState.songId.value
+            val isLiked = io.github.sekademi.spotufi.data.preferences.isSongLiked(this@PlaybackService, curId.toString())
+            val likeButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+                .setDisplayName(if (isLiked) "Unlike" else "Like")
+                .setSessionCommand(SessionCommand("ACTION_TOGGLE_LIKE", Bundle.EMPTY))
+                .setCustomIconResId(if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline)
                 .build()
 
             val closeButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
@@ -305,10 +382,9 @@ class PlaybackService : MediaLibraryService() {
                 .setCustomIconResId(R.drawable.ic_close)
                 .build()
 
-            // push close button to the right by adding an empty spacer button first
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
-                .setCustomLayout(ImmutableList.of(emptyButton, closeButton))
+                .setCustomLayout(ImmutableList.of(likeButton, closeButton))
                 .build()
         }
 
@@ -318,10 +394,28 @@ class PlaybackService : MediaLibraryService() {
             customCommand: SessionCommand,
             args: Bundle
         ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == "ACTION_TOGGLE_LIKE") {
+                val curId = currentSongState.songId.value
+                val curSong = currentSongState.queue.value.find { it.id == curId }
+                if (curSong != null) {
+                    val wasLiked = io.github.sekademi.spotufi.data.preferences.isSongLiked(this@PlaybackService, curId.toString())
+                    if (wasLiked) {
+                        io.github.sekademi.spotufi.data.preferences.removeLikedSongId(this@PlaybackService, curId.toString())
+                    } else {
+                        io.github.sekademi.spotufi.data.preferences.addLikedSongId(this@PlaybackService, curId.toString())
+                    }
+                    if (curSong.spotifyTrackId.isNotBlank()) {
+                        SpotifySync.setTrackSaved(this@PlaybackService, curSong.spotifyTrackId, !wasLiked)
+                    }
+                    updateSessionCustomLayout(session)
+                }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
             if (customCommand.customAction == "ACTION_CLOSE") {
-                // exit the player and kill the process directly to terminate the app cleanly
+                // Graceful shutdown on notification close: pause playback, dismiss foreground notification, and stop service
                 SongPlayer.pause()
-                android.os.Process.killProcess(android.os.Process.myPid())
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
@@ -364,7 +458,9 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = future {
-            LibraryResult.ofItemList(ImmutableList.copyOf(childrenOf(parentId)), params)
+            val all = childrenOf(parentId)
+            val paged = paginate(all, page, pageSize)
+            LibraryResult.ofItemList(ImmutableList.copyOf(paged), params)
         }
 
         override fun onGetItem(
@@ -398,7 +494,8 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = future {
             val results = lastSuccess(repository.searchSongs(query)).orEmpty()
             val items = registerTracks("search/$query", results)
-            LibraryResult.ofItemList(ImmutableList.copyOf(items), params)
+            val paged = paginate(items, page, pageSize)
+            LibraryResult.ofItemList(ImmutableList.copyOf(paged), params)
         }
 
         // A browsed track was tapped in the car: queue the list it came from and
@@ -528,10 +625,42 @@ class PlaybackService : MediaLibraryService() {
         return f
     }
 
+    private fun <T> paginate(list: List<T>, page: Int, pageSize: Int): List<T> {
+        if (pageSize <= 0 || page < 0) return list
+        val fromIndex = page * pageSize
+        if (fromIndex >= list.size) return emptyList()
+        val toIndex = minOf(fromIndex + pageSize, list.size)
+        return list.subList(fromIndex, toIndex)
+    }
+
+    private fun updateSessionCustomLayout(session: MediaSession) {
+        val curId = currentSongState.songId.value
+        val isLiked = io.github.sekademi.spotufi.data.preferences.isSongLiked(this, curId.toString())
+        val likeButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setDisplayName(if (isLiked) "Unlike" else "Like")
+            .setSessionCommand(SessionCommand("ACTION_TOGGLE_LIKE", Bundle.EMPTY))
+            .setCustomIconResId(if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline)
+            .build()
+
+        val closeButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setDisplayName("Close")
+            .setSessionCommand(SessionCommand("ACTION_CLOSE", Bundle.EMPTY))
+            .setCustomIconResId(R.drawable.ic_close)
+            .build()
+
+        session.setCustomLayout(ImmutableList.of(likeButton, closeButton))
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Stop playback + tear the service down when the app is swiped away.
-        SongPlayer.pause()
-        stopSelf()
+        super.onTaskRemoved(rootIntent)
+        // If playback is paused or inactive, tear the service down when swiped away from Recents.
+        // If playing, keep playing in the background (standard Android music player behavior).
+        val isPlaying = SongPlayer.exoPlayer?.isPlaying == true || SongPlayer.webPlaybackActive()
+        if (!isPlaying) {
+            SongPlayer.pause()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     override fun onDestroy() {
@@ -542,6 +671,7 @@ class PlaybackService : MediaLibraryService() {
         webPlayer = null
         mediaSession?.release()
         mediaSession = null
+        SongPlayer.release()
         super.onDestroy()
     }
 }

@@ -71,7 +71,7 @@ private val MutedText = Color(0xFFB3B3B3)
 @Composable
 fun HistoryScreen(navController: NavController) {
     val context = LocalContext.current
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
     var history by remember { mutableStateOf(getListeningHistory(context)) }
     var showClearDialog by remember { mutableStateOf(false) }
 

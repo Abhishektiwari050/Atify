@@ -23,7 +23,7 @@ object UpdateChecker {
         val releaseBody: String,
     )
 
-    private val client = OkHttpClient.Builder()
+    private val client = io.github.sekademi.spotufi.data.api.NetworkClient.baseOkHttpClient.newBuilder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
         .build()

@@ -392,7 +392,6 @@ fun SumUpHomeScreen(navController : NavController, albums: List<AlbumsModel>, ar
             HomePlaylistGrid(navController, albums)
             HomeAlbums(album = albums, navController)
         }
-        //HomeRecentlyPlayed(navController, albums = listOf("karan aujla", "diljit", "fudfu", "frref", "frrf"))
         if (artists.isNotEmpty()) {
             HomeArtists(artists = artists, navController)
         }
@@ -577,49 +576,6 @@ fun HomeAlbums(
                         textAlign = TextAlign.Center,
                         text = reversedAlbum[album].artists,
                         color = Color.LightGray)
-                }
-
-            }
-        }
-    }
-}
-
-@Composable
-fun HomeRecentlyPlayed(
-    navController: NavController,
-    albums : List<String>
-) {
-    Text(modifier = Modifier
-        .padding(20.dp, 10.dp, 0.dp, 0.dp),
-        text = "Recently Played",
-        color = Color.White,
-        fontSize = 23.sp,
-        fontWeight = FontWeight.Bold)
-    LazyRow(modifier = Modifier.padding(6.dp)){
-        items(albums.size){
-            Box(modifier = Modifier
-                .padding(10.dp)
-                .width(130.dp)
-                .height(140.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    navController.navigate(Routes.Player.route)
-                }
-            ){
-                Column(horizontalAlignment = Alignment.Start) {
-                    Image(modifier = Modifier
-                        .size(120.dp)
-                        .background(Color.Green),
-                        contentScale = ContentScale.Crop,
-                        painter = painterResource(id = R.drawable.album),
-                        contentDescription = "Albums")
-                    Text(modifier = Modifier.padding(2.dp),
-                        text = "Album name",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp)
                 }
 
             }

@@ -94,7 +94,17 @@ class BiquadFilter {
         return output
     }
 
-    fun processStereo(inputLeft: Double, inputRight: Double): Pair<Double, Double> {
+    /**
+     * Reusable stereo output buffer: [0] = left, [1] = right.
+     * Avoids allocating a Pair on every sample (44,100×/sec on the audio thread).
+     */
+    private val stereoOut = DoubleArray(2)
+
+    /**
+     * Process one stereo sample pair through both cascaded biquad stages.
+     * Results are written into [stereoOut]: index 0 = left, index 1 = right.
+     */
+    fun processStereo(inputLeft: Double, inputRight: Double): DoubleArray {
         val midL = b0_1 * inputLeft + b1_1 * s1_x1L + b2_1 * s1_x2L - a1_1 * s1_y1L - a2_1 * s1_y2L
         s1_x2L = s1_x1L; s1_x1L = inputLeft
         s1_y2L = s1_y1L; s1_y1L = midL
@@ -108,7 +118,10 @@ class BiquadFilter {
         val outR = b0_2 * midR + b1_2 * s2_x1R + b2_2 * s2_x2R - a1_2 * s2_y1R - a2_2 * s2_y2R
         s2_x2R = s2_x1R; s2_x1R = midR
         s2_y2R = s2_y1R; s2_y1R = outR
-        return outL to outR
+
+        stereoOut[0] = outL
+        stereoOut[1] = outR
+        return stereoOut
     }
 
     fun reset() {

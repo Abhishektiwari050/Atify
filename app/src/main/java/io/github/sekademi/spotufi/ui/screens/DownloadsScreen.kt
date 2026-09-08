@@ -17,10 +17,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -88,7 +89,7 @@ fun DownloadSortOption.getDescriptiveLabel(isDescending: Boolean): String {
 @Composable
 fun DownloadsScreen(navController: NavController) {
 
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
     val context = LocalContext.current
 
     // Completed downloads (from prefs) + live in-progress ones (from SongPlayer). Poll
@@ -170,63 +171,65 @@ fun DownloadsScreen(navController: NavController) {
                 )
             }
         ) {
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(AppBackground.toArgb()))
-                    .verticalScroll(rememberScrollState())
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(360.dp)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    accent.copy(alpha = 0.5f),
-                                    Color(AppBackground.toArgb())
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(360.dp)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        accent.copy(alpha = 0.5f),
+                                        Color(AppBackground.toArgb())
+                                    ),
+                                    startY = -100f,
                                 ),
-                                startY = -100f,
                             ),
-                        ),
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Spacer(modifier = Modifier.padding(25.dp))
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Box(
-                            modifier = Modifier
-                                .size(200.dp)
-                                .background(accent.copy(alpha = 0.25f)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = ImageVector.vectorResource(R.drawable.ic_download),
-                                contentDescription = "",
-                                tint = accent,
-                                modifier = Modifier.size(90.dp),
-                            )
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Spacer(modifier = Modifier.padding(25.dp))
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .size(200.dp)
+                                    .background(accent.copy(alpha = 0.25f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = ImageVector.vectorResource(R.drawable.ic_download),
+                                    contentDescription = "",
+                                    tint = accent,
+                                    modifier = Modifier.size(90.dp),
+                                )
+                            }
                         }
+                        Spacer(modifier = Modifier.padding(5.dp))
+                        Text(
+                            modifier = Modifier.padding(20.dp, 5.dp, 0.dp, 0.dp),
+                            text = "Downloaded",
+                            color = Color.White,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            modifier = Modifier.padding(20.dp, 4.dp, 20.dp, 0.dp),
+                            text = "${songs.size} songs • available offline",
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
-                    Spacer(modifier = Modifier.padding(5.dp))
-                    Text(
-                        modifier = Modifier.padding(20.dp, 5.dp, 0.dp, 0.dp),
-                        text = "Downloaded",
-                        color = Color.White,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        modifier = Modifier.padding(20.dp, 4.dp, 20.dp, 0.dp),
-                        text = "${songs.size} songs • available offline",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
                 }
 
                 // ── Search bar for downloads ──
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(20.dp, 8.dp)
@@ -284,8 +287,10 @@ fun DownloadsScreen(navController: NavController) {
                         )
                     }
                 }
+            }
 
-                // ── Sort and Clear all action ──
+            // ── Sort and Clear all action ──
+            item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -337,9 +342,10 @@ fun DownloadsScreen(navController: NavController) {
                         )
                     }
                 }
+            }
 
-                // ── In-progress downloads (with live progress bar) ──
-                inProgress.forEach { (song, pct) ->
+            // ── In-progress downloads (with live progress bar) ──
+            items(inProgress, key = { it.first.id }) { (song, pct) ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -389,81 +395,87 @@ fun DownloadsScreen(navController: NavController) {
                 }
 
                 if (songs.isEmpty() && inProgress.isEmpty()) {
-                    Text(
-                        text = "No downloads yet. Tap ⋯ on a track and choose Download.",
-                        color = Color.Gray,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(20.dp),
-                    )
+                    item {
+                        Text(
+                            text = "No downloads yet. Tap ⋯ on a track and choose Download.",
+                            color = Color.Gray,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(20.dp),
+                        )
+                    }
                 } else if (displayedSongs.isEmpty() && inProgress.isEmpty()) {
-                    Text(
-                        text = "No matches found for \"$searchQuery\"",
-                        color = Color.Gray,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(20.dp),
-                    )
+                    item {
+                        Text(
+                            text = "No matches found for \"$searchQuery\"",
+                            color = Color.Gray,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(20.dp),
+                        )
+                    }
                 } else {
-                    repeat(displayedSongs.size) { index ->
-                        val song = displayedSongs[index]
+                    itemsIndexed(displayedSongs, key = { _, song -> song.id }) { index, song ->
                         val currentColor = if (song.id == playerViewModel.currentSongId.value)
                             Color(AppPalette.toArgb()) else Color.White
 
                         SwipeToQueueBox(song = song, onAddToQueue = { playerViewModel.addToQueue(it) }) {
-                        Row(
-                            horizontalArrangement = Arrangement.Start,
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp, 8.dp)
-                                .combinedClickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onLongClick = { menuSong = song },
-                                    onClick = {
-                                        playerViewModel.updateQueue(displayedSongs)
-                                        SongPlayer.playSong(song.url, context)
-                                        playerViewModel.updateSongState(
-                                            song.coverUri, song.title, song.singer,
-                                            true, song.id, index, "Downloaded"
-                                        )
-                                    },
-                                )
-                        ) {
-                            AsyncImage(
+                            Row(
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(4.dp)),
-                                model = song.coverUri,
-                                error = painterResource(R.drawable.placeholder),
-                                contentScale = ContentScale.Crop,
-                                contentDescription = ""
-                            )
-                            Column(
-                                modifier = Modifier
-                                    .padding(start = 12.dp)
-                                    .width(280.dp)
+                                    .fillMaxWidth()
+                                    .padding(20.dp, 8.dp)
+                                    .combinedClickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onLongClick = { menuSong = song },
+                                        onClick = {
+                                            playerViewModel.updateQueue(displayedSongs)
+                                            SongPlayer.playSong(song.url, context)
+                                            playerViewModel.updateSongState(
+                                                song.coverUri, song.title, song.singer,
+                                                true, song.id, index, "Downloaded"
+                                            )
+                                        },
+                                    )
                             ) {
-                                Text(
-                                    text = song.title,
-                                    color = currentColor,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1
+                                AsyncImage(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    model = song.coverUri,
+                                    error = painterResource(R.drawable.placeholder),
+                                    contentScale = ContentScale.Crop,
+                                    contentDescription = ""
                                 )
-                                Text(
-                                    text = song.singer,
-                                    color = Color.Gray,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .padding(start = 12.dp)
+                                        .weight(1f)
+                                ) {
+                                    Text(
+                                        text = song.title,
+                                        color = currentColor,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = song.singer,
+                                        color = Color.Gray,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                }
                             }
-                        }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.padding(80.dp))
+                item {
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
+            }
                 if (showSortSheet) {
                     ModalBottomSheet(
                         onDismissRequest = { showSortSheet = false },
@@ -566,4 +578,3 @@ fun DownloadsScreen(navController: NavController) {
             }
         }
     }
-}

@@ -59,6 +59,10 @@ import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.data.entity.SearchResults
 import io.github.sekademi.spotufi.data.entity.SongsModel
+import androidx.compose.material.icons.filled.Info
+import io.github.sekademi.spotufi.ui.components.EmptyStateView
+import io.github.sekademi.spotufi.ui.components.ErrorRetryView
+import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
@@ -75,6 +79,14 @@ import io.github.sekademi.spotufi.ui.components.SwipeToQueueBox
 import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 import io.github.sekademi.spotufi.ui.viewmodel.SearchViewModel
 
+enum class SearchFilter(val label: String) {
+    ALL("All"),
+    SONGS("Songs"),
+    ARTISTS("Artists"),
+    ALBUMS("Albums"),
+    SHOWS("Podcasts")
+}
+
 
 @RequiresApi(Build.VERSION_CODES.S)
 @Composable
@@ -90,7 +102,7 @@ fun SearchScreen(navController: NavController) {
             .fillMaxSize()
             .background(Color(AppBackground.toArgb()))
     ) {
-        SumUpSearchScreen(navController = navController, searchResults, searchViewModel)
+        SumUpSearchScreen(navController = navController, searchResults, results, searchViewModel)
     }
 }
 
@@ -101,6 +113,7 @@ fun SearchScreen(navController: NavController) {
 fun SumUpSearchScreen(
     navController: NavController,
     results: SearchResults,
+    resultsResp: Response<SearchResults>,
     searchViewModel: SearchViewModel,
 ) {
     val context = LocalContext.current
@@ -108,6 +121,7 @@ fun SumUpSearchScreen(
     var text by remember {
         mutableStateOf("")
     }
+    var selectedFilter by remember { mutableStateOf(SearchFilter.ALL) }
     // Recents are the *items opened from results* (songs/artists/albums), not the
     // typed queries, and only appear once the user taps into the search bar.
     var searchFocused by remember { mutableStateOf(false) }
@@ -143,12 +157,49 @@ fun SumUpSearchScreen(
             SearchTopBar()
         }
         stickyHeader {
-            SearchStickyBar(
-                text,
-                onFocusChange = { searchFocused = it },
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(AppBackground.toArgb()))
             ) {
-                text = it
-                searchViewModel.search(it)
+                SearchStickyBar(
+                    text = text,
+                    onFocusChange = { searchFocused = it },
+                    onClear = {
+                        text = ""
+                        searchViewModel.search("")
+                    },
+                ) {
+                    text = it
+                    searchViewModel.search(it)
+                }
+
+                if (text.isNotBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SearchFilter.entries.forEach { filter ->
+                            val isSelected = filter == selectedFilter
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSelected) AppPalette else Color(0xFF242428))
+                                    .clickable { selectedFilter = filter }
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                            ) {
+                                Text(
+                                    text = filter.label,
+                                    color = if (isSelected) Color.White else Color(0xFFCCCCCC),
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -237,56 +288,155 @@ fun SumUpSearchScreen(
                 }
             }
         } else {
-            items(mixed.size) { i ->
-                when (val row = mixed[i]) {
-                    is SearchRow.Song -> SearchSongRow(row.song, searchedList, searchViewModel, onPlayed = {
-                        recordRecent(row.song.toRecentItem())
-                    })
-                    is SearchRow.Artist -> SearchArtistRow(row.artist) {
-                        recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
-                            type = "artist",
-                            key = row.artist.id.ifBlank { row.artist.name },
-                            name = row.artist.name,
-                            image = row.artist.coverUri,
-                        ))
-                        navController.navigate(artistRoute(row.artist.name, row.artist.id))
-                    }
-                    is SearchRow.Album -> SearchAlbumRow(row.album) {
-                        recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
-                            type = "album",
-                            key = row.album.name,
-                            name = row.album.name,
-                            singer = row.album.artists,
-                            image = row.album.coverUri,
-                        ))
-                        navController.navigate(albumRoute(row.album.name, row.album.artists))
+            when (resultsResp) {
+                is Response.Loading -> {
+                    item {
+                        TrackListShimmer(count = 7)
                     }
                 }
-            }
-            // ── Podcasts: shows (→ detail) then individual episodes (→ play) ──
-            if (results.shows.isNotEmpty()) {
-                item { SearchSectionHeader("Podcasts") }
-                items(results.shows.size) { i ->
-                    val show = results.shows[i]
-                    SearchShowRow(show) {
-                        recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
-                            type = "show",
-                            key = show.id,
-                            name = show.name,
-                            singer = show.publisher,
-                            image = show.coverUri,
-                        ))
-                        navController.navigate(showRoute(show.id, show.name))
+                is Response.Error -> {
+                    item {
+                        ErrorRetryView(
+                            message = "Search request failed. Please check your connection.",
+                            onRetry = { searchViewModel.search(text) },
+                        )
                     }
                 }
-            }
-            if (results.episodes.isNotEmpty()) {
-                item { SearchSectionHeader("Episodes") }
-                items(results.episodes.size) { i ->
-                    val ep = results.episodes[i]
-                    SearchSongRow(ep, results.episodes, searchViewModel, onPlayed = {
-                        recordRecent(ep.toRecentItem())
-                    })
+                is Response.Success -> {
+                    val isEmpty = when (selectedFilter) {
+                        SearchFilter.ALL -> mixed.isEmpty() && results.shows.isEmpty() && results.episodes.isEmpty()
+                        SearchFilter.SONGS -> results.songs.isEmpty()
+                        SearchFilter.ARTISTS -> results.artists.isEmpty()
+                        SearchFilter.ALBUMS -> results.albums.isEmpty()
+                        SearchFilter.SHOWS -> results.shows.isEmpty() && results.episodes.isEmpty()
+                    }
+
+                    if (isEmpty) {
+                        item {
+                            EmptyStateView(
+                                title = "No results found for \"$text\"",
+                                subtitle = "Please check the spelling or search for another artist, song, or podcast.",
+                                icon = Icons.Default.Info,
+                            )
+                        }
+                    } else {
+                        when (selectedFilter) {
+                            SearchFilter.ALL -> {
+                                items(mixed.size) { i ->
+                                    when (val row = mixed[i]) {
+                                        is SearchRow.Song -> SearchSongRow(row.song, searchedList, searchViewModel, onPlayed = {
+                                            recordRecent(row.song.toRecentItem())
+                                        })
+                                        is SearchRow.Artist -> SearchArtistRow(row.artist) {
+                                            recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                type = "artist",
+                                                key = row.artist.id.ifBlank { row.artist.name },
+                                                name = row.artist.name,
+                                                image = row.artist.coverUri,
+                                            ))
+                                            navController.navigate(artistRoute(row.artist.name, row.artist.id))
+                                        }
+                                        is SearchRow.Album -> SearchAlbumRow(row.album) {
+                                            recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                type = "album",
+                                                key = row.album.name,
+                                                name = row.album.name,
+                                                singer = row.album.artists,
+                                                image = row.album.coverUri,
+                                            ))
+                                            navController.navigate(albumRoute(row.album.name, row.album.artists))
+                                        }
+                                    }
+                                }
+                                if (results.shows.isNotEmpty()) {
+                                    item { SearchSectionHeader("Podcasts") }
+                                    items(results.shows.size) { i ->
+                                        val show = results.shows[i]
+                                        SearchShowRow(show) {
+                                            recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                type = "show",
+                                                key = show.id,
+                                                name = show.name,
+                                                singer = show.publisher,
+                                                image = show.coverUri,
+                                            ))
+                                            navController.navigate(showRoute(show.id, show.name))
+                                        }
+                                    }
+                                }
+                                if (results.episodes.isNotEmpty()) {
+                                    item { SearchSectionHeader("Episodes") }
+                                    items(results.episodes.size) { i ->
+                                        val ep = results.episodes[i]
+                                        SearchSongRow(ep, results.episodes, searchViewModel, onPlayed = {
+                                            recordRecent(ep.toRecentItem())
+                                        })
+                                    }
+                                }
+                            }
+                            SearchFilter.SONGS -> {
+                                items(results.songs.size) { i ->
+                                    val song = results.songs[i]
+                                    SearchSongRow(song, results.songs, searchViewModel, onPlayed = {
+                                        recordRecent(song.toRecentItem())
+                                    })
+                                }
+                            }
+                            SearchFilter.ARTISTS -> {
+                                items(results.artists.size) { i ->
+                                    val artist = results.artists[i]
+                                    SearchArtistRow(artist) {
+                                        recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                            type = "artist",
+                                            key = artist.id.ifBlank { artist.name },
+                                            name = artist.name,
+                                            image = artist.coverUri,
+                                        ))
+                                        navController.navigate(artistRoute(artist.name, artist.id))
+                                    }
+                                }
+                            }
+                            SearchFilter.ALBUMS -> {
+                                items(results.albums.size) { i ->
+                                    val album = results.albums[i]
+                                    SearchAlbumRow(album) {
+                                        recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                            type = "album",
+                                            key = album.name,
+                                            name = album.name,
+                                            singer = album.artists,
+                                            image = album.coverUri,
+                                        ))
+                                        navController.navigate(albumRoute(album.name, album.artists))
+                                    }
+                                }
+                            }
+                            SearchFilter.SHOWS -> {
+                                items(results.shows.size) { i ->
+                                    val show = results.shows[i]
+                                    SearchShowRow(show) {
+                                        recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                            type = "show",
+                                            key = show.id,
+                                            name = show.name,
+                                            singer = show.publisher,
+                                            image = show.coverUri,
+                                        ))
+                                        navController.navigate(showRoute(show.id, show.name))
+                                    }
+                                }
+                                if (results.episodes.isNotEmpty()) {
+                                    item { SearchSectionHeader("Episodes") }
+                                    items(results.episodes.size) { i ->
+                                        val ep = results.episodes[i]
+                                        SearchSongRow(ep, results.episodes, searchViewModel, onPlayed = {
+                                            recordRecent(ep.toRecentItem())
+                                        })
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -408,7 +558,7 @@ fun SearchSongRow(
     LaunchedEffect(likeState) { isLiked = isSongLiked(context, song.id.toString()) }
     val currentPlayingIndicatorColor =
         if (song.id == searchViewModel.currentSongId.value) Color(AppPalette.toArgb()) else Color.White
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
 
     SwipeToQueueBox(song = song, onAddToQueue = { playerViewModel.addToQueue(it) }) {
         Row(
@@ -440,7 +590,7 @@ fun SearchSongRow(
         Row(
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.width(280.dp),
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
         ) {
             AsyncImage(
                 modifier = Modifier
@@ -453,7 +603,7 @@ fun SearchSongRow(
                 placeholder = painterResource(R.drawable.placeholder),
                 contentDescription = "",
             )
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(text = song.title, color = currentPlayingIndicatorColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                 Text(text = "Song • ${song.singer}", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
@@ -700,28 +850,37 @@ fun SearchTopBar() {
 fun SearchStickyBar(
     text: String,
     onFocusChange: (Boolean) -> Unit = {},
+    onClear: () -> Unit = {},
     onTextChange: (String) -> Unit,
 ) {
-
-    Row(verticalAlignment = Alignment.CenterVertically,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .padding(10.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .height(55.dp)
-            .background(Color.White)
-            .padding(10.dp, 0.dp)
-    ){
+            .clip(RoundedCornerShape(12.dp))
+            .height(52.dp)
+            .background(Color(0xFF242428))
+            .padding(horizontal = 12.dp),
+    ) {
         Icon(
-            painterResource(id = R.drawable.ic_search_big),
-            tint = Color.Black,
-            contentDescription = "")
+            painter = painterResource(id = R.drawable.ic_search_big),
+            tint = Color(0xFFB3B3B3),
+            contentDescription = "Search",
+            modifier = Modifier.size(20.dp),
+        )
 
         TextField(
             enabled = true,
-            modifier = Modifier.onFocusChanged { onFocusChange(it.isFocused) },
+            modifier = Modifier
+                .weight(1f)
+                .onFocusChanged { onFocusChange(it.isFocused) },
             value = text,
-            textStyle = TextStyle.Default.copy(fontSize = 16.sp, color = Color.Black, fontWeight = FontWeight(500)),
+            textStyle = TextStyle.Default.copy(
+                fontSize = 15.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Medium,
+            ),
             colors = TextFieldDefaults.colors(
                 unfocusedContainerColor = Color.Transparent,
                 disabledContainerColor = Color.Transparent,
@@ -729,19 +888,32 @@ fun SearchStickyBar(
                 disabledIndicatorColor = Color.Transparent,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = Color.Black
-
+                cursorColor = AppPalette,
             ),
             singleLine = true,
             onValueChange = onTextChange,
             placeholder = {
                 Text(
-                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
-                    text = "What do you want to listen to?"
-
+                    fontWeight = FontWeight.Normal,
+                    text = "What do you want to listen to?",
+                    color = Color(0xFF888888),
+                    fontSize = 14.sp,
                 )
-            }
+            },
         )
+
+        if (text.isNotEmpty()) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Clear",
+                tint = Color(0xFFB3B3B3),
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onClear() },
+            )
+        }
     }
 }

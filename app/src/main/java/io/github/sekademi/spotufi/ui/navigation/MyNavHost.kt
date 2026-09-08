@@ -6,6 +6,8 @@ import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -44,10 +46,8 @@ fun MyNavHost(
     navHostController: NavHostController
 ) {
 
-    val playerViewModel : PlayerViewModel = hiltViewModel()
+    val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
     val playerState by playerViewModel.currentSongTitle
-
-    Log.d("player", playerState)
 
     val context = LocalContext.current
     // First launch (no Spotify session) lands on the login screen.
@@ -78,11 +78,22 @@ fun MyNavHost(
     NavHost(
         navController = navHostController,
         startDestination = startDestination,
-        // Quick fade between screens instead of the default slide/scale animations.
-        enterTransition = { fadeIn(animationSpec = tween(150)) },
-        exitTransition = { fadeOut(animationSpec = tween(150)) },
-        popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-        popExitTransition = { fadeOut(animationSpec = tween(150)) },
+        enterTransition = {
+            slideInHorizontally(initialOffsetX = { it / 3 }, animationSpec = tween(260)) +
+                fadeIn(animationSpec = tween(260))
+        },
+        exitTransition = {
+            slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(260)) +
+                fadeOut(animationSpec = tween(260))
+        },
+        popEnterTransition = {
+            slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(260)) +
+                fadeIn(animationSpec = tween(260))
+        },
+        popExitTransition = {
+            slideOutHorizontally(targetOffsetX = { it / 3 }, animationSpec = tween(260)) +
+                fadeOut(animationSpec = tween(260))
+        },
     ){
         composable(
             route = Routes.Login.route,
@@ -100,13 +111,25 @@ fun MyNavHost(
             val deepLinkSpDc = navBackStackEntry.arguments?.getString("sp_dc")
             SpotifyLoginScreen(navHostController, initialSpDc = deepLinkSpDc)
         }
-        composable(Routes.Home.route){
+        composable(
+            Routes.Home.route,
+            enterTransition = { fadeIn(tween(180)) },
+            exitTransition = { fadeOut(tween(180)) },
+        ){
             HomeScreen(navHostController)
         }
-        composable(Routes.Search.route){
+        composable(
+            Routes.Search.route,
+            enterTransition = { fadeIn(tween(180)) },
+            exitTransition = { fadeOut(tween(180)) },
+        ){
             SearchScreen(navHostController)
         }
-        composable(Routes.Library.route) {
+        composable(
+            Routes.Library.route,
+            enterTransition = { fadeIn(tween(180)) },
+            exitTransition = { fadeOut(tween(180)) },
+        ) {
             LibraryScreen(navHostController)
         }
         dialog(

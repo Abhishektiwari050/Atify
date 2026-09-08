@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         controllerFuture?.let { MediaController.releaseFuture(it) }
-        SongPlayer.release()
+        io.github.sekademi.spotufi.di.SpotifyWebPlayer.detach(this)
     }
 }
 

@@ -19,17 +19,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.Context
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +49,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.vectorResource
@@ -65,6 +78,45 @@ import io.github.sekademi.spotufi.ui.components.SwipeToQueueBox
 import io.github.sekademi.spotufi.ui.viewmodel.LikedSongsViewModel
 import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 
+enum class LikedSortOption(val label: String) {
+    DATE("Date added"),
+    TITLE("Title"),
+    ARTIST("Artist"),
+    ALBUM("Album")
+}
+
+fun LikedSortOption.getDescriptiveLabel(isDescending: Boolean): String {
+    return when (this) {
+        LikedSortOption.DATE -> if (isDescending) "Date added (newest to oldest)" else "Date added (oldest to newest)"
+        LikedSortOption.TITLE -> if (isDescending) "Title (Z to A)" else "Title (A to Z)"
+        LikedSortOption.ARTIST -> if (isDescending) "Artist (Z to A)" else "Artist (A to Z)"
+        LikedSortOption.ALBUM -> if (isDescending) "Album (Z to A)" else "Album (A to Z)"
+    }
+}
+
+private const val PREF_LIKED_SORTS = "LikedSongsSorts"
+
+fun getLikedSortOption(context: Context): LikedSortOption {
+    val prefs = context.getSharedPreferences(PREF_LIKED_SORTS, Context.MODE_PRIVATE)
+    val saved = prefs.getString("sort_option", LikedSortOption.DATE.name)
+    return runCatching { LikedSortOption.valueOf(saved!!) }.getOrDefault(LikedSortOption.DATE)
+}
+
+fun isLikedSortDescending(context: Context): Boolean {
+    val prefs = context.getSharedPreferences(PREF_LIKED_SORTS, Context.MODE_PRIVATE)
+    if (!prefs.contains("sort_descending")) {
+        return true
+    }
+    return prefs.getBoolean("sort_descending", true)
+}
+
+fun setLikedSort(context: Context, option: LikedSortOption, descending: Boolean) {
+    context.getSharedPreferences(PREF_LIKED_SORTS, Context.MODE_PRIVATE).edit()
+        .putString("sort_option", option.name)
+        .putBoolean("sort_descending", descending)
+        .apply()
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun LikedSongsScreen(navController: NavController) {
@@ -78,6 +130,30 @@ fun LikedSongsScreen(navController: NavController) {
     LaunchedEffect(songs) {
         if (songs.isNotEmpty()) {
             SongPlayer.prefetchList(songs.map { it.url }, context)
+        }
+    }
+
+    var searchQuery by remember { mutableStateOf("") }
+    var currentSort by remember { mutableStateOf(getLikedSortOption(context)) }
+    var isDescending by remember { mutableStateOf(isLikedSortDescending(context)) }
+    var showSortSheet by remember { mutableStateOf(false) }
+
+    val filteredSongs = remember(songs, searchQuery, currentSort, isDescending) {
+        val filtered = if (searchQuery.isBlank()) {
+            songs
+        } else {
+            songs.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.singer.contains(searchQuery, ignoreCase = true) ||
+                    it.album.contains(searchQuery, ignoreCase = true)
+            }
+        }
+
+        when (currentSort) {
+            LikedSortOption.DATE -> if (isDescending) filtered else filtered.reversed()
+            LikedSortOption.TITLE -> if (isDescending) filtered.sortedByDescending { it.title.lowercase() } else filtered.sortedBy { it.title.lowercase() }
+            LikedSortOption.ARTIST -> if (isDescending) filtered.sortedByDescending { it.singer.lowercase() } else filtered.sortedBy { it.singer.lowercase() }
+            LikedSortOption.ALBUM -> if (isDescending) filtered.sortedByDescending { it.album.lowercase() } else filtered.sortedBy { it.album.lowercase() }
         }
     }
 
@@ -134,7 +210,7 @@ fun LikedSongsScreen(navController: NavController) {
                 )
             }
         ) {
-            val playerViewModel: PlayerViewModel = hiltViewModel()
+            val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -304,7 +380,106 @@ fun LikedSongsScreen(navController: NavController) {
                     }
                 }
 
-                itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
+                // ── Search bar for liked songs ──
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp, 8.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .height(55.dp)
+                            .background(Color(0xFF242424))
+                            .padding(10.dp, 0.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_search_big),
+                            tint = Color.White,
+                            contentDescription = "Search",
+                            modifier = Modifier.size(24.dp)
+                        )
+
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.weight(1f),
+                            textStyle = TextStyle.Default.copy(
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight(500)
+                            ),
+                            colors = TextFieldDefaults.colors(
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = Color.White
+                            ),
+                            singleLine = true,
+                            placeholder = {
+                                Text(
+                                    text = "Search in Liked Songs",
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        )
+
+                        if (searchQuery.isNotEmpty()) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { searchQuery = "" }
+                            )
+                        }
+                    }
+                }
+
+                // ── Sort action ──
+                item {
+                    if (songs.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp, 0.dp, 20.dp, 8.dp),
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color(0xFF2A2A30))
+                                    .clickable { showSortSheet = true }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = currentSort.getDescriptiveLabel(isDescending),
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Sort Options",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .padding(start = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                itemsIndexed(filteredSongs, key = { _, song -> song.id }) { index, song ->
                     val currentColor = if (song.id == likedSongsViewModel.currentSongId.value)
                         Color(AppPalette.toArgb()) else Color.White
 
@@ -320,7 +495,7 @@ fun LikedSongsScreen(navController: NavController) {
                                 indication = null,
                                 onLongClick = { menuSong = song },
                                 onClick = {
-                                    likedSongsViewModel.updateQueue(songs)
+                                    likedSongsViewModel.updateQueue(filteredSongs)
                                     SongPlayer.playSong(song.url, context)
                                     likedSongsViewModel.updateSongState(
                                         song.coverUri,
@@ -343,7 +518,7 @@ fun LikedSongsScreen(navController: NavController) {
                             contentScale = ContentScale.Crop,
                             contentDescription = ""
                         )
-                        Column(modifier = Modifier.padding(start = 12.dp).width(280.dp)) {
+                        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
                             Text(
                                 text = song.title,
                                 color = currentColor,
@@ -364,6 +539,79 @@ fun LikedSongsScreen(navController: NavController) {
                 }
 
                 item { Spacer(modifier = Modifier.padding(80.dp)) }
+            }
+        }
+
+        if (showSortSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showSortSheet = false },
+                containerColor = Color(0xFF1A1A1A)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                ) {
+                    Text(
+                        text = "Sort by",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 12.dp)
+                    )
+                    HorizontalDivider(color = Color(0xFF2A2A2A))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LikedSortOption.entries.forEach { option ->
+                        val isSelected = option == currentSort
+                        val icon = when (option) {
+                            LikedSortOption.DATE -> Icons.Default.DateRange
+                            LikedSortOption.TITLE -> Icons.AutoMirrored.Filled.List
+                            LikedSortOption.ARTIST -> Icons.Default.Person
+                            LikedSortOption.ALBUM -> Icons.Default.Menu
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val nextDesc = if (currentSort == option) {
+                                        !isDescending
+                                    } else {
+                                        option == LikedSortOption.DATE
+                                    }
+                                    currentSort = option
+                                    isDescending = nextDesc
+                                    setLikedSort(context, option, nextDesc)
+                                    showSortSheet = false
+                                }
+                                .padding(16.dp, 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = if (isSelected) Color(AppPalette.toArgb()) else Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(18.dp))
+                            Text(
+                                text = if (isSelected) option.getDescriptiveLabel(isDescending) else option.getDescriptiveLabel(option == LikedSortOption.DATE),
+                                color = if (isSelected) Color(AppPalette.toArgb()) else Color.White,
+                                fontSize = 15.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = if (isDescending) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                    contentDescription = null,
+                                    tint = Color(AppPalette.toArgb()),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
             }
         }
     }

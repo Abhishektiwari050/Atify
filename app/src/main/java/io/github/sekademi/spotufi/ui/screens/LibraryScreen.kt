@@ -59,6 +59,9 @@ import io.github.sekademi.spotufi.data.api.Api
 import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.entity.LibraryEntry
+import io.github.sekademi.spotufi.ui.components.EmptyStateView
+import io.github.sekademi.spotufi.ui.components.ErrorRetryView
+import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.data.preferences.isLibraryGridView
 import io.github.sekademi.spotufi.data.preferences.setLibraryGridView
 import io.github.sekademi.spotufi.ui.components.Loader
@@ -167,11 +170,15 @@ fun LibraryScreen(navController: NavController) {
 
         val followedArtists by libraryViewModel.followedArtists.collectAsState()
         when (entries) {
-            is Response.Loading -> LibrarySkeleton(PaddingValues(0.dp))
+            is Response.Loading -> TrackListShimmer(count = 7)
             is Response.Success ->
                 if (gridView) LibraryGridScreen(PaddingValues(0.dp), (entries as Response.Success).data, followedArtists, navController)
                 else SumUpLibraryScreen(PaddingValues(0.dp), (entries as Response.Success).data, followedArtists, navController)
-            else -> Box(modifier = Modifier.padding(20.dp, 100.dp)) { Snackbar(showMessage = "Couldn't load your library") }
+            else -> ErrorRetryView(
+                title = "Couldn't load your library",
+                subtitle = "Please check your network connection and try again",
+                onRetry = { libraryViewModel.load() }
+            )
         }
     }
 }
@@ -194,7 +201,12 @@ fun SumUpLibraryScreen(
     navController: NavController
 ) {
     if (entries.isEmpty() && followedArtists.isEmpty()) {
-        Box(modifier = Modifier.padding(20.dp, 40.dp)) { Snackbar(showMessage = "Library is Empty") }
+        EmptyStateView(
+            title = "Your library is empty",
+            subtitle = "Liked songs, saved albums, and playlists will appear here",
+            actionLabel = "Explore music",
+            onAction = { navController.navigate(Routes.Search.route) }
+        )
         return
     }
     LazyColumn(
@@ -318,7 +330,12 @@ fun LibraryGridScreen(
     navController: NavController
 ) {
     if (entries.isEmpty() && followedArtists.isEmpty()) {
-        Box(modifier = Modifier.padding(20.dp, 40.dp)) { Snackbar(showMessage = "Library is Empty") }
+        EmptyStateView(
+            title = "Your library is empty",
+            subtitle = "Liked songs, saved albums, and playlists will appear here",
+            actionLabel = "Explore music",
+            onAction = { navController.navigate(Routes.Search.route) }
+        )
         return
     }
     LazyVerticalGrid(

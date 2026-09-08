@@ -149,8 +149,6 @@ fun LikedSongsScreen(
                         modifier = Modifier.size(180.dp),
                         model = album[0].coverUri,
                         error = painterResource(R.drawable.placeholder),
-                        //loading = painterResource(R.drawable.album),
-                        //contentScale = ContentScale.Crop,
                         contentDescription = "",
                     )
                 }
@@ -224,7 +222,7 @@ fun LikedSongsScreen(
 //            Spacer(modifier = Modifier.padding(25.dp))
 
             if(likedSongs.isNotEmpty()){
-                val playerViewModel: PlayerViewModel = hiltViewModel()
+                val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
                 repeat(likedSongs.size) {song ->
 
                     var isLiked by remember {
@@ -262,7 +260,7 @@ fun LikedSongsScreen(
                         Row(
                             horizontalArrangement = Arrangement.Start,
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.width(280.dp)
+                            modifier = Modifier.weight(1f)
                         ) {
                             AsyncImage(
                                 modifier = Modifier

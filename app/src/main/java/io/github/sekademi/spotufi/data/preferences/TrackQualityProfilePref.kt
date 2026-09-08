@@ -1,4 +1,4 @@
-﻿package io.github.sekademi.spotufi.data.preferences
+package io.github.sekademi.spotufi.data.preferences
 
 import android.content.Context
 
@@ -110,6 +110,14 @@ fun flagBestVideoMatch(context: Context, query: String, videoId: String, quality
         losslessAvailability = existing?.losslessAvailability ?: LosslessAvailability.UNKNOWN,
         bestVideoId = videoId,
     )
+}
+
+fun clearBestVideoMatch(context: Context, query: String) {
+    if (query.isBlank()) return
+    context.getSharedPreferences(PREF_TRACK_QUALITY_PROFILE, Context.MODE_PRIVATE)
+        .edit()
+        .remove(query + SUFFIX_BEST_VIDEO_ID)
+        .apply()
 }
 
 fun clearTrackQualityProfile(context: Context, query: String) {

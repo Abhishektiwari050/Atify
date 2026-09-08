@@ -19,26 +19,33 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80,
+    primary = AtifySage,
+    onPrimary = Color.White,
+    secondary = AtifyTaupe,
+    onSecondary = Color.White,
+    tertiary = AtifyRust,
+    onTertiary = Color.White,
     background = AppBackground,
+    onBackground = AtifyCream,
+    surface = AppBackground,
+    onSurface = AtifyCream,
+    surfaceVariant = GridBackground,
+    onSurfaceVariant = AtifyTaupe,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40 ,
-    background = AppBackground,
-    /* Other default colors to override
-
-    surface = Color(0xFFFFFBFE),
+    primary = AtifySage,
     onPrimary = Color.White,
+    secondary = AtifyTaupe,
     onSecondary = Color.White,
+    tertiary = AtifyRust,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    background = AppBackground,
+    onBackground = AtifyCream,
+    surface = AppBackground,
+    onSurface = AtifyCream,
+    surfaceVariant = GridBackground,
+    onSurfaceVariant = AtifyTaupe,
 )
 
 @Composable
@@ -61,7 +68,7 @@ fun SpotuiTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 

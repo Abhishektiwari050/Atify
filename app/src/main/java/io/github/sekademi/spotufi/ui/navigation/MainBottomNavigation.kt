@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -33,15 +34,6 @@ import io.github.sekademi.spotufi.ui.components.MiniPlayer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
-class NoRippleInteractionSource : MutableInteractionSource {
-
-    override val interactions: Flow<Interaction> = emptyFlow()
-
-    override suspend fun emit(interaction: Interaction) {}
-
-    override fun tryEmit(interaction: Interaction) = true
-}
-
 @Composable
 fun MainBottomNavigation(navController: NavHostController, bottomBarState: MutableState<Boolean>, bottomBarPlayerState : MutableState<Boolean>) {
 
@@ -59,7 +51,7 @@ fun MainBottomNavigation(navController: NavHostController, bottomBarState: Mutab
                 contentAlignment = Alignment.BottomCenter,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .wrapContentHeight()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
@@ -125,7 +117,6 @@ fun MainBottomNavigation(navController: NavHostController, bottomBarState: Mutab
                                     }
                                 },
                                 alwaysShowLabel = true,
-                                interactionSource = NoRippleInteractionSource(),
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = Color.White,
                                     unselectedIconColor = Color.Gray,

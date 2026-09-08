@@ -260,6 +260,25 @@ object SongPlayer {
         return p to filter
     }
 
+    @Volatile private var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
+
+    fun updateVolumeNormalization(context: Context, audioSessionId: Int) {
+        try {
+            loudnessEnhancer?.release()
+            loudnessEnhancer = null
+            if (io.github.sekademi.spotufi.data.preferences.isVolumeNormalizationEnabled(context) &&
+                audioSessionId != androidx.media3.common.C.AUDIO_SESSION_ID_UNSET
+            ) {
+                loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
+                    setTargetGain(150)
+                    enabled = true
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SongPlayer", "Failed to configure LoudnessEnhancer: ${e.message}")
+        }
+    }
+
     private fun ensurePlayer(context: Context) {
         appCtx = context.applicationContext
         if (player == null) {
@@ -267,6 +286,7 @@ object SongPlayer {
             player = p
             currentPlayerFilter = filter
             CrossfadeEngine.bindPrimaryFilter(filter)
+            updateVolumeNormalization(context, p.audioSessionId)
             onPlayerCreated?.invoke(p)
         }
     }
@@ -275,6 +295,7 @@ object SongPlayer {
         player = incoming
         currentPlayerFilter = filter
         CrossfadeEngine.bindPrimaryFilter(filter)
+        appCtx?.let { updateVolumeNormalization(it, incoming.audioSessionId) }
     }
 
     val exoPlayer: ExoPlayer? get() = player
@@ -465,6 +486,8 @@ object SongPlayer {
     }
 
     fun release() {
+        loudnessEnhancer?.release()
+        loudnessEnhancer = null
         CrossfadeEngine.release()
         player?.release()
         player = null

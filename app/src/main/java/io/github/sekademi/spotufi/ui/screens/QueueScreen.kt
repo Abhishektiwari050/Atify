@@ -66,7 +66,7 @@ import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun QueueScreen(navController: NavController) {
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
     val context = LocalContext.current
     val queue by playerViewModel.queue
     val currentId = playerViewModel.currentSongId.value
@@ -106,19 +106,25 @@ fun QueueScreen(navController: NavController) {
             Text("Queue", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
 
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            current?.let {
-                item {
-                    Text(
-                        "Now playing",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 6.dp)
-                    )
-                    QueueRow(song = it, highlight = true, onClick = {})
+        if (current == null && upcoming.isEmpty()) {
+            io.github.sekademi.spotufi.ui.components.EmptyStateView(
+                title = "Your queue is empty",
+                subtitle = "Add songs, albums, or playlists to listen next.",
+            )
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                current?.let {
+                    item {
+                        Text(
+                            "Now playing",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 6.dp)
+                        )
+                        QueueRow(song = it, highlight = true, onClick = {})
+                    }
                 }
-            }
             if (upcoming.isNotEmpty()) {
                 item {
                     Text(
@@ -197,6 +203,7 @@ fun QueueScreen(navController: NavController) {
                 }
             }
             item { Spacer(modifier = Modifier.height(120.dp)) }
+        }
         }
     }
 }

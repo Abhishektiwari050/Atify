@@ -60,7 +60,9 @@ import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.data.entity.SongsModel
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.components.BiographyText
+import io.github.sekademi.spotufi.ui.components.ErrorRetryView
 import io.github.sekademi.spotufi.ui.components.Loader
+import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.navigation.albumRoute
 import io.github.sekademi.spotufi.ui.navigation.artistRoute
@@ -87,10 +89,11 @@ fun ArtistScreen(navController: NavController, artistName: String, artistId: Str
             .background(Color(AppBackground.toArgb()))
     ) {
         when (val state = overview) {
-            is Response.Loading -> Loader()
-            is Response.Error -> ArtistOverviewContent(
-                navController, artistViewModel,
-                ArtistOverviewModel(name = artistName), artistName,
+            is Response.Loading -> TrackListShimmer(count = 7)
+            is Response.Error -> ErrorRetryView(
+                title = "Couldn't load artist",
+                subtitle = "Please check your network connection and try again",
+                onRetry = { artistViewModel.loadArtistOverview(artistName, artistId) }
             )
             is Response.Success -> ArtistOverviewContent(
                 navController, artistViewModel, state.data, artistName,
@@ -447,7 +450,7 @@ private fun PopularTrackRow(
     LaunchedEffect(likeState) { isLiked = isSongLiked(context, song.id.toString()) }
     val titleColor =
         if (song.id == artistViewModel.currentSongId.value) Color(AppPalette.toArgb()) else Color.White
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
 
     SwipeToQueueBox(song = song, onAddToQueue = { playerViewModel.addToQueue(it) }) {
         Row(

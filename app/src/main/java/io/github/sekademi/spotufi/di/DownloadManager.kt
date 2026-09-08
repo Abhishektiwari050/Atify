@@ -2,13 +2,21 @@ package io.github.sekademi.spotufi.di
 
 import android.content.ContentValues
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import io.github.sekademi.spotufi.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
@@ -17,6 +25,11 @@ import kotlinx.coroutines.withContext
  */
 object DownloadManager {
     private const val TAG = "DownloadManager"
+    private const val NOTIFICATION_ID = 8081
+    private const val CHANNEL_ID = "atify_downloads"
+
+    private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val downloadSemaphore = Semaphore(2)
 
     private val downloading = java.util.Collections.newSetFromMap(
         java.util.concurrent.ConcurrentHashMap<String, Boolean>()
@@ -246,6 +259,13 @@ object DownloadManager {
                 put(MediaStore.Audio.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MUSIC}/$folderName")
                 put(MediaStore.Audio.Media.TITLE, song.title)
                 put(MediaStore.Audio.Media.ARTIST, song.singer)
+                if (song.album.isNotBlank()) {
+                    put(MediaStore.Audio.Media.ALBUM, song.album)
+                }
+                if (song.durationMs > 0) {
+                    put(MediaStore.Audio.Media.DURATION, song.durationMs.toLong())
+                }
+                put(MediaStore.Audio.Media.IS_MUSIC, 1)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val uri = appContext.contentResolver.insert(
@@ -274,12 +294,76 @@ object DownloadManager {
             ).apply { mkdirs() }
             val outFile = java.io.File(dir, "$fileName.$ext")
             if (!tmpFile.renameTo(outFile)) return null
+            MediaScannerConnection.scanFile(
+                appContext,
+                arrayOf(outFile.absolutePath),
+                arrayOf(mime),
+                null
+            )
             return outFile.absolutePath
         }
     }
 
-    fun downloadAll(songs: List<io.github.sekademi.spotufi.data.entity.SongsModel>, context: Context, scope: CoroutineScope) {
-        songs.forEach { downloadSong(it, context, scope) }
+    private fun ensureChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                CHANNEL_ID,
+                "Downloads",
+                android.app.NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = "Track download progress"
+                setShowBadge(false)
+            }
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            nm.createNotificationChannel(channel)
+        }
+    }
+
+    private fun updateNotification(context: Context) {
+        val nm = NotificationManagerCompat.from(context)
+        val activeCount = downloading.size
+        if (activeCount == 0) {
+            nm.cancel(NOTIFICATION_ID)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        ensureChannel(context)
+        val progressValues = downloadProgress.values
+        val totalProgress = if (progressValues.isEmpty()) 0 else progressValues.sum() / progressValues.size
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_download)
+            .setContentTitle("Downloading music")
+            .setContentText("$activeCount track${if (activeCount > 1) "s" else ""} remaining")
+            .setProgress(100, totalProgress, totalProgress <= 0)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
+        try {
+            nm.notify(NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // Notifications disabled or permission denied
+        }
+    }
+
+    fun downloadAll(
+        songs: List<io.github.sekademi.spotufi.data.entity.SongsModel>,
+        context: Context,
+        scope: CoroutineScope = downloadScope,
+    ) {
+        val toDownload = songs.filter {
+            it.url.isNotBlank() && !io.github.sekademi.spotufi.data.preferences.isDownloaded(context, it.id.toString())
+        }
+        if (toDownload.isEmpty()) return
+        toDownload.forEach { song ->
+            downloadSong(song, context, scope)
+        }
     }
 
     fun allDownloaded(
@@ -296,7 +380,7 @@ object DownloadManager {
     fun downloadSong(
         song: io.github.sekademi.spotufi.data.entity.SongsModel,
         context: Context,
-        scope: CoroutineScope,
+        scope: CoroutineScope = downloadScope,
         onComplete: (Boolean) -> Unit = {},
     ) {
         val appContext = context.applicationContext
@@ -308,14 +392,18 @@ object DownloadManager {
         downloadingSongs[query] = song
         downloadProgress[query] = 0
         onDownloadsChanged?.invoke()
+        updateNotification(appContext)
         lastDownloadError = null
         scope.launch {
-            val ok = runCatching { downloadToFile(song, appContext) }
-                .onFailure { lastDownloadError = it.message ?: "Unexpected error" }
-                .getOrDefault(false)
+            val ok = downloadSemaphore.withPermit {
+                runCatching { downloadToFile(song, appContext) }
+                    .onFailure { lastDownloadError = it.message ?: "Unexpected error" }
+                    .getOrDefault(false)
+            }
             downloading.remove(query)
             downloadProgress.remove(query)
             downloadingSongs.remove(query)
+            updateNotification(appContext)
             withContext(Dispatchers.Main) {
                 if (!ok) {
                     android.widget.Toast.makeText(

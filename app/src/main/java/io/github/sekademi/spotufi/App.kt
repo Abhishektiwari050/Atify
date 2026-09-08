@@ -30,7 +30,7 @@ fun App() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val playerViewModel: io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel = hiltViewModel()
+    val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
     val playerState by playerViewModel.currentSongTitle
     var lastRoute by remember { mutableStateOf<String?>(null) }
 

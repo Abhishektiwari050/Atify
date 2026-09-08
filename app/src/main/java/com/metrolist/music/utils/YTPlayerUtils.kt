@@ -45,13 +45,7 @@ object YTPlayerUtils {
     /** Max seconds to wait for PoToken generation before giving up. */
     private const val POT_FUTURE_TIMEOUT_SEC = 14L
 
-    private val httpClient = OkHttpClient.Builder()
-        .proxy(YouTube.proxy)
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
+    private val httpClient = io.github.sekademi.spotufi.data.api.NetworkClient.baseOkHttpClient
 
     private val poTokenGenerator = PoTokenGenerator()
 

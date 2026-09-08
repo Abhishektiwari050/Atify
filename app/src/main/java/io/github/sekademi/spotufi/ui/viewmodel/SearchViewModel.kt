@@ -75,9 +75,17 @@ class SearchViewModel @Inject constructor(private val repository: AppRepository,
 
     fun search(query: String) {
         searchJob?.cancel()
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) {
+            _results.value = Response.Success(SearchResults())
+            _songs.value = Response.Success(emptyList())
+            return
+        }
+        _results.value = Response.Loading()
+        _songs.value = Response.Loading()
         searchJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(150) // short debounce for snappy real-time results
-            repository.searchEverything(query).collect { result ->
+            delay(300) // 300ms debounce to avoid spamming API on fast typing
+            repository.searchEverything(trimmed).collect { result ->
                 _results.value = result
                 // Keep the legacy songs flow in sync for any remaining consumers.
                 _songs.value = when (result) {

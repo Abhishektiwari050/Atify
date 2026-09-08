@@ -75,10 +75,18 @@ object CrossfadeEngine {
     fun startPositionWatch(scope: CoroutineScope) {
         positionWatchJob?.cancel()
         positionWatchJob = scope.launch {
+            var lastPosSaveTime = System.currentTimeMillis()
             while (isActive) {
-                kotlinx.coroutines.delay(250)
-                val ctx = appCtx ?: continue
-                if (++posSaveTick % 12 == 0 && !SongPlayer.webPlaybackActive()) {
+                val ctx = appCtx
+                if (ctx == null) {
+                    kotlinx.coroutines.delay(1000)
+                    continue
+                }
+
+                // Periodic position persistence (roughly every 3 seconds)
+                val now = System.currentTimeMillis()
+                if (now - lastPosSaveTime >= 3000L && !SongPlayer.webPlaybackActive()) {
+                    lastPosSaveTime = now
                     SongPlayer.exoPlayer?.let { p ->
                         val pos = withContext(Dispatchers.Main) {
                             if (p.isPlaying) p.currentPosition else -1L
@@ -86,20 +94,46 @@ object CrossfadeEngine {
                         if (pos > 0) io.github.sekademi.spotufi.data.preferences.saveLastPosition(ctx, pos)
                     }
                 }
-                if (isCrossfading) continue
-                val crossfadeMs = io.github.sekademi.spotufi.data.preferences.getCrossfadeMs(ctx)
-                if (crossfadeMs <= 0) continue
-                val state = boundState ?: continue
-                if (state.repeat.value != RepeatMode.OFF) continue
-                val p = SongPlayer.exoPlayer ?: continue
-                val playing = withContext(Dispatchers.Main) { p.isPlaying }
-                if (!playing) continue
-                val dur = withContext(Dispatchers.Main) { p.duration }
-                val pos = withContext(Dispatchers.Main) { p.currentPosition }
-                if (dur <= 0 || pos < 0) continue
-                if (pos >= dur - crossfadeMs) {
-                    triggerCrossfade(ctx, crossfadeMs, scope)
+
+                if (isCrossfading) {
+                    kotlinx.coroutines.delay(1000)
+                    continue
                 }
+
+                val crossfadeMs = io.github.sekademi.spotufi.data.preferences.getCrossfadeMs(ctx)
+                val state = boundState
+                val p = SongPlayer.exoPlayer
+
+                if (crossfadeMs <= 0 || state == null || state.repeat.value != RepeatMode.OFF || p == null) {
+                    kotlinx.coroutines.delay(2000)
+                    continue
+                }
+
+                val (playing, dur, pos) = withContext(Dispatchers.Main) {
+                    Triple(p.isPlaying, p.duration, p.currentPosition)
+                }
+
+                if (!playing || dur <= 0 || pos < 0) {
+                    kotlinx.coroutines.delay(1500)
+                    continue
+                }
+
+                val triggerThreshold = dur - crossfadeMs
+                val remainingUntilTrigger = triggerThreshold - pos
+
+                val nextDelayMs: Long
+                if (remainingUntilTrigger <= 0) {
+                    triggerCrossfade(ctx, crossfadeMs, scope)
+                    nextDelayMs = 1000L
+                } else if (remainingUntilTrigger <= 3000L) {
+                    // Close to trigger point: high precision 250ms polling
+                    nextDelayMs = 250L
+                } else {
+                    // Far from trigger point: adaptive sleep up to 2500ms
+                    nextDelayMs = (remainingUntilTrigger - 2500L).coerceIn(500L, 2500L)
+                }
+
+                kotlinx.coroutines.delay(nextDelayMs)
             }
         }
     }

@@ -75,8 +75,6 @@
 -keep class java8.** { *; }
 
 # Keep data classes for serialization
--keep class com.metrolist.music.data.entity.** { *; }
--keep class com.metrolist.music.models.** { *; }
 -keep class com.metrolist.spotify.models.** { *; }
 -keep class com.metrolist.innertube.models.** { *; }
 -keep class io.github.sekademi.spotufi.data.entity.** { *; }
