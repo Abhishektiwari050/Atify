@@ -66,7 +66,7 @@ import io.github.sekademi.spotufi.data.preferences.isAlbumLiked
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.data.preferences.removeLikedAlbumId
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
-import io.github.sekademi.spotufi.di.Palette
+import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.components.EmptyStateView
 import io.github.sekademi.spotufi.ui.components.ErrorRetryView
@@ -171,8 +171,10 @@ fun SumUpAlbumScreen(
     var dominentColor by remember {
         mutableStateOf(Color(AppBackground.toArgb()))
     }
-    Palette().extractSecondColorFromCoverUrl(context = context, album[0].coverUri){ color ->
-        dominentColor = color
+    LaunchedEffect(album[0].coverUri) {
+        PaletteExtractor.extractSecondColorFromCoverUrl(context = context, imageUrl = album[0].coverUri) { color ->
+            dominentColor = color
+        }
     }
 
     var isAlbumLiked by remember { mutableStateOf( isAlbumLiked(context, album[0].id.toString())) }

@@ -54,7 +54,7 @@ import io.github.sekademi.spotufi.data.preferences.getLikedSongIds
 import io.github.sekademi.spotufi.data.preferences.getSongsByIds
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
-import io.github.sekademi.spotufi.di.Palette
+import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
@@ -80,8 +80,10 @@ fun LikedSongsScreen(
     var dominentColor by remember {
         mutableStateOf(Color(AppBackground.toArgb()))
     }
-    Palette().extractSecondColorFromCoverUrl(context = context, album[0].coverUri){ color ->
-        dominentColor = color
+    LaunchedEffect(album[0].coverUri) {
+        PaletteExtractor.extractSecondColorFromCoverUrl(context = context, imageUrl = album[0].coverUri) { color ->
+            dominentColor = color
+        }
     }
     val likeState = albumViewModel.likeState.value
     LaunchedEffect(likeState) {

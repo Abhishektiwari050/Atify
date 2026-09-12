@@ -109,7 +109,7 @@ import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.data.preferences.setLocalAlternativeStream
 import io.github.sekademi.spotufi.data.preferences.setYouTubeAlternativeStream
-import io.github.sekademi.spotufi.di.Palette
+import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.di.RepeatMode
 import io.github.sekademi.spotufi.ui.components.Snackbar
@@ -389,8 +389,10 @@ fun PlayerScreen(navController: NavController) {
     var dominentColor by remember {
         mutableStateOf(Color(AppBackground.toArgb()))
     }
-    Palette().extractSecondColorFromCoverUrl(context = context, songCoverUri){ color ->
-        dominentColor = color
+    LaunchedEffect(songCoverUri) {
+        PaletteExtractor.extractSecondColorFromCoverUrl(context = context, imageUrl = songCoverUri) { color ->
+            dominentColor = color
+        }
     }
 
     val shuffle = playerViewModel.shuffleState.value

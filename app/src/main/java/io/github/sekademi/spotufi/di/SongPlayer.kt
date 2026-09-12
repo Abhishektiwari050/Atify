@@ -132,13 +132,19 @@ object SongPlayer {
             if (ctx != null && coverUri.isNotBlank()) {
                 val request = ImageRequest.Builder(ctx)
                     .data(coverUri)
+                    // 384×384 is more than sufficient for system media notifications
+                    // and reduces the bitmap from ~4 MB to ~450 KB before JPEG compression.
+                    .size(coil3.size.Size(384, 384))
                     .allowHardware(false)
                     .target(
                         onSuccess = { result ->
                             runCatching {
                                 val bitmap = result.toBitmap()
                                 val stream = ByteArrayOutputStream()
-                                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                                // Release the decoded bitmap immediately — the JPEG bytes
+                                // are the only thing we need to keep.
+                                bitmap.recycle()
                                 val bytes = stream.toByteArray()
                                 metaArtworkData = bytes
                                 updatePlayerArtwork(bytes, coverUri)
@@ -292,10 +298,22 @@ object SongPlayer {
     }
 
     fun promotePlayer(incoming: ExoPlayer, filter: io.github.sekademi.spotufi.audio.CrossfadeFilterAudioProcessor?) {
+        val oldPlayer = player
         player = incoming
         currentPlayerFilter = filter
         CrossfadeEngine.bindPrimaryFilter(filter)
         appCtx?.let { updateVolumeNormalization(it, incoming.audioSessionId) }
+        // Release the outgoing player so it doesn't leak its AudioTrack, audio-session
+        // handle, and decoder threads. Must run on the main thread per ExoPlayer contract.
+        if (oldPlayer != null && oldPlayer !== incoming) {
+            scope.launch(Dispatchers.Main) {
+                runCatching {
+                    oldPlayer.stop()
+                    oldPlayer.clearMediaItems()
+                    oldPlayer.release()
+                }
+            }
+        }
     }
 
     val exoPlayer: ExoPlayer? get() = player

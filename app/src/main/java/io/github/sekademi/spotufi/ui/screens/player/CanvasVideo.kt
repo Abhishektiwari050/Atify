@@ -11,6 +11,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -18,24 +19,52 @@ import androidx.media3.ui.PlayerView
 /**
  * Plays a Spotify Canvas clip: a short, muted, looping video filling the
  * now-playing background. Uses a dedicated ExoPlayer (separate from the audio
- * engine) released when the composable leaves. Falls back to nothing if the URL fails.
+ * engine) released when the composable leaves.
+ *
+ * A minimal [DefaultLoadControl] is configured: the canvas clip is typically
+ * 3–8 seconds, so a 3-second max buffer (vs. the default 50 MB) keeps RAM
+ * consumption negligible. Proper disposal prevents [PlayerView] → ExoPlayer
+ * surface attachment leaks on recomposition.
  */
 @OptIn(UnstableApi::class)
 @Composable
 fun CanvasVideo(url: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+
     val exo = remember(url) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(url))
-            repeatMode = Player.REPEAT_MODE_ALL
-            volume = 0f
-            playWhenReady = true
-            prepare()
+        // Minimal buffer profile: canvas clips loop continuously so we only
+        // need ~3 s of look-ahead, not the default 50 s / 50 MB budget.
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs        = */ 1_000,
+                /* maxBufferMs        = */ 3_000,
+                /* bufferForPlaybackMs           = */ 500,
+                /* bufferForPlaybackAfterRebufferMs = */ 1_000,
+            )
+            .build()
+
+        ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build()
+            .apply {
+                setMediaItem(MediaItem.fromUri(url))
+                repeatMode = Player.REPEAT_MODE_ALL
+                volume = 0f
+                playWhenReady = true
+                prepare()
+            }
+    }
+
+    DisposableEffect(url) {
+        onDispose {
+            // Detach from any PlayerView before releasing to avoid surface
+            // attachment errors when the Composable is removed during navigation.
+            exo.stop()
+            exo.clearMediaItems()
+            exo.release()
         }
     }
-    DisposableEffect(url) {
-        onDispose { exo.release() }
-    }
+
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
@@ -50,6 +79,11 @@ fun CanvasVideo(url: String, modifier: Modifier = Modifier) {
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 setBackgroundColor(AndroidColor.TRANSPARENT)
             }
+        },
+        update = { playerView ->
+            // Re-attach after recomposition (e.g. on config change) so the
+            // surface is never pointing at a different or released player.
+            if (playerView.player !== exo) playerView.player = exo
         },
     )
 }

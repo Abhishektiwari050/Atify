@@ -71,7 +71,7 @@ import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
-import io.github.sekademi.spotufi.di.Palette
+import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.theme.AppBackground
@@ -137,8 +137,10 @@ fun MiniPlayer(navController: NavHostController) {
     var darkVibrantColor by remember {
         mutableStateOf(Color(GridBackground.toArgb()))
     }
-    Palette().extractFirstColorFromImageUrl(context = context, songCoverUri){ color ->
-        darkVibrantColor = color
+    LaunchedEffect(songCoverUri) {
+        PaletteExtractor.extractFirstColorFromImageUrl(context = context, imageUrl = songCoverUri) { color ->
+            darkVibrantColor = color
+        }
     }
 
     var isLiked by remember {

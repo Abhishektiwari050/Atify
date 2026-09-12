@@ -86,8 +86,15 @@ object SpotifyWebPlayer {
         }
     }
 
-    /** Attach the hidden WebView to the activity window (media won't play detached). */
+    /** Attach the hidden WebView to the activity window (media won't play detached).
+     *  Only creates the WebView when [SongPlayer.webPlayerEnabled] is true — the
+     *  system WebView cannot decrypt Widevine DRM, so when the feature is off there
+     *  is zero reason to create a 150–300 MB Chromium instance or start the 500ms
+     *  main-thread JS polling loop. */
     fun attach(activity: Activity) {
+        // Fast path: skip the entire ~200ms WebView init + 150-300 MB RAM cost when
+        // web playback is disabled (the default). This is the primary RAM fix.
+        if (!SongPlayer.webPlayerEnabled) return
         if (webView != null) return
         try {
             // Lets `chrome://inspect` attach to the hidden player for diagnosis (debug only)

@@ -71,7 +71,7 @@ import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.data.entity.AlbumsModel
-import io.github.sekademi.spotufi.di.Palette
+import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.components.EmptyStateView
 import io.github.sekademi.spotufi.ui.components.ErrorRetryView
@@ -204,8 +204,10 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
         }
 
         var dominentColor by remember { mutableStateOf(Color(AppBackground.toArgb())) }
-        Palette().extractSecondColorFromCoverUrl(context = context, playlist.coverUri) { color ->
-            dominentColor = color
+        LaunchedEffect(playlist.coverUri) {
+            PaletteExtractor.extractSecondColorFromCoverUrl(context = context, imageUrl = playlist.coverUri) { color ->
+                dominentColor = color
+            }
         }
 
         Scaffold(
