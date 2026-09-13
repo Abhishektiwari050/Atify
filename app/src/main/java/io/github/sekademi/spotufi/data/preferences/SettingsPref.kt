@@ -147,3 +147,22 @@ fun isVolumeNormalizationEnabled(c: Context): Boolean =
 
 fun setVolumeNormalizationEnabled(c: Context, enabled: Boolean) =
     prefs(c).edit().putBoolean(KEY_VOLUME_NORMALIZATION, enabled).apply()
+
+private const val KEY_EQUALIZER_ENABLED = "equalizer_enabled"
+private const val KEY_EQUALIZER_PRESET = "equalizer_preset"
+private const val KEY_AUDIO_OFFLOAD = "audio_offload_enabled"
+
+fun isEqualizerEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_EQUALIZER_ENABLED, false)
+fun setEqualizerEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBoolean(KEY_EQUALIZER_ENABLED, enabled).apply()
+
+fun getEqualizerPreset(c: Context): String = prefs(c).getString(KEY_EQUALIZER_PRESET, "Flat") ?: "Flat"
+fun setEqualizerPreset(c: Context, preset: String) = prefs(c).edit().putString(KEY_EQUALIZER_PRESET, preset).apply()
+
+fun getEqualizerBandLevel(c: Context, bandIndex: Int): Int =
+    prefs(c).getInt("eq_band_$bandIndex", 0)
+
+fun setEqualizerBandLevel(c: Context, bandIndex: Int, level: Int) =
+    prefs(c).edit().putInt("eq_band_$bandIndex", level).apply()
+
+fun isAudioOffloadEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_AUDIO_OFFLOAD, true)
+fun setAudioOffloadEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBoolean(KEY_AUDIO_OFFLOAD, enabled).apply()

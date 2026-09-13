@@ -61,6 +61,7 @@ fun PlayerInfo(
     onArtistClick: (() -> Unit)? = null,
     spotifyTrackId: String = "",
     onShowSavedIn: (() -> Unit)? = null,
+    onQualityClick: (() -> Unit)? = null,
 ) {
     var snackbarMessage by remember { mutableStateOf("") }
     var snackbarVisible by remember { mutableStateOf(false) }
@@ -125,7 +126,12 @@ fun PlayerInfo(
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 3.dp),
+                            modifier = Modifier
+                                .padding(top = 3.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { onQualityClick?.invoke() },
                         ) {
                             Box(
                                 modifier = Modifier

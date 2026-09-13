@@ -112,6 +112,7 @@ import io.github.sekademi.spotufi.data.preferences.setYouTubeAlternativeStream
 import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.di.RepeatMode
+import io.github.sekademi.spotufi.ui.components.AudioDetailsSheet
 import io.github.sekademi.spotufi.ui.components.Snackbar
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.navigation.albumRoute
@@ -389,6 +390,7 @@ fun PlayerScreen(navController: NavController) {
     var dominentColor by remember {
         mutableStateOf(Color(AppBackground.toArgb()))
     }
+    var showAudioDetails by remember { mutableStateOf(false) }
     LaunchedEffect(songCoverUri) {
         PaletteExtractor.extractSecondColorFromCoverUrl(context = context, imageUrl = songCoverUri) { color ->
             dominentColor = color
@@ -619,6 +621,7 @@ fun PlayerScreen(navController: NavController) {
                     },
                     spotifyTrackId = queueSongs.firstOrNull { it.id == songId }?.spotifyTrackId.orEmpty(),
                     onShowSavedIn = { showSavedIn = true },
+                    onQualityClick = { showAudioDetails = true },
                 )
 
                 PlayerProgress(
@@ -661,6 +664,14 @@ fun PlayerScreen(navController: NavController) {
                 album = playerViewModel.currentSongAlbum.value,
                 accentColor = dominentColor,
                 onClose = { showLyrics = false }
+            )
+        }
+
+        if (showAudioDetails) {
+            AudioDetailsSheet(
+                details = SongPlayer.getAudioStreamDetails(),
+                context = context,
+                onDismiss = { showAudioDetails = false }
             )
         }
     }

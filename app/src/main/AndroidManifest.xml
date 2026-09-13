@@ -65,6 +65,20 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name=".ui.widget.NowPlayingWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="io.github.sekademi.spotufi.widget.PLAY_PAUSE" />
+                <action android:name="io.github.sekademi.spotufi.widget.NEXT" />
+                <action android:name="io.github.sekademi.spotufi.widget.PREV" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_now_playing_info" />
+        </receiver>
     </application>
 
 </manifest>

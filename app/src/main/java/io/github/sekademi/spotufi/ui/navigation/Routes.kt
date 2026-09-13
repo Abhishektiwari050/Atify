@@ -24,6 +24,7 @@ sealed class Routes(
     object Login : Routes(0, "Login", "login")
     object Settings : Routes(0, "Settings", "settings")
     object History : Routes(0, "History", "history")
+    object Equalizer : Routes(0, "Equalizer", "equalizer")
 }
 
 /** Builds a Browse-category route carrying the search genre and a display title. */

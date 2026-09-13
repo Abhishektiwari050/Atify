@@ -169,6 +169,45 @@ fun SettingsScreen(navController: NavController) {
                 }
             }
 
+            var audioOffload by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isAudioOffloadEnabled(context)) }
+            SettingsSwitchRow(
+                title = "Hardware audio offload",
+                subtitle = "Decode audio via low-power DSP to maximize battery life",
+                checked = audioOffload,
+            ) {
+                audioOffload = it
+                io.github.sekademi.spotufi.data.preferences.setAudioOffloadEnabled(context, it)
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { navController.navigate(io.github.sekademi.spotufi.ui.navigation.Routes.Equalizer.route) }
+                    .background(Color(0xFF1A1A20))
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Equalizer", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    val eqEnabled = io.github.sekademi.spotufi.data.preferences.isEqualizerEnabled(context)
+                    val eqPreset = io.github.sekademi.spotufi.data.preferences.getEqualizerPreset(context)
+                    Text(
+                        if (eqEnabled) "Active ($eqPreset)" else "Off (Tap to configure)",
+                        color = if (eqEnabled) Color(0xFF1ED760) else Color(0xFFB3B3B3),
+                        fontSize = 12.sp,
+                    )
+                }
+                Text(
+                    ">",
+                    color = Color.Gray,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+            }
+
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),

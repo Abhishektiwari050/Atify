@@ -194,7 +194,7 @@ object SongPlayer {
         kotlinx.coroutines.runBlocking { StreamResolver.resolveStreamUrl(song, appContext, forPlayback) }
 
     // ── MediaItem + ExoPlayer ──
-    private fun buildMediaItem(streamUrl: String, mimeType: String? = null): MediaItem {
+    private fun buildMediaItem(streamUrl: String, mimeType: String? = null, mediaId: String? = null): MediaItem {
         val metadata = androidx.media3.common.MediaMetadata.Builder()
             .setTitle(metaTitle)
             .setArtist(metaArtist)
@@ -204,6 +204,30 @@ object SongPlayer {
             }
             .build()
         return MediaItem.Builder()
+            .apply { if (!mediaId.isNullOrBlank()) setMediaId(mediaId) }
+            .setUri(streamUrl)
+            .apply { if (mimeType != null) setMimeType(mimeType) }
+            .setMediaMetadata(metadata)
+            .build()
+    }
+
+    fun buildMediaItemWithSong(streamUrl: String, song: io.github.sekademi.spotufi.data.entity.SongsModel): MediaItem {
+        val mimeType = when {
+            streamUrl.contains(".flac", ignoreCase = true) -> androidx.media3.common.MimeTypes.AUDIO_FLAC
+            streamUrl.contains(".mp4", ignoreCase = true) || streamUrl.contains(".m4a", ignoreCase = true) -> androidx.media3.common.MimeTypes.AUDIO_MP4
+            streamUrl.contains(".webm", ignoreCase = true) || streamUrl.contains(".opus", ignoreCase = true) -> androidx.media3.common.MimeTypes.AUDIO_OPUS
+            else -> null
+        }
+        val metadata = androidx.media3.common.MediaMetadata.Builder()
+            .setTitle(song.title)
+            .setArtist(song.singer)
+            .setAlbumTitle(song.album)
+            .apply {
+                if (song.coverUri.isNotBlank()) setArtworkUri(android.net.Uri.parse(song.coverUri))
+            }
+            .build()
+        return MediaItem.Builder()
+            .setMediaId(song.id.toString())
             .setUri(streamUrl)
             .apply { if (mimeType != null) setMimeType(mimeType) }
             .setMediaMetadata(metadata)
@@ -237,13 +261,19 @@ object SongPlayer {
                 context: Context,
                 enableFloatOutput: Boolean,
                 enableAudioTrackPlaybackParams: Boolean,
-            ): androidx.media3.exoplayer.audio.AudioSink =
-                androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+            ): androidx.media3.exoplayer.audio.AudioSink {
+                val sink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(true)
                     .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
                     .setAudioProcessorChain(
                         androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain(filter),
-                    ).build()
+                    )
+                    .build()
+                if (io.github.sekademi.spotufi.data.preferences.isAudioOffloadEnabled(context)) {
+                    sink.setOffloadMode(androidx.media3.exoplayer.audio.AudioSink.OFFLOAD_MODE_ENABLED_GAPLESS_NOT_REQUIRED)
+                }
+                return sink
+            }
         }
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
@@ -283,6 +313,7 @@ object SongPlayer {
         } catch (e: Exception) {
             android.util.Log.w("SongPlayer", "Failed to configure LoudnessEnhancer: ${e.message}")
         }
+        io.github.sekademi.spotufi.audio.EqualizerEngine.bindAudioSession(context, audioSessionId)
     }
 
     private fun ensurePlayer(context: Context) {
@@ -411,7 +442,13 @@ object SongPlayer {
                         return@withContext
                     }
                     ensurePlayer(appContext)
-                    player!!.setMediaItem(buildMediaItem(streamUrl))
+                    val currentSongModel = boundState?.queue?.value?.firstOrNull { it.url == song }
+                    val initialItem = if (currentSongModel != null) {
+                        buildMediaItemWithSong(streamUrl, currentSongModel)
+                    } else {
+                        buildMediaItem(streamUrl, mediaId = song)
+                    }
+                    player!!.setMediaItem(initialItem)
                     player!!.prepare()
                     if (song == restoreQuery && restorePositionMs > 0) {
                         player!!.seekTo(restorePositionMs)
@@ -428,6 +465,7 @@ object SongPlayer {
                 if (currentIndex in 0 until currentQueue.lastIndex) {
                     val nextSong = currentQueue[currentIndex + 1]
                     prefetch(nextSong.url, appContext)
+                    queueNextMediaItem(nextSong, appContext)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "playSong failed for query: $song", e)
@@ -435,6 +473,54 @@ object SongPlayer {
                 updateResolveStatus(false)
             }
         }
+    }
+
+    /**
+     * Proactively resolves and appends the next MediaItem to ExoPlayer for sample-accurate gapless playback.
+     */
+    fun queueNextMediaItem(nextSong: io.github.sekademi.spotufi.data.entity.SongsModel, context: Context) {
+        val crossfadeMs = io.github.sekademi.spotufi.data.preferences.getCrossfadeMs(context)
+        if (crossfadeMs > 0) return
+        val p = player ?: return
+        scope.launch {
+            val url = runCatching { resolveStreamUrl(nextSong.url, context, forPlayback = false) }.getOrNull()
+            if (url.isNullOrBlank()) return@launch
+            withContext(Dispatchers.Main) {
+                if (player === p && p.mediaItemCount == 1) {
+                    val nextItem = buildMediaItemWithSong(url, nextSong)
+                    p.addMediaItem(nextItem)
+                    Log.d(TAG, "Gapless: Pre-queued next MediaItem: ${nextSong.title}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns live technical metadata regarding the active audio stream.
+     */
+    fun getAudioStreamDetails(): io.github.sekademi.spotufi.data.entity.AudioStreamDetails {
+        val format = player?.audioFormat
+        val mime = format?.sampleMimeType.orEmpty()
+        val cleanMime = when {
+            mime.contains("opus", ignoreCase = true) -> "Opus"
+            mime.contains("mp4a", ignoreCase = true) || mime.contains("aac", ignoreCase = true) -> "AAC"
+            mime.contains("flac", ignoreCase = true) -> "FLAC"
+            mime.contains("mpeg", ignoreCase = true) || mime.contains("mp3", ignoreCase = true) -> "MP3"
+            mime.contains("vorbis", ignoreCase = true) -> "Vorbis"
+            mime.isNotBlank() -> mime.substringAfterLast('/')
+            else -> ""
+        }
+        val ctx = appCtx
+        val isOffload = ctx != null && io.github.sekademi.spotufi.data.preferences.isAudioOffloadEnabled(ctx)
+        return io.github.sekademi.spotufi.data.entity.AudioStreamDetails(
+            source = currentSource,
+            quality = currentQuality,
+            format = cleanMime,
+            sampleRateHz = format?.sampleRate ?: 0,
+            channelCount = format?.channelCount ?: 0,
+            bitrateBps = format?.bitrate ?: 0,
+            isOffloadActive = isOffload,
+        )
     }
 
     fun prefetch(song: String, context: Context) {

@@ -28,6 +28,7 @@ import io.github.sekademi.spotufi.ui.screens.ArtistReleasesScreen
 import io.github.sekademi.spotufi.ui.screens.ArtistScreen
 import io.github.sekademi.spotufi.ui.screens.CategoryScreen
 import io.github.sekademi.spotufi.ui.screens.DownloadsScreen
+import io.github.sekademi.spotufi.ui.screens.EqualizerScreen
 import io.github.sekademi.spotufi.ui.screens.HistoryScreen
 import io.github.sekademi.spotufi.ui.screens.HomeScreen
 import io.github.sekademi.spotufi.ui.screens.LibraryScreen
@@ -220,6 +221,10 @@ fun MyNavHost(
             aId?.let { aid->
                 ArtistScreen(navHostController, aid, artistId)
             }
+        }
+
+        composable(Routes.Equalizer.route) {
+            EqualizerScreen(navHostController)
         }
     }
 }

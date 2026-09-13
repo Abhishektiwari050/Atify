@@ -144,6 +144,27 @@ class PlaybackService : MediaLibraryService() {
             lastErrorSongId = null
             advance(forward = true)
         }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && mediaItem != null) {
+                val nextId = mediaItem.mediaId.toIntOrNull()
+                val queue = currentSongState.queue.value
+                val nextSong = queue.firstOrNull { it.id == nextId }
+                if (nextSong != null) {
+                    val nextIdx = queue.indexOf(nextSong)
+                    currentSongState.updateSongState(
+                        nextSong.coverUri, nextSong.title, nextSong.singer,
+                        true, nextSong.id, nextIdx, nextSong.album
+                    )
+                    // Proactively queue the subsequent track for uninterrupted gapless playback
+                    if (nextIdx in 0 until queue.lastIndex) {
+                        val subsequent = queue[nextIdx + 1]
+                        SongPlayer.queueNextMediaItem(subsequent, applicationContext)
+                    }
+                    maybeExtendRadio(queue, nextIdx)
+                }
+            }
+        }
     }
 
     override fun onCreate() {
@@ -174,6 +195,25 @@ class PlaybackService : MediaLibraryService() {
         lifecycleScope.launch {
             snapshotFlow { currentSongState.songId.value }.collect {
                 mediaSession?.let { session -> updateSessionCustomLayout(session) }
+                io.github.sekademi.spotufi.ui.widget.NowPlayingWidgetProvider.updateAllWidgets(
+                    this@PlaybackService,
+                    currentSongState.title.value,
+                    currentSongState.singer.value,
+                    currentSongState.playingState.value,
+                    currentSongState.coverUri.value,
+                )
+            }
+        }
+
+        lifecycleScope.launch {
+            snapshotFlow { currentSongState.playingState.value }.collect { isPlaying ->
+                io.github.sekademi.spotufi.ui.widget.NowPlayingWidgetProvider.updateAllWidgets(
+                    this@PlaybackService,
+                    currentSongState.title.value,
+                    currentSongState.singer.value,
+                    isPlaying,
+                    currentSongState.coverUri.value,
+                )
             }
         }
 
