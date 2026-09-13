@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -80,6 +81,7 @@ import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 
 enum class LikedSortOption(val label: String) {
     DATE("Date added"),
+    SMART_FLOW("Smart Flow"),
     TITLE("Title"),
     ARTIST("Artist"),
     ALBUM("Album")
@@ -88,6 +90,7 @@ enum class LikedSortOption(val label: String) {
 fun LikedSortOption.getDescriptiveLabel(isDescending: Boolean): String {
     return when (this) {
         LikedSortOption.DATE -> if (isDescending) "Date added (newest to oldest)" else "Date added (oldest to newest)"
+        LikedSortOption.SMART_FLOW -> "Smart Flow (Personalized ML trajectory)"
         LikedSortOption.TITLE -> if (isDescending) "Title (Z to A)" else "Title (A to Z)"
         LikedSortOption.ARTIST -> if (isDescending) "Artist (Z to A)" else "Artist (A to Z)"
         LikedSortOption.ALBUM -> if (isDescending) "Album (Z to A)" else "Album (A to Z)"
@@ -151,6 +154,10 @@ fun LikedSongsScreen(navController: NavController) {
 
         when (currentSort) {
             LikedSortOption.DATE -> if (isDescending) filtered else filtered.reversed()
+            LikedSortOption.SMART_FLOW -> {
+                val flow = io.github.sekademi.spotufi.data.recommendation.SmartMusicRanker.sortSmartFlow(context, filtered)
+                if (isDescending) flow else flow.reversed()
+            }
             LikedSortOption.TITLE -> if (isDescending) filtered.sortedByDescending { it.title.lowercase() } else filtered.sortedBy { it.title.lowercase() }
             LikedSortOption.ARTIST -> if (isDescending) filtered.sortedByDescending { it.singer.lowercase() } else filtered.sortedBy { it.singer.lowercase() }
             LikedSortOption.ALBUM -> if (isDescending) filtered.sortedByDescending { it.album.lowercase() } else filtered.sortedBy { it.album.lowercase() }
@@ -565,6 +572,7 @@ fun LikedSongsScreen(navController: NavController) {
                         val isSelected = option == currentSort
                         val icon = when (option) {
                             LikedSortOption.DATE -> Icons.Default.DateRange
+                            LikedSortOption.SMART_FLOW -> Icons.Default.Star
                             LikedSortOption.TITLE -> Icons.AutoMirrored.Filled.List
                             LikedSortOption.ARTIST -> Icons.Default.Person
                             LikedSortOption.ALBUM -> Icons.Default.Menu

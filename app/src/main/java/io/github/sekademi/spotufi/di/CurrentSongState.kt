@@ -176,6 +176,19 @@ class CurrentSongState @Inject constructor() {
 
     fun updateLikeState(newLikeState : Boolean){
         likeState.value = newLikeState
+        if (newLikeState) {
+            val curId = _songId.value
+            val currentTrack = _queue.value.firstOrNull { it.id == curId }
+            val artistList = currentTrack?.artistIds?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
+                ?.ifEmpty { null }
+                ?: _singer.value.split(",", "&", "/").map { it.trim() }.filter { it.isNotBlank() }
+            if (artistList.isNotEmpty()) {
+                io.github.sekademi.spotufi.data.recommendation.TasteProfileEngine.recordLike(
+                    io.github.sekademi.spotufi.MyApplication.instance,
+                    artistList
+                )
+            }
+        }
     }
 
     fun updateSongState(coverUri: String, title: String, singer: String, playingState: Boolean, songId : Int, songIndex : Int, album : String) {

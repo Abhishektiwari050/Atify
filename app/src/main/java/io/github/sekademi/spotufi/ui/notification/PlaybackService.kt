@@ -90,6 +90,18 @@ class PlaybackService : MediaLibraryService() {
                         return
                     }
                 }
+                val queue = currentSongState.queue.value
+                val curId = currentSongState.songId.value
+                val cur = queue.indexOfFirst { it.id == curId }
+                    .let { if (it >= 0) it else currentSongState.songIndex.value }
+                if (cur in queue.indices) {
+                    val completed = queue[cur]
+                    val artistList = completed.artistIds.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                        .ifEmpty { completed.singer.split(",", "&", "/").map { it.trim() }.filter { it.isNotBlank() } }
+                    if (artistList.isNotEmpty()) {
+                        io.github.sekademi.spotufi.data.recommendation.TasteProfileEngine.recordCompletion(applicationContext, artistList)
+                    }
+                }
                 when (currentSongState.repeat.value) {
                     RepeatMode.ONE -> {
                         val queue = currentSongState.queue.value
@@ -330,6 +342,19 @@ class PlaybackService : MediaLibraryService() {
         
         val nextIdx: Int
         if (forward) {
+            val p = SongPlayer.exoPlayer
+            if (p != null && cur in queue.indices) {
+                val pos = p.currentPosition
+                val dur = p.duration
+                if (dur > 40_000L && pos in 1L..25_000L) {
+                    val skipped = queue[cur]
+                    val artistList = skipped.artistIds.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                        .ifEmpty { skipped.singer.split(",", "&", "/").map { it.trim() }.filter { it.isNotBlank() } }
+                    if (artistList.isNotEmpty()) {
+                        io.github.sekademi.spotufi.data.recommendation.TasteProfileEngine.recordSkip(applicationContext, artistList)
+                    }
+                }
+            }
             maybeExtendRadio(queue, cur)
             if (cur < queue.size - 1) {
                 nextIdx = cur + 1
@@ -443,6 +468,11 @@ class PlaybackService : MediaLibraryService() {
                         io.github.sekademi.spotufi.data.preferences.removeLikedSongId(this@PlaybackService, curId.toString())
                     } else {
                         io.github.sekademi.spotufi.data.preferences.addLikedSongId(this@PlaybackService, curId.toString())
+                        val artistList = curSong.artistIds.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                            .ifEmpty { curSong.singer.split(",", "&", "/").map { it.trim() }.filter { it.isNotBlank() } }
+                        if (artistList.isNotEmpty()) {
+                            io.github.sekademi.spotufi.data.recommendation.TasteProfileEngine.recordLike(this@PlaybackService, artistList)
+                        }
                     }
                     if (curSong.spotifyTrackId.isNotBlank()) {
                         SpotifySync.setTrackSaved(this@PlaybackService, curSong.spotifyTrackId, !wasLiked)

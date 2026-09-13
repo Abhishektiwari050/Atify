@@ -86,12 +86,25 @@ class SearchViewModel @Inject constructor(private val repository: AppRepository,
         searchJob = viewModelScope.launch(Dispatchers.IO) {
             delay(300) // 300ms debounce to avoid spamming API on fast typing
             repository.searchEverything(trimmed).collect { result ->
-                _results.value = result
-                // Keep the legacy songs flow in sync for any remaining consumers.
-                _songs.value = when (result) {
-                    is Response.Success -> Response.Success(result.data.songs)
-                    is Response.Error -> Response.Error(result.error)
-                    is Response.Loading -> Response.Loading()
+                when (result) {
+                    is Response.Success -> {
+                        val rerankedSongs = io.github.sekademi.spotufi.data.recommendation.SmartMusicRanker.rerankSearchResults(
+                            io.github.sekademi.spotufi.MyApplication.instance,
+                            result.data.songs,
+                            trimmed,
+                        )
+                        val rerankedResults = result.data.copy(songs = rerankedSongs)
+                        _results.value = Response.Success(rerankedResults)
+                        _songs.value = Response.Success(rerankedSongs)
+                    }
+                    is Response.Error -> {
+                        _results.value = result
+                        _songs.value = Response.Error(result.error)
+                    }
+                    is Response.Loading -> {
+                        _results.value = result
+                        _songs.value = Response.Loading()
+                    }
                 }
             }
         }

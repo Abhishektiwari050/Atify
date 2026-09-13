@@ -4,6 +4,7 @@ import android.util.Log
 import com.metrolist.spotify.Spotify
 import com.metrolist.spotify.models.SpotifyArtist
 import com.metrolist.spotify.models.SpotifyTrack
+import io.github.sekademi.spotufi.MyApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -12,17 +13,16 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /**
- * Personalized recommendation engine, ported from Meld's SpotifyRecommendationEngine.
+ * Personalized ML recommendation engine.
  *
- * Spotify deprecated its `/v1/recommendations` and related-artists endpoints for
- * cookie/dev-mode tokens, so this builds its own recommender from endpoints that
- * still work:
- * 1. **Taste profile** — the user's top tracks/artists → artist-affinity + genre maps.
- * 2. **Candidate generation** — seed-artist top tracks, same-album tracks,
- *    genre-neighbour artist top tracks, and the user's top-track pool.
- * 3. **Composite scoring** — source relevance, artist affinity, genre overlap,
- *    popularity similarity, recency.
- * 4. **Diversification** — per-artist cap + bucket interleaving.
+ * Combines:
+ * 1. **Dynamic Taste Profile** — real-time on-device vector embeddings with Cosine Similarity.
+ * 2. **Candidate Generation (Open Discovery)** — seed artist top tracks, same-album tracks,
+ *    2nd-degree related artists (via GQL queryArtistOverview), genre-neighbour artists, and user top tracks.
+ * 3. **Composite Scoring** — ML taste cosine similarity, artist affinity, genre overlap,
+ *    popularity similarity, recency, and negative skip penalties.
+ * 4. **Epsilon-Greedy Diversification** (80/20) — 80% exploitation of top taste matches,
+ *    20% serendipitous exploration of adjacent discovery tracks to prevent echo chambers.
  */
 object SpotifyRecommendationEngine {
 
@@ -30,12 +30,13 @@ object SpotifyRecommendationEngine {
     private const val PROFILE_TTL_MS = 6L * 60 * 60 * 1000 // 6 hours
     private const val MAX_TRACKS_PER_ARTIST = 3
 
-    // Scoring weights
-    private const val W_SOURCE = 0.25f
-    private const val W_AFFINITY = 0.30f
-    private const val W_GENRE = 0.20f
-    private const val W_POPULARITY = 0.10f
-    private const val W_RECENCY = 0.15f
+    // ML Scoring weights (Sum = 1.0)
+    private const val W_SOURCE = 0.15f
+    private const val W_COSINE_SIM = 0.35f
+    private const val W_AFFINITY = 0.20f
+    private const val W_GENRE = 0.15f
+    private const val W_POPULARITY = 0.05f
+    private const val W_RECENCY = 0.10f
 
     @Volatile private var artistAffinityMap: Map<String, Float> = emptyMap()
     @Volatile private var artistGenreMap: Map<String, Set<String>> = emptyMap()
@@ -45,8 +46,9 @@ object SpotifyRecommendationEngine {
 
     private enum class Bucket(val sourceScore: Float) {
         SEED_ARTIST(1.0f),
+        DISCOVERY_RELATED(0.95f),
         SAME_ALBUM(0.85f),
-        GENRE_NEIGHBOR(0.65f),
+        GENRE_NEIGHBOR(0.70f),
         USER_TOP(0.45f),
     }
 
@@ -58,9 +60,11 @@ object SpotifyRecommendationEngine {
         val genreOverlap: Float,
         val popularitySimilarity: Float,
         val recencyBoost: Float,
+        val mlCosineScore: Float,
     ) {
         val finalScore: Float
             get() = (W_SOURCE * sourceScore) +
+                (W_COSINE_SIM * mlCosineScore) +
                 (W_AFFINITY * artistAffinity) +
                 (W_GENRE * genreOverlap) +
                 (W_POPULARITY * popularitySimilarity) +
@@ -155,7 +159,31 @@ object SpotifyRecommendationEngine {
                 }.awaitAll()
             }
 
-            // Source 2: same-album tracks
+            // Source 2: 2nd-degree Related Artists (Discovery beyond the bubble)
+            coroutineScope {
+                seedArtistIds.take(2).map { artistId ->
+                    async {
+                        Spotify.artistRelatedArtists(artistId).getOrNull()?.let { relatedArtists ->
+                            for (relArtist in relatedArtists.take(4)) {
+                                val relId = relArtist.id
+                                if (relId.isNotEmpty() && relId !in seedArtistIds) {
+                                    Spotify.artistTopTracks(relId).getOrNull()?.tracks?.let { relTracks ->
+                                        synchronized(candidates) {
+                                            for (track in relTracks.take(4)) {
+                                                if (track.id.isNotEmpty() && seenIds.add(track.id)) {
+                                                    candidates.add(buildCandidate(track, Bucket.DISCOVERY_RELATED, seedPopularity, seedGenres))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+
+            // Source 3: same-album tracks
             seedTrack.album?.id?.let { albumId ->
                 Spotify.album(albumId).getOrNull()?.tracks?.items?.let { albumTracks ->
                     for (track in albumTracks) {
@@ -166,7 +194,7 @@ object SpotifyRecommendationEngine {
                 }
             }
 
-            // Source 3: genre-neighbour artist top tracks
+            // Source 4: genre-neighbour artist top tracks
             coroutineScope {
                 findGenreNeighbors(seedArtistIds, seedGenres).take(4).map { artistId ->
                     async {
@@ -183,7 +211,7 @@ object SpotifyRecommendationEngine {
                 }.awaitAll()
             }
 
-            // Source 4: user's top-track pool
+            // Source 5: user's top-track pool
             for (track in topTrackPool) {
                 if (track.id.isNotEmpty() && seenIds.add(track.id)) {
                     candidates.add(buildCandidate(track, Bucket.USER_TOP, seedPopularity, seedGenres))
@@ -208,7 +236,24 @@ object SpotifyRecommendationEngine {
         val popDiff = abs((track.popularity ?: 50) - seedPopularity)
         val popSimilarity = 1.0f - (popDiff.toFloat() / 100f)
         val recency = if (trackArtistIds.any { it in shortTermArtistIds }) 1.0f else 0f
-        return ScoredCandidate(track, bucket, bucket.sourceScore, affinity, genreOverlap, popSimilarity, recency)
+
+        // Compute Cosine Similarity from on-device TasteProfileEngine
+        val mlCosine = TasteProfileEngine.scoreCandidate(
+            MyApplication.instance,
+            trackArtistIds,
+            trackGenres,
+        )
+
+        return ScoredCandidate(
+            track = track,
+            bucket = bucket,
+            sourceScore = bucket.sourceScore,
+            artistAffinity = affinity,
+            genreOverlap = genreOverlap,
+            popularitySimilarity = popSimilarity,
+            recencyBoost = recency,
+            mlCosineScore = mlCosine,
+        )
     }
 
     /** Approximates related-artists by finding profile artists that share genres with the seed. */
@@ -231,37 +276,59 @@ object SpotifyRecommendationEngine {
             .map { it.first }
     }
 
+    /**
+     * Diversifies the candidate pool using Epsilon-Greedy Serendipity (80% exploitation / 20% exploration)
+     * and a per-artist cap of [MAX_TRACKS_PER_ARTIST].
+     */
     private fun diversify(ranked: List<ScoredCandidate>, limit: Int): List<SpotifyTrack> {
         val result = mutableListOf<SpotifyTrack>()
         val artistCount = mutableMapOf<String, Int>()
-        val lastBuckets = mutableListOf<Bucket>()
         val usedIndices = mutableSetOf<Int>()
 
-        while (result.size < limit && usedIndices.size < ranked.size) {
-            val preferDifferentBucket = lastBuckets.size >= 3 &&
-                lastBuckets.takeLast(3).distinct().size == 1
+        // Split target into 80% exploitation (top scored) and 20% exploration (discovery related)
+        val exploreTarget = (limit * 0.20f).toInt().coerceAtLeast(1)
+        val exploitTarget = limit - exploreTarget
 
-            var bestIndex = -1
-            for (i in ranked.indices) {
-                if (i in usedIndices) continue
-                val candidate = ranked[i]
+        // Pass 1: Exploitation (best overall candidates matching taste profile)
+        for (i in ranked.indices) {
+            if (result.size >= exploitTarget) break
+            val candidate = ranked[i]
+            val mainArtist = candidate.track.artists.firstOrNull()?.id ?: ""
+            if ((artistCount[mainArtist] ?: 0) >= MAX_TRACKS_PER_ARTIST) continue
+
+            result.add(candidate.track)
+            usedIndices.add(i)
+            artistCount[mainArtist] = (artistCount[mainArtist] ?: 0) + 1
+        }
+
+        // Pass 2: Exploration (prioritize DISCOVERY_RELATED and GENRE_NEIGHBOR)
+        for (i in ranked.indices) {
+            if (result.size >= limit) break
+            if (i in usedIndices) continue
+            val candidate = ranked[i]
+            if (candidate.bucket == Bucket.DISCOVERY_RELATED || candidate.bucket == Bucket.GENRE_NEIGHBOR) {
                 val mainArtist = candidate.track.artists.firstOrNull()?.id ?: ""
                 if ((artistCount[mainArtist] ?: 0) >= MAX_TRACKS_PER_ARTIST) continue
-                if (preferDifferentBucket && lastBuckets.isNotEmpty()) {
-                    if (candidate.bucket != lastBuckets.last()) { bestIndex = i; break }
-                    if (bestIndex == -1) bestIndex = i
-                } else { bestIndex = i; break }
-            }
-            if (bestIndex == -1) break
 
-            val chosen = ranked[bestIndex]
-            usedIndices.add(bestIndex)
-            result.add(chosen.track)
-            val mainArtist = chosen.track.artists.firstOrNull()?.id ?: ""
-            artistCount[mainArtist] = (artistCount[mainArtist] ?: 0) + 1
-            lastBuckets.add(chosen.bucket)
-            if (lastBuckets.size > 5) lastBuckets.removeAt(0)
+                result.add(candidate.track)
+                usedIndices.add(i)
+                artistCount[mainArtist] = (artistCount[mainArtist] ?: 0) + 1
+            }
         }
+
+        // Pass 3: Fill any remaining slots with next best candidates
+        for (i in ranked.indices) {
+            if (result.size >= limit) break
+            if (i in usedIndices) continue
+            val candidate = ranked[i]
+            val mainArtist = candidate.track.artists.firstOrNull()?.id ?: ""
+            if ((artistCount[mainArtist] ?: 0) >= MAX_TRACKS_PER_ARTIST) continue
+
+            result.add(candidate.track)
+            usedIndices.add(i)
+            artistCount[mainArtist] = (artistCount[mainArtist] ?: 0) + 1
+        }
+
         return result
     }
 
