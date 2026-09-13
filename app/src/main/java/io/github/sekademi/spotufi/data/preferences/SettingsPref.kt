@@ -166,3 +166,7 @@ fun setEqualizerBandLevel(c: Context, bandIndex: Int, level: Int) =
 
 fun isAudioOffloadEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_AUDIO_OFFLOAD, true)
 fun setAudioOffloadEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBoolean(KEY_AUDIO_OFFLOAD, enabled).apply()
+
+private const val KEY_SKIP_SILENCE = "skip_silence"
+fun isSkipSilenceEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_SKIP_SILENCE, false)
+fun setSkipSilenceEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBoolean(KEY_SKIP_SILENCE, enabled).apply()

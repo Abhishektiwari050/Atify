@@ -10,6 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import android.graphics.Bitmap
 import coil3.imageLoader
@@ -82,6 +85,14 @@ object SongPlayer {
 
     @Volatile private var boundState: CurrentSongState? = null
     @Volatile private var lastYtFailureReason: String? = null
+
+    private val silenceProcessors = java.util.Collections.newSetFromMap(java.util.WeakHashMap<androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor, Boolean>())
+
+    fun setSkipSilence(enabled: Boolean) {
+        synchronized(silenceProcessors) {
+            silenceProcessors.forEach { it.setEnabled(enabled) }
+        }
+    }
 
     private fun updateResolveStatus(isResolving: Boolean, status: String = "") {
         boundState?.updateResolveState(isResolving, status)
@@ -262,11 +273,17 @@ object SongPlayer {
                 enableFloatOutput: Boolean,
                 enableAudioTrackPlaybackParams: Boolean,
             ): androidx.media3.exoplayer.audio.AudioSink {
+                val silenceProcessor = androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor()
+                silenceProcessor.setEnabled(io.github.sekademi.spotufi.data.preferences.isSkipSilenceEnabled(context))
+                synchronized(silenceProcessors) {
+                    silenceProcessors.add(silenceProcessor)
+                }
+
                 val sink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(true)
                     .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
                     .setAudioProcessorChain(
-                        androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain(filter),
+                        androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain(filter, silenceProcessor),
                     )
                     .build()
                 if (io.github.sekademi.spotufi.data.preferences.isAudioOffloadEnabled(context)) {
@@ -619,17 +636,99 @@ object SongPlayer {
     @Volatile var sleepTimerEndAt: Long = 0L
         private set
 
+    private val _sleepTimerRemainingSec = MutableStateFlow<Long?>(null)
+    val sleepTimerRemainingSec: StateFlow<Long?> = _sleepTimerRemainingSec.asStateFlow()
+
+    private val _sleepTimerStopAtTrackEnd = MutableStateFlow(false)
+    val sleepTimerStopAtTrackEnd: StateFlow<Boolean> = _sleepTimerStopAtTrackEnd.asStateFlow()
+
     fun setSleepTimer(durationMillis: Long) {
-        sleepJob?.cancel()
-        if (durationMillis <= 0L) {
-            sleepTimerEndAt = 0L
-            return
-        }
-        sleepTimerEndAt = System.currentTimeMillis() + durationMillis
+        cancelSleepTimer()
+        if (durationMillis <= 0L) return
+
+        val endTime = System.currentTimeMillis() + durationMillis
+        sleepTimerEndAt = endTime
+        _sleepTimerRemainingSec.value = durationMillis / 1000L
+
         sleepJob = scope.launch {
-            kotlinx.coroutines.delay(durationMillis)
-            withContext(Dispatchers.Main) { pause() }
+            val fadeDurationMs = 15_000L.coerceAtMost(durationMillis)
+
+            // Countdown loop until fade-out threshold
+            while (true) {
+                val now = System.currentTimeMillis()
+                val remainingMs = sleepTimerEndAt - now
+                if (remainingMs <= fadeDurationMs) break
+                _sleepTimerRemainingSec.value = (remainingMs / 1000L).coerceAtLeast(1L)
+                delay(1000L.coerceAtMost(remainingMs - fadeDurationMs))
+            }
+
+            // Smooth volume fade-out over the final seconds
+            val fadeStart = System.currentTimeMillis()
+            while (true) {
+                val elapsed = System.currentTimeMillis() - fadeStart
+                val remainingFade = (fadeDurationMs - elapsed).coerceAtLeast(0L)
+                _sleepTimerRemainingSec.value = remainingFade / 1000L
+                val factor = (remainingFade.toFloat() / fadeDurationMs.toFloat()).coerceIn(0f, 1f)
+                withContext(Dispatchers.Main) {
+                    player?.volume = factor
+                }
+                if (elapsed >= fadeDurationMs) break
+                delay(300L)
+            }
+
+            withContext(Dispatchers.Main) {
+                pause()
+                player?.volume = 1f
+            }
+            _sleepTimerRemainingSec.value = null
             sleepTimerEndAt = 0L
+        }
+    }
+
+    fun setSleepTimerAtTrackEnd() {
+        cancelSleepTimer()
+        _sleepTimerStopAtTrackEnd.value = true
+
+        sleepJob = scope.launch {
+            val initialTrack = loadedQuery
+            val fadeDurationMs = 15_000L
+
+            while (_sleepTimerStopAtTrackEnd.value) {
+                // If song changed or stopped, finish timer
+                if (loadedQuery != initialTrack) {
+                    withContext(Dispatchers.Main) {
+                        pause()
+                        player?.volume = 1f
+                    }
+                    break
+                }
+
+                val dur = getDuration()
+                val pos = getCurrentPosition()
+
+                if (dur > 0L && pos > 0L) {
+                    val remainingMs = dur - pos
+                    if (remainingMs <= fadeDurationMs) {
+                        val factor = (remainingMs.toFloat() / fadeDurationMs.toFloat()).coerceIn(0f, 1f)
+                        withContext(Dispatchers.Main) {
+                            player?.volume = factor
+                        }
+                    }
+                    if (remainingMs <= 400L || !isPrepared()) {
+                        withContext(Dispatchers.Main) {
+                            pause()
+                            player?.volume = 1f
+                        }
+                        break
+                    }
+                }
+                delay(400L)
+            }
+
+            withContext(Dispatchers.Main) {
+                player?.volume = 1f
+            }
+            _sleepTimerStopAtTrackEnd.value = false
         }
     }
 
@@ -637,5 +736,10 @@ object SongPlayer {
         sleepJob?.cancel()
         sleepJob = null
         sleepTimerEndAt = 0L
+        _sleepTimerRemainingSec.value = null
+        _sleepTimerStopAtTrackEnd.value = false
+        scope.launch(Dispatchers.Main) {
+            player?.volume = 1f
+        }
     }
 }

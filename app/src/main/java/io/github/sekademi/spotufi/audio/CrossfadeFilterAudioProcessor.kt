@@ -140,9 +140,9 @@ class CrossfadeFilterAudioProcessor : BaseAudioProcessor() {
         while (input.remaining() >= 4) {
             val left = input.short.toDouble() / Short.MAX_VALUE
             val right = input.short.toDouble() / Short.MAX_VALUE
-            val out = filter.processStereo(left, right)
-            output.putShort((out[0].coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort())
-            output.putShort((out[1].coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort())
+            filter.processStereoDirect(left, right)
+            output.putShort((filter.outLeft.coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort())
+            output.putShort((filter.outRight.coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort())
         }
     }
 
@@ -158,9 +158,9 @@ class CrossfadeFilterAudioProcessor : BaseAudioProcessor() {
         while (input.remaining() >= 8) {
             val left = input.float.toDouble()
             val right = input.float.toDouble()
-            val out = filter.processStereo(left, right)
-            output.putFloat(out[0].coerceIn(-1.0, 1.0).toFloat())
-            output.putFloat(out[1].coerceIn(-1.0, 1.0).toFloat())
+            filter.processStereoDirect(left, right)
+            output.putFloat(filter.outLeft.coerceIn(-1.0, 1.0).toFloat())
+            output.putFloat(filter.outRight.coerceIn(-1.0, 1.0).toFloat())
         }
     }
 

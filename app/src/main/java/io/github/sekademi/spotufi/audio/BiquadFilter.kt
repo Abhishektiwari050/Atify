@@ -95,32 +95,48 @@ class BiquadFilter {
     }
 
     /**
+     * Direct primitive output properties to eliminate any array allocations or indexing
+     * overhead on the real-time audio thread (44,100×/sec).
+     */
+    var outLeft: Double = 0.0
+        private set
+    var outRight: Double = 0.0
+        private set
+
+    /**
      * Reusable stereo output buffer: [0] = left, [1] = right.
-     * Avoids allocating a Pair on every sample (44,100×/sec on the audio thread).
+     * Maintained for backwards-compatibility.
      */
     private val stereoOut = DoubleArray(2)
+
+    /**
+     * Process one stereo sample pair directly writing into primitive fields [outLeft] and [outRight].
+     * Zero-allocation, zero-indirection.
+     */
+    fun processStereoDirect(inputLeft: Double, inputRight: Double) {
+        val midL = b0_1 * inputLeft + b1_1 * s1_x1L + b2_1 * s1_x2L - a1_1 * s1_y1L - a2_1 * s1_y2L
+        s1_x2L = s1_x1L; s1_x1L = inputLeft
+        s1_y2L = s1_y1L; s1_y1L = midL
+        outLeft = b0_2 * midL + b1_2 * s2_x1L + b2_2 * s2_x2L - a1_2 * s2_y1L - a2_2 * s2_y2L
+        s2_x2L = s2_x1L; s2_x1L = midL
+        s2_y2L = s2_y1L; s2_y1L = outLeft
+
+        val midR = b0_1 * inputRight + b1_1 * s1_x1R + b2_1 * s1_x2R - a1_1 * s1_y1R - a2_1 * s1_y2R
+        s1_x2R = s1_x1R; s1_x1R = inputRight
+        s1_y2R = s1_y1R; s1_y1R = midR
+        outRight = b0_2 * midR + b1_2 * s2_x1R + b2_2 * s2_x2R - a1_2 * s2_y1R - a2_2 * s2_y2R
+        s2_x2R = s2_x1R; s2_x1R = midR
+        s2_y2R = s2_y1R; s2_y1R = outRight
+    }
 
     /**
      * Process one stereo sample pair through both cascaded biquad stages.
      * Results are written into [stereoOut]: index 0 = left, index 1 = right.
      */
     fun processStereo(inputLeft: Double, inputRight: Double): DoubleArray {
-        val midL = b0_1 * inputLeft + b1_1 * s1_x1L + b2_1 * s1_x2L - a1_1 * s1_y1L - a2_1 * s1_y2L
-        s1_x2L = s1_x1L; s1_x1L = inputLeft
-        s1_y2L = s1_y1L; s1_y1L = midL
-        val outL = b0_2 * midL + b1_2 * s2_x1L + b2_2 * s2_x2L - a1_2 * s2_y1L - a2_2 * s2_y2L
-        s2_x2L = s2_x1L; s2_x1L = midL
-        s2_y2L = s2_y1L; s2_y1L = outL
-
-        val midR = b0_1 * inputRight + b1_1 * s1_x1R + b2_1 * s1_x2R - a1_1 * s1_y1R - a2_1 * s1_y2R
-        s1_x2R = s1_x1R; s1_x1R = inputRight
-        s1_y2R = s1_y1R; s1_y1R = midR
-        val outR = b0_2 * midR + b1_2 * s2_x1R + b2_2 * s2_x2R - a1_2 * s2_y1R - a2_2 * s2_y2R
-        s2_x2R = s2_x1R; s2_x1R = midR
-        s2_y2R = s2_y1R; s2_y1R = outR
-
-        stereoOut[0] = outL
-        stereoOut[1] = outR
+        processStereoDirect(inputLeft, inputRight)
+        stereoOut[0] = outLeft
+        stereoOut[1] = outRight
         return stereoOut
     }
 

@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -136,7 +137,7 @@ fun SumUpSearchScreen(
     val searchedList = results.songs
     // One relevance-mixed list (songs, artists, albums interleaved) instead of
     // separate type sections — matches how most music apps present search.
-    val mixed = remember(results) { mixSearchResults(results) }
+    val mixed = remember(results, text) { mixSearchResults(results, text) }
 
     // Warm the stream cache for the top search hits so tapping a result plays
     // (near-)instantly instead of resolving YouTube on the tap.
@@ -322,29 +323,83 @@ fun SumUpSearchScreen(
                     } else {
                         when (selectedFilter) {
                             SearchFilter.ALL -> {
-                                items(mixed.size) { i ->
-                                    when (val row = mixed[i]) {
-                                        is SearchRow.Song -> SearchSongRow(row.song, searchedList, searchViewModel, onPlayed = {
-                                            recordRecent(row.song.toRecentItem())
-                                        })
-                                        is SearchRow.Artist -> SearchArtistRow(row.artist) {
-                                            recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
-                                                type = "artist",
-                                                key = row.artist.id.ifBlank { row.artist.name },
-                                                name = row.artist.name,
-                                                image = row.artist.coverUri,
-                                            ))
-                                            navController.navigate(artistRoute(row.artist.name, row.artist.id))
+                                val topResult = mixed.firstOrNull()
+                                val remainingMixed = if (mixed.size > 1) mixed.subList(1, mixed.size) else emptyList()
+
+                                if (topResult != null) {
+                                    item {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        ) {
+                                            Text(
+                                                text = "Top result",
+                                                color = Color.White,
+                                                fontSize = 20.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(bottom = 10.dp)
+                                            )
+                                            TopResultCard(
+                                                topResult = topResult,
+                                                onPlaySong = { song ->
+                                                    recordRecent(song.toRecentItem())
+                                                    searchViewModel.startRadioFromSong(song)
+                                                    SongPlayer.playSong(song.url, context)
+                                                    searchViewModel.updateSongState(
+                                                        song.coverUri, song.title, song.singer, true, song.id, 0, song.album
+                                                    )
+                                                },
+                                                onArtistClick = { artist ->
+                                                    recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                        type = "artist",
+                                                        key = artist.id.ifBlank { artist.name },
+                                                        name = artist.name,
+                                                        image = artist.coverUri,
+                                                    ))
+                                                    navController.navigate(artistRoute(artist.name, artist.id))
+                                                },
+                                                onAlbumClick = { album ->
+                                                    recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                        type = "album",
+                                                        key = album.name,
+                                                        name = album.name,
+                                                        singer = album.artists,
+                                                        image = album.coverUri,
+                                                    ))
+                                                    navController.navigate(albumRoute(album.name, album.artists))
+                                                },
+                                            )
                                         }
-                                        is SearchRow.Album -> SearchAlbumRow(row.album) {
-                                            recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
-                                                type = "album",
-                                                key = row.album.name,
-                                                name = row.album.name,
-                                                singer = row.album.artists,
-                                                image = row.album.coverUri,
-                                            ))
-                                            navController.navigate(albumRoute(row.album.name, row.album.artists))
+                                    }
+                                }
+
+                                if (remainingMixed.isNotEmpty()) {
+                                    item { SearchSectionHeader("Songs & more") }
+                                    items(remainingMixed.size) { i ->
+                                        when (val row = remainingMixed[i]) {
+                                            is SearchRow.Song -> SearchSongRow(row.song, searchedList, searchViewModel, onPlayed = {
+                                                recordRecent(row.song.toRecentItem())
+                                            })
+                                            is SearchRow.Artist -> SearchArtistRow(row.artist) {
+                                                recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                    type = "artist",
+                                                    key = row.artist.id.ifBlank { row.artist.name },
+                                                    name = row.artist.name,
+                                                    image = row.artist.coverUri,
+                                                ))
+                                                navController.navigate(artistRoute(row.artist.name, row.artist.id))
+                                            }
+                                            is SearchRow.Album -> SearchAlbumRow(row.album) {
+                                                recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                    type = "album",
+                                                    key = row.album.name,
+                                                    name = row.album.name,
+                                                    singer = row.album.artists,
+                                                    image = row.album.coverUri,
+                                                ))
+                                                navController.navigate(albumRoute(row.album.name, row.album.artists))
+                                            }
                                         }
                                     }
                                 }
@@ -460,17 +515,205 @@ sealed class SearchRow {
  * (2 songs per artist+album cycle) so the list reads as mixed rather than
  * grouped, while songs — the most common search intent — stay prominent.
  */
-private fun mixSearchResults(results: SearchResults): List<SearchRow> {
-    val songs = results.songs.iterator()
-    val artists = results.artists.iterator()
-    val albums = results.albums.iterator()
+private fun mixSearchResults(results: SearchResults, query: String = ""): List<SearchRow> {
+    val q = query.trim().lowercase()
     val out = ArrayList<SearchRow>()
+    val matchedArtist = if (q.isNotBlank()) {
+        results.artists.firstOrNull { it.name.trim().lowercase() == q }
+    } else null
+
+    if (matchedArtist != null) {
+        out += SearchRow.Artist(matchedArtist)
+    }
+
+    val songs = results.songs.iterator()
+    val artists = results.artists.filter { it != matchedArtist }.iterator()
+    val albums = results.albums.iterator()
     while (songs.hasNext() || artists.hasNext() || albums.hasNext()) {
         repeat(2) { if (songs.hasNext()) out += SearchRow.Song(songs.next()) }
         if (artists.hasNext()) out += SearchRow.Artist(artists.next())
         if (albums.hasNext()) out += SearchRow.Album(albums.next())
     }
     return out
+}
+
+/** Spotify-style elevated hero card for the #1 search match with instant 1-tap play. */
+@Composable
+fun TopResultCard(
+    topResult: SearchRow,
+    onPlaySong: (SongsModel) -> Unit,
+    onArtistClick: (io.github.sekademi.spotufi.data.entity.ArtistsModel) -> Unit,
+    onAlbumClick: (io.github.sekademi.spotufi.data.entity.AlbumsModel) -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1E1E24))
+            .clickable {
+                when (topResult) {
+                    is SearchRow.Song -> onPlaySong(topResult.song)
+                    is SearchRow.Artist -> onArtistClick(topResult.artist)
+                    is SearchRow.Album -> onAlbumClick(topResult.album)
+                }
+            }
+            .padding(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(end = 56.dp)) {
+            when (topResult) {
+                is SearchRow.Song -> {
+                    AsyncImage(
+                        model = topResult.song.coverUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(R.drawable.placeholder),
+                        placeholder = painterResource(R.drawable.placeholder),
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = topResult.song.title,
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFF2A2A32),
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                text = "Song",
+                                color = Color(0xFFE0E0E0),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Text(
+                            text = "• ${topResult.song.singer}",
+                            color = Color(0xFFB3B3B3),
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                is SearchRow.Artist -> {
+                    AsyncImage(
+                        model = topResult.artist.coverUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(R.drawable.placeholder),
+                        placeholder = painterResource(R.drawable.placeholder),
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape),
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = topResult.artist.name,
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFF2A2A32),
+                    ) {
+                        Text(
+                            text = "Artist",
+                            color = Color(0xFFE0E0E0),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                is SearchRow.Album -> {
+                    AsyncImage(
+                        model = topResult.album.coverUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(R.drawable.placeholder),
+                        placeholder = painterResource(R.drawable.placeholder),
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = topResult.album.name,
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFF2A2A32),
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                text = "Album",
+                                color = Color(0xFFE0E0E0),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Text(
+                            text = "• ${topResult.album.artists}",
+                            color = Color(0xFFB3B3B3),
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+
+        // Circular Green Play Button in bottom right
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(46.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(AppPalette)
+                .clickable {
+                    when (topResult) {
+                        is SearchRow.Song -> onPlaySong(topResult.song)
+                        is SearchRow.Artist -> onArtistClick(topResult.artist)
+                        is SearchRow.Album -> onAlbumClick(topResult.album)
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Play",
+                tint = Color.Black,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+    }
 }
 
 /** Maps a tapped search-result song to a persisted recent item. */

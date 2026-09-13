@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,10 @@ fun PlayerOptionsSheet(
     var showSleep by remember { mutableStateOf(false) }
     var showSavedIn by remember { mutableStateOf(false) }
     var showAlternativeStream by remember { mutableStateOf(false) }
+
+    val sleepTimerSec by SongPlayer.sleepTimerRemainingSec.collectAsState()
+    val sleepTimerTrackEnd by SongPlayer.sleepTimerStopAtTrackEnd.collectAsState()
+    val isTimerActive = sleepTimerSec != null || sleepTimerTrackEnd
 
     val title = playerViewModel.currentSongTitle.value
     val singer = playerViewModel.currentSongSinger.value
@@ -286,33 +291,80 @@ fun PlayerOptionsSheet(
                         navController.navigate(route)
                     }
                 }
+                val timerLabel = when {
+                    sleepTimerSec != null -> {
+                        val sec = sleepTimerSec ?: 0L
+                        val m = sec / 60
+                        val s = sec % 60
+                        "Sleep timer (${String.format(java.util.Locale.US, "%d:%02d", m, s)})"
+                    }
+                    sleepTimerTrackEnd -> "Sleep timer (End of track)"
+                    else -> "Sleep timer"
+                }
                 PlayerMenuRow(
                     icon = Icons.Default.Notifications,
-                    label = "Sleep timer",
+                    iconTint = if (isTimerActive) Color(AppPalette.toArgb()) else Color.White,
+                    label = timerLabel,
                     trailingArrow = true
                 ) { showSleep = true }
             } else {
-                Text(
-                    "Sleep timer",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(16.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Sleep timer",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (isTimerActive) {
+                        val remainingText = if (sleepTimerTrackEnd) {
+                            "End of track"
+                        } else {
+                            val sec = sleepTimerSec ?: 0L
+                            val m = sec / 60
+                            val s = sec % 60
+                            "${String.format(java.util.Locale.US, "%d:%02d", m, s)} left"
+                        }
+                        Text(
+                            text = remainingText,
+                            color = Color(AppPalette.toArgb()),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
                 HorizontalDivider(color = Color(0xFF2A2A2A))
-                val options = listOf(
-                    "Off" to 0L,
-                    "5 minutes" to 5L,
-                    "15 minutes" to 15L,
-                    "30 minutes" to 30L,
-                    "45 minutes" to 45L,
-                    "1 hour" to 60L
-                )
-                options.forEach { (label, minutes) ->
-                    PlayerMenuRow(icon = Icons.Default.Notifications, label = label) {
-                        SongPlayer.setSleepTimer(minutes * 60_000L)
+                if (isTimerActive) {
+                    PlayerMenuRow(
+                        icon = Icons.Default.Notifications,
+                        iconTint = Color(0xFFFF5252),
+                        label = "Turn off timer"
+                    ) {
+                        SongPlayer.cancelSleepTimer()
                         onDismiss()
                     }
+                }
+                val options = listOf(
+                    "5 minutes" to (5L * 60_000L),
+                    "15 minutes" to (15L * 60_000L),
+                    "30 minutes" to (30L * 60_000L),
+                    "45 minutes" to (45L * 60_000L),
+                    "1 hour" to (60L * 60_000L),
+                )
+                options.forEach { (label, durationMs) ->
+                    PlayerMenuRow(icon = Icons.Default.Notifications, label = label) {
+                        SongPlayer.setSleepTimer(durationMs)
+                        onDismiss()
+                    }
+                }
+                PlayerMenuRow(icon = Icons.Default.Notifications, label = "End of current track") {
+                    SongPlayer.setSleepTimerAtTrackEnd()
+                    onDismiss()
                 }
             }
         }

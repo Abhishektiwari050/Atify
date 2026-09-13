@@ -44,3 +44,12 @@ fun cacheLyrics(context: Context, key: String, lyrics: Lyrics) {
         .putString(KEY_ARTIST + key, o.toString())
         .apply()
 }
+
+fun clearLyricsCache(context: Context) {
+    context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().clear().apply()
+}
+
+fun getLyricsCacheSizeBytes(context: Context): Long {
+    val file = java.io.File(context.applicationInfo.dataDir, "shared_prefs/$PREF.xml")
+    return if (file.exists()) file.length() else 0L
+}

@@ -22,8 +22,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -34,6 +35,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -94,7 +96,8 @@ fun SettingsScreen(navController: NavController) {
     var batteryOptExempt by remember { mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimization(context)) }
     var updateRepoUrl by remember { mutableStateOf(getUpdateRepoUrl(context)) }
     var downloadFolderName by remember { mutableStateOf(getDownloadFolderName(context)) }
-    var cacheSizeBytes by remember { mutableStateOf(io.github.sekademi.spotufi.di.StreamResolver.getMediaCacheSizeBytes(context)) }
+    var cacheBreakdown by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.StorageManager.getCacheBreakdown(context)) }
+    var showClearCacheDialog by remember { mutableStateOf(false) }
 
     val batteryOptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -104,6 +107,37 @@ fun SettingsScreen(navController: NavController) {
 
     // Manual update check state
     var updateCheckState by remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
+
+    if (showClearCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheDialog = false },
+            title = { Text("Clear all cache?", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "This will free up space by removing cached audio chunks, artwork images, and lyrics. Your downloaded offline songs and playlists will NOT be deleted.",
+                    color = Color(0xFFB3B3B3),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val prevTotal = cacheBreakdown.totalBytes
+                    cacheBreakdown = io.github.sekademi.spotufi.data.preferences.StorageManager.clearAllCaches(context)
+                    showClearCacheDialog = false
+                    val freedMb = String.format(java.util.Locale.US, "%.1f", (prevTotal - cacheBreakdown.totalBytes).coerceAtLeast(0L) / (1024f * 1024f))
+                    android.widget.Toast.makeText(context, "Cache cleared ($freedMb MB freed)", android.widget.Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Clear", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCacheDialog = false }) {
+                    Text("Cancel", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF1A1A1A),
+            titleContentColor = Color.White,
+        )
+    }
 
     Scaffold(
         containerColor = AppBackground,
@@ -177,6 +211,17 @@ fun SettingsScreen(navController: NavController) {
             ) {
                 audioOffload = it
                 io.github.sekademi.spotufi.data.preferences.setAudioOffloadEnabled(context, it)
+            }
+
+            var skipSilence by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isSkipSilenceEnabled(context)) }
+            SettingsSwitchRow(
+                title = "Skip silence",
+                subtitle = "Automatically skip silent intro and outro gaps in tracks",
+                checked = skipSilence,
+            ) {
+                skipSilence = it
+                io.github.sekademi.spotufi.data.preferences.setSkipSilenceEnabled(context, it)
+                SongPlayer.setSkipSilence(it)
             }
 
             Spacer(Modifier.height(6.dp))
@@ -322,23 +367,24 @@ fun SettingsScreen(navController: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Streaming cache", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Storage & cache", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    val totalMb = String.format(java.util.Locale.US, "%.1f", cacheBreakdown.totalBytes / (1024f * 1024f))
+                    val audioMb = String.format(java.util.Locale.US, "%.1f", cacheBreakdown.audioBytes / (1024f * 1024f))
+                    val imageMb = String.format(java.util.Locale.US, "%.1f", cacheBreakdown.imageBytes / (1024f * 1024f))
                     Text(
-                        "${String.format(java.util.Locale.US, "%.1f", cacheSizeBytes / (1024f * 1024f))} MB cached",
+                        "$totalMb MB cached (Audio: $audioMb MB • Images: $imageMb MB)",
                         color = Color(0xFFB3B3B3),
                         fontSize = 12.sp,
                     )
                 }
                 Text(
                     "Clear",
-                    color = AppPalette,
+                    color = if (cacheBreakdown.totalBytes > 0L) AppPalette else Color(0xFF555555),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .clickable {
-                            io.github.sekademi.spotufi.di.StreamResolver.clearMediaCache(context)
-                            cacheSizeBytes = io.github.sekademi.spotufi.di.StreamResolver.getMediaCacheSizeBytes(context)
-                            android.widget.Toast.makeText(context, "Streaming cache cleared", android.widget.Toast.LENGTH_SHORT).show()
+                        .clickable(enabled = cacheBreakdown.totalBytes > 0L) {
+                            showClearCacheDialog = true
                         }
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
