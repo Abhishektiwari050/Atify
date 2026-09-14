@@ -170,3 +170,8 @@ fun setAudioOffloadEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBo
 private const val KEY_SKIP_SILENCE = "skip_silence"
 fun isSkipSilenceEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_SKIP_SILENCE, false)
 fun setSkipSilenceEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBoolean(KEY_SKIP_SILENCE, enabled).apply()
+
+private const val KEY_SPOTIFY_CANVAS = "spotify_canvas_enabled"
+fun isSpotifyCanvasEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_SPOTIFY_CANVAS, true)
+fun setSpotifyCanvasEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBoolean(KEY_SPOTIFY_CANVAS, enabled).apply()
+

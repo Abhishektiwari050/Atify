@@ -1,5 +1,7 @@
 package io.github.sekademi.spotufi.ui.screens.player
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +11,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -29,11 +32,20 @@ fun PlayerArtwork(
     currentCoverUri: String,
     pagerState: PagerState,
     canvasUrl: String?,
+    showStaticCover: Boolean = false,
+    onToggleCover: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val artworkAlpha = if (canvasUrl != null && !showStaticCover) 0f else 1f
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onToggleCover,
+            )
     ) {
         if (queueSongs.isEmpty()) {
             AsyncImage(
@@ -42,7 +54,7 @@ fun PlayerArtwork(
                     .aspectRatio(1f)
                     .padding(20.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .alpha(if (canvasUrl != null) 0f else 1f),
+                    .alpha(artworkAlpha),
                 model = currentCoverUri,
                 contentScale = ContentScale.Crop,
                 contentDescription = "Cover Art"
@@ -59,7 +71,7 @@ fun PlayerArtwork(
                         .fillMaxSize()
                         .padding(20.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .alpha(if (canvasUrl != null) 0f else 1f),
+                        .alpha(artworkAlpha),
                     model = queueSongs.getOrNull(page)?.coverUri ?: currentCoverUri,
                     contentScale = ContentScale.Crop,
                     contentDescription = "Cover Art"

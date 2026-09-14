@@ -2042,6 +2042,21 @@ object Spotify {
         val token = accessToken ?: return null
         return SpotifyCanvas.canvasUrl(trackId, token)
     }
+
+    /** Audio features (key, mode, tempo BPM, energy) for up to 100 tracks at a time. */
+    suspend fun audioFeatures(trackIds: List<String>): Result<List<com.metrolist.spotify.models.SpotifyAudioFeatures>> =
+        runCatching {
+            if (trackIds.isEmpty()) return@runCatching emptyList()
+            val chunks = trackIds.chunked(50)
+            val results = mutableListOf<com.metrolist.spotify.models.SpotifyAudioFeatures>()
+            for (chunk in chunks) {
+                val resp = authenticatedGet<com.metrolist.spotify.models.SpotifyAudioFeaturesResponse>("audio-features") {
+                    parameter("ids", chunk.joinToString(","))
+                }
+                results.addAll(resp.audioFeatures.filterNotNull())
+            }
+            results
+        }
 }
 
 @kotlinx.serialization.Serializable

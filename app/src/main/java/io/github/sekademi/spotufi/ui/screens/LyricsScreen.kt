@@ -39,8 +39,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.compose.ui.res.painterResource
+import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.entity.Lyrics
 import io.github.sekademi.spotufi.di.SongPlayer
+import io.github.sekademi.spotufi.ui.components.KaraokeControlSheet
 import io.github.sekademi.spotufi.ui.viewmodel.LyricsViewModel
 import kotlinx.coroutines.delay
 
@@ -88,6 +91,9 @@ fun LyricsScreen(
     }
     val state by vm.state.collectAsState()
     val positionMs by rememberPlaybackPositionMs()
+    var showKaraokeSheet by remember { mutableStateOf(false) }
+    val attenuation by SongPlayer.vocalAttenuation.collectAsState()
+    val isKaraokeActive = attenuation > 0.01f
 
     Column(
         modifier = Modifier
@@ -109,22 +115,43 @@ fun LyricsScreen(
                 .fillMaxWidth()
                 .padding(16.dp, 8.dp)
         ) {
-            Column(modifier = Modifier.padding(end = 12.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                 Text("Lyrics", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Close",
-                tint = Color.White,
-                modifier = Modifier
-                    .size(30.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onClose() }
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Karaoke / Sing-Along microphone button
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_microphone),
+                    contentDescription = "Sing Along Karaoke",
+                    tint = if (isKaraokeActive) Color(0xFF1ED760) else Color.White,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { showKaraokeSheet = !showKaraokeSheet },
+                        ),
+                )
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(16.dp))
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onClose() }
+                )
+            }
         }
+
+        KaraokeControlSheet(
+            visible = showKaraokeSheet,
+            onDismiss = { showKaraokeSheet = false },
+        )
 
         when (val s = state) {
             is LyricsViewModel.State.Loading ->

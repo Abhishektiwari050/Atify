@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -87,23 +88,62 @@ fun QueueScreen(navController: NavController) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp, 8.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Close",
-                tint = Color.White,
-                modifier = Modifier
-                    .size(28.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { navController.navigateUp() }
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text("Queue", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { navController.navigateUp() }
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Queue", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+
+            if (upcoming.size > 1) {
+                val isHarmonizing = playerViewModel.isHarmonizingQueue.value
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFF1ED760).copy(alpha = 0.15f))
+                        .clickable(enabled = !isHarmonizing) {
+                            playerViewModel.applyHarmonicDjFlow()
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    if (isHarmonizing) {
+                        CircularProgressIndicator(
+                            color = Color(0xFF1ED760),
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_dj_flow),
+                            contentDescription = "Harmonic DJ Flow",
+                            tint = Color(0xFF1ED760),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isHarmonizing) "Mixing…" else "Harmonic DJ",
+                        color = Color(0xFF1ED760),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
         }
 
         if (current == null && upcoming.isEmpty()) {

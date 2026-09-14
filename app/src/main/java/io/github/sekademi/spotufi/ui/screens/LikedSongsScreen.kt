@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +83,7 @@ import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 enum class LikedSortOption(val label: String) {
     DATE("Date added"),
     SMART_FLOW("Smart Flow"),
+    HARMONIC_DJ("Harmonic DJ Flow"),
     TITLE("Title"),
     ARTIST("Artist"),
     ALBUM("Album")
@@ -91,6 +93,7 @@ fun LikedSortOption.getDescriptiveLabel(isDescending: Boolean): String {
     return when (this) {
         LikedSortOption.DATE -> if (isDescending) "Date added (newest to oldest)" else "Date added (oldest to newest)"
         LikedSortOption.SMART_FLOW -> "Smart Flow (Personalized ML trajectory)"
+        LikedSortOption.HARMONIC_DJ -> "Harmonic DJ Flow (Camelot Wheel & BPM)"
         LikedSortOption.TITLE -> if (isDescending) "Title (Z to A)" else "Title (A to Z)"
         LikedSortOption.ARTIST -> if (isDescending) "Artist (Z to A)" else "Artist (A to Z)"
         LikedSortOption.ALBUM -> if (isDescending) "Album (Z to A)" else "Album (A to Z)"
@@ -140,8 +143,16 @@ fun LikedSongsScreen(navController: NavController) {
     var currentSort by remember { mutableStateOf(getLikedSortOption(context)) }
     var isDescending by remember { mutableStateOf(isLikedSortDescending(context)) }
     var showSortSheet by remember { mutableStateOf(false) }
+    var harmonicSortedSongs by remember { mutableStateOf<List<io.github.sekademi.spotufi.data.entity.SongsModel>>(emptyList()) }
 
-    val filteredSongs = remember(songs, searchQuery, currentSort, isDescending) {
+    LaunchedEffect(songs, currentSort) {
+        if (currentSort == LikedSortOption.HARMONIC_DJ && songs.isNotEmpty()) {
+            val sorted = io.github.sekademi.spotufi.di.HarmonicDjEngine.reorderHarmonicQueue(null, songs)
+            harmonicSortedSongs = sorted
+        }
+    }
+
+    val filteredSongs = remember(songs, searchQuery, currentSort, isDescending, harmonicSortedSongs) {
         val filtered = if (searchQuery.isBlank()) {
             songs
         } else {
@@ -157,6 +168,12 @@ fun LikedSongsScreen(navController: NavController) {
             LikedSortOption.SMART_FLOW -> {
                 val flow = io.github.sekademi.spotufi.data.recommendation.SmartMusicRanker.sortSmartFlow(context, filtered)
                 if (isDescending) flow else flow.reversed()
+            }
+            LikedSortOption.HARMONIC_DJ -> {
+                val sorted = if (harmonicSortedSongs.isNotEmpty()) {
+                    if (searchQuery.isBlank()) harmonicSortedSongs else harmonicSortedSongs.filter { it in filtered }
+                } else filtered
+                if (isDescending) sorted else sorted.reversed()
             }
             LikedSortOption.TITLE -> if (isDescending) filtered.sortedByDescending { it.title.lowercase() } else filtered.sortedBy { it.title.lowercase() }
             LikedSortOption.ARTIST -> if (isDescending) filtered.sortedByDescending { it.singer.lowercase() } else filtered.sortedBy { it.singer.lowercase() }
@@ -573,6 +590,7 @@ fun LikedSongsScreen(navController: NavController) {
                         val icon = when (option) {
                             LikedSortOption.DATE -> Icons.Default.DateRange
                             LikedSortOption.SMART_FLOW -> Icons.Default.Star
+                            LikedSortOption.HARMONIC_DJ -> Icons.Default.PlayArrow
                             LikedSortOption.TITLE -> Icons.AutoMirrored.Filled.List
                             LikedSortOption.ARTIST -> Icons.Default.Person
                             LikedSortOption.ALBUM -> Icons.Default.Menu

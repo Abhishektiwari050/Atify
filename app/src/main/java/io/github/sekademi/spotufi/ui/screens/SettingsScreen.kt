@@ -224,6 +224,16 @@ fun SettingsScreen(navController: NavController) {
                 SongPlayer.setSkipSilence(it)
             }
 
+            var spotifyCanvas by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isSpotifyCanvasEnabled(context)) }
+            SettingsSwitchRow(
+                title = "Spotify Canvas",
+                subtitle = "Display short, looping visual backgrounds for supported tracks",
+                checked = spotifyCanvas,
+            ) {
+                spotifyCanvas = it
+                io.github.sekademi.spotufi.data.preferences.setSpotifyCanvasEnabled(context, it)
+            }
+
             Spacer(Modifier.height(6.dp))
             Row(
                 modifier = Modifier

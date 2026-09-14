@@ -94,6 +94,20 @@ object SongPlayer {
         }
     }
 
+    private val vocalRemovers = java.util.Collections.newSetFromMap(java.util.WeakHashMap<io.github.sekademi.spotufi.audio.VocalRemoverAudioProcessor, Boolean>())
+    private val _vocalAttenuation = MutableStateFlow(0f)
+    val vocalAttenuation: StateFlow<Float> = _vocalAttenuation.asStateFlow()
+
+    fun setVocalAttenuation(value: Float) {
+        val clamped = value.coerceIn(0f, 1f)
+        _vocalAttenuation.value = clamped
+        synchronized(vocalRemovers) {
+            vocalRemovers.forEach { it.attenuation = clamped }
+        }
+    }
+
+    fun getVocalAttenuation(): Float = _vocalAttenuation.value
+
     private fun updateResolveStatus(isResolving: Boolean, status: String = "") {
         boundState?.updateResolveState(isResolving, status)
     }
@@ -279,11 +293,17 @@ object SongPlayer {
                     silenceProcessors.add(silenceProcessor)
                 }
 
+                val vocalRemover = io.github.sekademi.spotufi.audio.VocalRemoverAudioProcessor()
+                vocalRemover.attenuation = _vocalAttenuation.value
+                synchronized(vocalRemovers) {
+                    vocalRemovers.add(vocalRemover)
+                }
+
                 val sink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(true)
                     .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
                     .setAudioProcessorChain(
-                        androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain(filter, silenceProcessor),
+                        androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain(filter, silenceProcessor, vocalRemover),
                     )
                     .build()
                 if (io.github.sekademi.spotufi.data.preferences.isAudioOffloadEnabled(context)) {

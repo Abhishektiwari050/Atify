@@ -40,6 +40,12 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
 
     val currentSongId : State<Int> get() = currentSongState.songId
 
+    val vocalAttenuation: StateFlow<Float> = SongPlayer.vocalAttenuation
+
+    fun setVocalAttenuation(value: Float) {
+        SongPlayer.setVocalAttenuation(value)
+    }
+
     val queue : State<List<SongsModel>> get() = currentSongState.queue
 
     fun updateQueue(songs: List<SongsModel>) = currentSongState.updateQueue(songs)
@@ -76,6 +82,47 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
         val q = currentSongState.queue.value.toMutableList()
         q.removeAll { it.id == song.id }
         currentSongState.updateQueue(q)
+    }
+
+    private val _isHarmonizingQueue = mutableStateOf(false)
+    val isHarmonizingQueue: State<Boolean> get() = _isHarmonizingQueue
+
+    /**
+     * Automatically reorders upcoming queue tracks using Camelot Wheel harmonic key
+     * compatibility and BPM matching, anchored on the currently playing track.
+     */
+    fun applyHarmonicDjFlow(onComplete: (Boolean) -> Unit = {}) {
+        val q = currentSongState.queue.value
+        if (q.size <= 2) {
+            onComplete(false)
+            return
+        }
+        val curId = currentSongId.value
+        val curIdx = q.indexOfFirst { it.id == curId }.coerceAtLeast(0)
+        val anchor = q.getOrNull(curIdx)
+        val head = q.take(curIdx + 1)
+        val upcoming = q.drop(curIdx + 1)
+        if (upcoming.size <= 1) {
+            onComplete(false)
+            return
+        }
+
+        _isHarmonizingQueue.value = true
+        viewModelScope.launch {
+            try {
+                val reorderedUpcoming = io.github.sekademi.spotufi.di.HarmonicDjEngine.reorderHarmonicQueue(anchor, upcoming)
+                currentSongState.updateQueue(head + reorderedUpcoming)
+                withContext(Dispatchers.Main) {
+                    onComplete(true)
+                }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    onComplete(false)
+                }
+            } finally {
+                _isHarmonizingQueue.value = false
+            }
+        }
     }
 
 

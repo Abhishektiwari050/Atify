@@ -29,6 +29,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -201,8 +203,12 @@ fun PlayerConnectRow(
     navController: NavController,
     context: Context,
     currentTrack: SongsModel?,
+    onKaraokeClick: () -> Unit = {},
 ) {
     val routeName = remember(currentTrack?.id) { currentAudioRoute(context) }
+    val attenuation by SongPlayer.vocalAttenuation.collectAsState()
+    val isKaraokeActive = attenuation > 0.01f
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -227,10 +233,24 @@ fun PlayerConnectRow(
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier
                     .padding(start = 6.dp)
-                    .widthIn(max = 170.dp),
+                    .widthIn(max = 140.dp),
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Sing-Along / Karaoke Microphone button
+            Icon(
+                painter = painterResource(id = R.drawable.ic_microphone),
+                tint = if (isKaraokeActive) Color(0xFF1ED760) else Color.White,
+                modifier = Modifier
+                    .size(22.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onKaraokeClick,
+                    ),
+                contentDescription = "Sing Along Karaoke",
+            )
+            Spacer(modifier = Modifier.width(20.dp))
             Icon(
                 painter = painterResource(id = R.drawable.ic_share),
                 tint = Color.White,
@@ -252,7 +272,7 @@ fun PlayerConnectRow(
                     },
                 contentDescription = "Share",
             )
-            Spacer(modifier = Modifier.width(22.dp))
+            Spacer(modifier = Modifier.width(20.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.List,
                 tint = Color.White,

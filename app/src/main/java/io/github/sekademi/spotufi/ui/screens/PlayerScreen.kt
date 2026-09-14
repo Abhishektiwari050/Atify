@@ -341,6 +341,9 @@ fun PlayerScreen(navController: NavController) {
     var showMenu by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
     var showSavedIn by remember { mutableStateOf(false) }
+    var showKaraokeSheet by remember { mutableStateOf(false) }
+    var showStaticCover by remember { mutableStateOf(false) }
+    val isCanvasSettingEnabled = remember { io.github.sekademi.spotufi.data.preferences.isSpotifyCanvasEnabled(context) }
 
     if (showMenu) {
         PlayerOptionsSheet(
@@ -449,7 +452,9 @@ fun PlayerScreen(navController: NavController) {
     }
 
     // Load the current track's Spotify Canvas (full-screen looping video background).
-    LaunchedEffect(playerViewModel.currentSongId.value, queueSongs) {
+    LaunchedEffect(playerViewModel.currentSongId.value, queueSongs, isCanvasSettingEnabled) {
+        showStaticCover = false
+        if (!isCanvasSettingEnabled) return@LaunchedEffect
         val track = queueSongs.firstOrNull { it.id == playerViewModel.currentSongId.value }
         playerViewModel.loadCanvas(track?.spotifyTrackId.orEmpty())
     }
@@ -485,7 +490,7 @@ fun PlayerScreen(navController: NavController) {
 
 
 
-    val canvasUrl = playerViewModel.canvasUrl.value
+    val canvasUrl = if (isCanvasSettingEnabled && !showStaticCover) playerViewModel.canvasUrl.value else null
 
     DisposableEffect(SongPlayer.exoPlayer) {
         val p = SongPlayer.exoPlayer ?: return@DisposableEffect onDispose {}
@@ -593,6 +598,8 @@ fun PlayerScreen(navController: NavController) {
                 currentCoverUri = songCoverUri,
                 pagerState = artworkPagerState,
                 canvasUrl = canvasUrl,
+                showStaticCover = showStaticCover,
+                onToggleCover = { if (playerViewModel.canvasUrl.value != null) showStaticCover = !showStaticCover },
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -641,6 +648,7 @@ fun PlayerScreen(navController: NavController) {
                 navController = navController,
                 context = context,
                 currentTrack = queueSongs.firstOrNull { it.id == playerViewModel.currentSongId.value },
+                onKaraokeClick = { showKaraokeSheet = !showKaraokeSheet },
             )
 
             //PlayerEndInfo()
@@ -674,5 +682,13 @@ fun PlayerScreen(navController: NavController) {
                 onDismiss = { showAudioDetails = false }
             )
         }
+
+        io.github.sekademi.spotufi.ui.components.KaraokeControlSheet(
+            visible = showKaraokeSheet,
+            onDismiss = { showKaraokeSheet = false },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp),
+        )
     }
 }
