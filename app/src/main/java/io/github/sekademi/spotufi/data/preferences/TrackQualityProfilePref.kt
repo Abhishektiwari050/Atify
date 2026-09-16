@@ -9,8 +9,8 @@ private const val SUFFIX_LOSSLESS_STATUS = "_ll_status"
 private const val SUFFIX_BEST_VIDEO_ID = "_bvid"
 private const val SUFFIX_TIMESTAMP = "_ts"
 
-/** Max age for negative (UNAVAILABLE) cache = 3 days so newly added lossless tracks can eventually be re-checked */
-private const val UNAVAILABLE_CACHE_TTL_MS = 3 * 24 * 60 * 60 * 1000L
+/** Max age for negative (UNAVAILABLE) cache = 12 hours so newly added lossless tracks can quickly be re-checked */
+private const val UNAVAILABLE_CACHE_TTL_MS = 12 * 60 * 60 * 1000L
 
 enum class LosslessAvailability {
     UNKNOWN,
@@ -130,3 +130,24 @@ fun clearTrackQualityProfile(context: Context, query: String) {
         .remove(query + SUFFIX_TIMESTAMP)
         .apply()
 }
+
+/**
+ * Purge stale negative availability flags caused by past provider downtime or API changes.
+ * This unblocks all previously flagged tracks so they can immediately attempt lossless resolution.
+ */
+fun clearNegativeAvailabilityCache(context: Context) {
+    runCatching {
+        val prefs = context.getSharedPreferences(PREF_TRACK_QUALITY_PROFILE, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        var changed = false
+        prefs.all.forEach { (k, v) ->
+            if (k.endsWith(SUFFIX_LOSSLESS_STATUS) && v == LosslessAvailability.UNAVAILABLE.name) {
+                editor.remove(k)
+                editor.remove(k.removeSuffix(SUFFIX_LOSSLESS_STATUS) + SUFFIX_TIMESTAMP)
+                changed = true
+            }
+        }
+        if (changed) editor.apply()
+    }
+}
+

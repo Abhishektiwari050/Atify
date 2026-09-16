@@ -7,6 +7,10 @@ import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.music.constants.AudioQuality
 import com.metrolist.music.utils.YTPlayerUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Resolves stream URLs for playback from various sources:
@@ -120,7 +124,17 @@ object StreamResolver {
         return key?.let { io.github.sekademi.spotufi.data.preferences.getAlternativeStream(appContext, it) }
     }
 
+    @Volatile private var hasPurgedNegativeCache = false
+
+    private fun ensureNegativeCachePurged(appContext: Context) {
+        if (!hasPurgedNegativeCache) {
+            hasPurgedNegativeCache = true
+            io.github.sekademi.spotufi.data.preferences.clearNegativeAvailabilityCache(appContext)
+        }
+    }
+
     suspend fun resolveStreamUrl(song: String, appContext: Context, forPlayback: Boolean = false): String? {
+        ensureNegativeCachePurged(appContext)
         alternativeStreamForPlayback(song, appContext)?.let { alt ->
             invalidateResolvedStream(song)
             return when {
@@ -178,82 +192,90 @@ object StreamResolver {
         val isLosslessKnownUnavailable = qualityProfile?.losslessAvailability == io.github.sekademi.spotufi.data.preferences.LosslessAvailability.UNAVAILABLE
 
         val quality = io.github.sekademi.spotufi.data.preferences.currentStreamingQuality(appContext)
-        if (losslessStreaming && quality.lossless && !isLosslessKnownUnavailable) {
-            (trackIdRegistry[song] ?: spotifyTrackIdForPlayback(song))?.let { spotifyId ->
-                val r = kotlinx.coroutines.withTimeoutOrNull(1_800) {
+        val sid = (trackIdRegistry[song] ?: spotifyTrackIdForPlayback(song))
+        val shouldTryLossless = losslessStreaming && quality.lossless && !isLosslessKnownUnavailable && sid != null
+
+        return coroutineScope {
+            // Concurrent speculative YouTube resolution: starts immediately in parallel with Lossless
+            val ytDeferred = if (youtubeEnabled) {
+                async(Dispatchers.IO) {
+                    runCatching { resolveYtPlayback(song, quality.audioQuality, appContext) }.getOrNull()
+                }
+            } else null
+
+            if (shouldTryLossless) {
+                val flacResult = withTimeoutOrNull(2_800) {
                     com.metrolist.spotify.SpotiFlac.resolve(
-                        spotifyId,
+                        sid,
                         isrc = null,
                         preferHiRes = losslessHiRes,
                     )
                 }
-                when (r) {
-                    is com.metrolist.spotify.SpotiFlac.Result.Success -> {
-                        Log.d(TAG, "lossless ${r.track.provider} ${r.track.quality}-bit for: $song")
-                        val flacQuality = "FLAC ${r.track.quality}-bit"
-                        if (forPlayback) {
-                            currentSource = "Lossless • ${r.track.provider}"
-                            currentQuality = flacQuality
-                        }
-                        streamCache[song] = r.track.url
-                        sourceCache[song] = "Lossless • ${r.track.provider}"
-                        qualityCache[song] = flacQuality
-                        io.github.sekademi.spotufi.data.preferences.setCachedStream(
-                            appContext,
-                            song,
-                            r.track.url,
-                            "Lossless • ${r.track.provider}",
-                            flacQuality,
-                            43200,
-                        )
-                        io.github.sekademi.spotufi.data.preferences.flagLosslessAvailable(
-                            appContext,
-                            song,
-                            r.track.provider,
-                            flacQuality,
-                        )
-                        return r.track.url
+
+                if (flacResult is com.metrolist.spotify.SpotiFlac.Result.Success) {
+                    ytDeferred?.cancel()
+                    Log.d(TAG, "lossless ${flacResult.track.provider} ${flacResult.track.quality}-bit for: $song")
+                    val flacQuality = "FLAC ${flacResult.track.quality}-bit"
+                    if (forPlayback) {
+                        currentSource = "Lossless • ${flacResult.track.provider}"
+                        currentQuality = flacQuality
                     }
-                    is com.metrolist.spotify.SpotiFlac.Result.NotFound -> {
-                        Log.w(TAG, "lossless not found on any provider, flagging unavailable for: $song")
-                        io.github.sekademi.spotufi.data.preferences.flagLosslessUnavailable(appContext, song)
-                    }
-                    is com.metrolist.spotify.SpotiFlac.Result.Cooldown ->
-                        Log.d(TAG, "lossless on cooldown, using YouTube for: $song")
-                    null ->
-                        Log.w(TAG, "lossless resolution timed out, temporarily using YouTube for: $song")
-                    is com.metrolist.spotify.SpotiFlac.Result.Error ->
-                        Log.w(TAG, "lossless error (${r.message}), temporarily using YouTube for: $song")
+                    streamCache[song] = flacResult.track.url
+                    sourceCache[song] = "Lossless • ${flacResult.track.provider}"
+                    qualityCache[song] = flacQuality
+                    io.github.sekademi.spotufi.data.preferences.setCachedStream(
+                        appContext,
+                        song,
+                        flacResult.track.url,
+                        "Lossless • ${flacResult.track.provider}",
+                        flacQuality,
+                        43200,
+                    )
+                    io.github.sekademi.spotufi.data.preferences.flagLosslessAvailable(
+                        appContext,
+                        song,
+                        flacResult.track.provider,
+                        flacQuality,
+                    )
+                    return@coroutineScope flacResult.track.url
+                } else if (flacResult is com.metrolist.spotify.SpotiFlac.Result.NotFound) {
+                    Log.d(TAG, "lossless not found for: $song")
+                } else if (flacResult == null) {
+                    Log.d(TAG, "lossless resolution timed out, utilizing parallel YouTube stream for: $song")
+                } else if (flacResult is com.metrolist.spotify.SpotiFlac.Result.Error) {
+                    Log.d(TAG, "lossless error (${flacResult.message}), utilizing parallel YouTube stream for: $song")
                 }
             }
+
+            if (!youtubeEnabled) {
+                Log.w(TAG, "YouTube fallback disabled — no stream for: $song")
+                return@coroutineScope null
+            }
+
+            // YouTube was already resolving in parallel while lossless was running!
+            val playback = ytDeferred?.await() ?: return@coroutineScope null
+            val codec = playback.format.mimeType
+                .substringAfter("codecs=\"", "").substringBefore('"').substringBefore('.')
+                .uppercase()
+            val ytQuality = listOf(codec, "${playback.format.bitrate / 1000} kbps")
+                .filter { it.isNotBlank() }.joinToString(" ")
+            if (forPlayback) {
+                currentSource = "YouTube"
+                currentQuality = ytQuality
+            }
+            streamCache[song] = playback.streamUrl
+            sourceCache[song] = "YouTube"
+            qualityCache[song] = ytQuality
+            io.github.sekademi.spotufi.data.preferences.setCachedStream(
+                appContext,
+                song,
+                playback.streamUrl,
+                "YouTube",
+                ytQuality,
+                playback.streamExpiresInSeconds,
+            )
+            return@coroutineScope playback.streamUrl
         }
-        if (!youtubeEnabled) {
-            Log.w(TAG, "YouTube fallback disabled — no stream for: $song")
-            return null
-        }
-        if (forPlayback) {
-            currentSource = "YouTube"
-            currentQuality = ""
-        }
-        val playback = resolveYtPlayback(song, quality.audioQuality, appContext) ?: return null
-        val codec = playback.format.mimeType
-            .substringAfter("codecs=\"", "").substringBefore('"').substringBefore('.')
-            .uppercase()
-        val ytQuality = listOf(codec, "${playback.format.bitrate / 1000} kbps")
-            .filter { it.isNotBlank() }.joinToString(" ")
-        if (forPlayback) currentQuality = ytQuality
-        streamCache[song] = playback.streamUrl
-        sourceCache[song] = "YouTube"
-        qualityCache[song] = ytQuality
-        io.github.sekademi.spotufi.data.preferences.setCachedStream(
-            appContext,
-            song,
-            playback.streamUrl,
-            "YouTube",
-            ytQuality,
-            playback.streamExpiresInSeconds,
-        )
-        return playback.streamUrl
     }
 
     private fun ensureSpotifyMatchMetadata(query: String): CandidateScorer.TrackMatchMetadata? {

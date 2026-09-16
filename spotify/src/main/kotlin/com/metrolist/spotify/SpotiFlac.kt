@@ -145,9 +145,9 @@ object SpotiFlac {
         HttpClient(OkHttp) {
             engine {
                 config {
-                    connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                    writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    readTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+                    writeTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
                 }
             }
             expectSuccess = false
@@ -165,12 +165,13 @@ object SpotiFlac {
         val up = runCatching {
             val r = client.get(STATUS_URL) { header("User-Agent", UA) }
             if (r.status.value !in 200..299) return@runCatching null
-            json.parseToJsonElement(r.bodyAsText()).jsonObject["spotiflac"]
+            val root = json.parseToJsonElement(r.bodyAsText()).jsonObject
+            root["spotiflac"]
                 ?.jsonObject?.get("status")?.jsonObject
                 ?.filterValues { it.jsonPrimitive.contentOrNull.equals("up", true) }
                 ?.keys?.toSet()
         }.getOrNull()
-        val result = up ?: allProviders
+        val result = if (up.isNullOrEmpty()) allProviders else up
         upProvidersCache = result
         upProvidersAt = System.currentTimeMillis()
         return result
@@ -189,10 +190,6 @@ object SpotiFlac {
         preferHiRes: Boolean = true,
     ): Result {
         val upProviders = upLosslessProviders()
-        if (upProviders.isEmpty()) {
-            log("D", "all lossless servers down \u2014 skipping lossless")
-            return Result.NotFound
-        }
         val quality = if (preferHiRes) "24" else "16"
         val ids = runCatching { resolveProviderIds(spotifyTrackId, isrc) }
             .getOrElse {
@@ -203,7 +200,7 @@ object SpotiFlac {
         var sawCooldown: String? = null
         var sawMatch = false
 
-        // PRIMARY login-free path: resolve the TIDAL id (via Odesli) to a FLAC URL
+        // PRIMARY login-free path: resolve the TIDAL id (via song.link/Odesli) to a FLAC URL
         // through the monochrome / squid.wtf public backends. No account needed.
         ids.tidalId?.takeIf { it.isNotBlank() }?.let { tidalId ->
             sawMatch = true
@@ -215,7 +212,7 @@ object SpotiFlac {
             }
         }
 
-        // Order: Tidal & Amazon need only Odesli; Qobuz needs an ISRC match.
+        // Order: Tidal & Amazon need only Odesli/songlink; Qobuz needs an ISRC match.
         val attempts = listOf(
             Triple("tidal", TIDAL_BASE, ids.tidalId),
             Triple("qobuz", QOBUZ_BASE, ids.qobuzId),
@@ -223,6 +220,7 @@ object SpotiFlac {
         )
         for ((provider, base, id) in attempts) {
             if (id.isNullOrBlank()) continue
+            if (!upProviders.contains(provider) && upProviders.isNotEmpty() && !upProviders.containsAll(allProviders)) continue
             sawMatch = true
             when (val r = communityDownload(provider, base, id, quality)) {
                 is Result.Success -> return r
@@ -248,25 +246,71 @@ object SpotiFlac {
     private suspend fun resolveProviderIds(spotifyTrackId: String, isrc: String?): ProviderIds {
         var tidalId: String? = null
         var amazonId: String? = null
+        var activeIsrc: String? = isrc
 
-        // Odesli: spotify track -> all-platform links/ids.
-        val odesli = runCatching {
-            val resp = client.get("https://api.song.link/v1-alpha.1/links") {
-                parameter("url", "spotify:track:$spotifyTrackId")
-                header("User-Agent", "Mozilla/5.0")
+        // 1. Primary: fetch universal song.link web page and parse __NEXT_DATA__
+        runCatching {
+            val resp = client.get("https://song.link/s/$spotifyTrackId") {
+                header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
+                header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             }
-            json.parseToJsonElement(resp.bodyAsText()).jsonObject
-        }.getOrNull()
+            if (resp.status.value in 200..299) {
+                val html = resp.bodyAsText()
+                val jsonStr = html.substringAfter("<script id=\"__NEXT_DATA__\" type=\"application/json\">", "")
+                    .substringBefore("</script>", "")
+                if (jsonStr.isNotBlank()) {
+                    val root = json.parseToJsonElement(jsonStr).jsonObject
+                    val pageData = root["props"]?.jsonObject?.get("pageProps")
+                        ?.jsonObject?.get("pageData")?.jsonObject
+                    val entityData = pageData?.get("entityData")?.jsonObject
+                    if (activeIsrc.isNullOrBlank()) {
+                        activeIsrc = entityData?.get("isrc")?.jsonPrimitive?.contentOrNull
+                    }
+                    val sections = pageData?.get("sections") as? JsonArray
+                    val listenLinks = sections?.mapNotNull { (it as? JsonObject) }
+                        ?.firstOrNull { it["sectionId"]?.jsonPrimitive?.contentOrNull?.contains("links|listen") == true }
+                        ?.get("links") as? JsonArray
+                    listenLinks?.mapNotNull { (it as? JsonObject) }?.forEach { link ->
+                        val platform = link["platform"]?.jsonPrimitive?.contentOrNull
+                        val uniqueId = link["uniqueId"]?.jsonPrimitive?.contentOrNull
+                        val url = link["url"]?.jsonPrimitive?.contentOrNull
+                        when (platform) {
+                            "tidal" -> {
+                                tidalId = uniqueId?.substringAfterLast('|')?.takeIf { it.isNotBlank() }
+                                    ?: url?.substringAfterLast("/track/")?.substringBefore('?')
+                            }
+                            "amazonMusic" -> {
+                                amazonId = uniqueId?.substringAfterLast('|')?.takeIf { it.isNotBlank() }
+                                    ?: url?.substringAfterLast("trackAsin=")?.substringBefore('&')
+                            }
+                        }
+                    }
+                }
+            }
+        }.onFailure { log("W", "song.link scrape failed: ${it.message}") }
 
-        odesli?.get("linksByPlatform")?.jsonObject?.let { platforms ->
-            tidalId = entityId(platforms, "tidal", "TIDAL_SONG::")
-            amazonId = entityId(platforms, "amazonMusic", "AMAZON_SONG::")
+        // 2. Fallback: if Tidal and Amazon not found, try song.link JSON API
+        if (tidalId == null && amazonId == null) {
+            val odesli = runCatching {
+                val resp = client.get("https://api.song.link/v1-alpha.1/links") {
+                    parameter("url", "spotify:track:$spotifyTrackId")
+                    header("User-Agent", "Mozilla/5.0")
+                }
+                if (resp.status.value in 200..299) {
+                    json.parseToJsonElement(resp.bodyAsText()).jsonObject
+                } else null
+            }.getOrNull()
+
+            odesli?.get("linksByPlatform")?.jsonObject?.let { platforms ->
+                tidalId = entityId(platforms, "tidal", "TIDAL_SONG::")
+                amazonId = entityId(platforms, "amazonMusic", "AMAZON_SONG::")
+            }
         }
 
-        // Qobuz: resolve via ISRC signed search.
-        val qobuzId = isrc?.takeIf { it.isNotBlank() }?.let { qobuzIdForIsrc(it) }
+        // 3. Qobuz: resolve via ISRC signed search
+        val qobuzId = activeIsrc?.takeIf { it.isNotBlank() }?.let { qobuzIdForIsrc(it) }
 
-        log("D", "ids tidal=$tidalId amazon=$amazonId qobuz=$qobuzId")
+        log("D", "ids tidal=$tidalId amazon=$amazonId qobuz=$qobuzId isrc=$activeIsrc")
         return ProviderIds(tidalId = tidalId, amazonId = amazonId, qobuzId = qobuzId)
     }
 
