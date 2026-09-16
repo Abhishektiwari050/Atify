@@ -2,7 +2,6 @@ package io.github.sekademi.spotufi.ui.screens
 
 import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -89,7 +88,6 @@ enum class SearchFilter(val label: String) {
 }
 
 
-@RequiresApi(Build.VERSION_CODES.S)
 @Composable
 fun SearchScreen(navController: NavController) {
     val searchViewModel : SearchViewModel = hiltViewModel()
@@ -108,8 +106,6 @@ fun SearchScreen(navController: NavController) {
 }
 
 
-@RequiresApi(Build.VERSION_CODES.S)
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SumUpSearchScreen(
     navController: NavController,
@@ -147,99 +143,97 @@ fun SumUpSearchScreen(
         }
     }
 
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(AppBackground.toArgb()))
             .statusBarsPadding()
+    ) {
+        SearchTopBar()
 
-    ){
-        item{
-            SearchTopBar()
+        SearchStickyBar(
+            text = text,
+            onFocusChange = { searchFocused = it },
+            onClear = {
+                text = ""
+                searchViewModel.search("")
+            },
+        ) {
+            text = it
+            searchViewModel.search(it)
         }
-        stickyHeader {
-            Column(
+
+        if (text.isNotBlank()) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(AppBackground.toArgb()))
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SearchStickyBar(
-                    text = text,
-                    onFocusChange = { searchFocused = it },
-                    onClear = {
-                        text = ""
-                        searchViewModel.search("")
-                    },
-                ) {
-                    text = it
-                    searchViewModel.search(it)
-                }
-
-                if (text.isNotBlank()) {
-                    Row(
+                SearchFilter.entries.forEach { filter ->
+                    val isSelected = filter == selectedFilter
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isSelected) AppPalette else Color(0xFF242428))
+                            .clickable { selectedFilter = filter }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                     ) {
-                        SearchFilter.entries.forEach { filter ->
-                            val isSelected = filter == selectedFilter
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSelected) AppPalette else Color(0xFF242428))
-                                    .clickable { selectedFilter = filter }
-                                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                            ) {
-                                Text(
-                                    text = filter.label,
-                                    color = if (isSelected) Color.White else Color(0xFFCCCCCC),
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                )
-                            }
-                        }
+                        Text(
+                            text = filter.label,
+                            color = if (isSelected) Color.White else Color(0xFFCCCCCC),
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        )
                     }
                 }
             }
         }
 
-        if (text.isBlank()) {
-            if (searchFocused && recents.isNotEmpty()) {
-                // ── Recent searches: the items the user opened (Spotify-style),
-                // shown only once the search bar is focused ──
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp, 16.dp, 16.dp, 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            "Recent searches",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            "Clear",
-                            color = Color(0xFFB3B3B3),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) {
-                                io.github.sekademi.spotufi.data.preferences.clearRecentItems(context)
-                                recents = emptyList()
-                            },
-                        )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            if (text.isBlank()) {
+                if (searchFocused && recents.isNotEmpty()) {
+                    // ── Recent searches: the items the user opened (Spotify-style),
+                    // shown only once the search bar is focused ──
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp, 16.dp, 16.dp, 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                "Recent searches",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                "Clear",
+                                color = Color(0xFFB3B3B3),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) {
+                                    io.github.sekademi.spotufi.data.preferences.clearRecentItems(context)
+                                    recents = emptyList()
+                                },
+                            )
+                        }
                     }
-                }
-                items(recents.size) { i ->
-                    val item = recents[i]
-                    RecentItemRow(
+                    items(
+                        count = recents.size,
+                        key = { i -> "${recents[i].type}_${recents[i].key}_$i" },
+                    ) { i ->
+                        val item = recents[i]
+                        RecentItemRow(
                         item = item,
                         onClick = {
                             when (item.type) {
@@ -499,8 +493,8 @@ fun SumUpSearchScreen(
         item{
             Spacer(modifier = Modifier.height(130.dp))
         }
-
     }
+}
 }
 
 /** A single row in the search results: a track, an artist, or an album. */
@@ -787,7 +781,6 @@ fun RecentItemRow(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.S)
 @Composable
 fun SearchSongRow(
     song: SongsModel,
@@ -1088,7 +1081,6 @@ fun SearchTopBar() {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@RequiresApi(Build.VERSION_CODES.S)
 @Composable
 fun SearchStickyBar(
     text: String,

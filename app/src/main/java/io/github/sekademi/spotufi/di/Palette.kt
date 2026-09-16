@@ -53,16 +53,17 @@ object PaletteExtractor {
             .allowHardware(false)
             .target(
                 onSuccess = { result ->
-                    val bitmap = result.toBitmap()
-                    Palette.from(bitmap).generate { palette ->
-                        val rgb = palette?.darkVibrantSwatch?.rgb
-                        if (rgb != null) {
-                            val color = Color(rgb or (0xFF shl 24))
-                            darkVibrantCache.put(imageUrl, color)
-                            onColorExtracted(color)
+                    runCatching {
+                        val bitmap = result.toBitmap()
+                        Palette.from(bitmap).generate { palette ->
+                            val rgb = palette?.darkVibrantSwatch?.rgb
+                            if (rgb != null) {
+                                val color = Color(rgb or (0xFF shl 24))
+                                darkVibrantCache.put(imageUrl, color)
+                                onColorExtracted(color)
+                            }
                         }
                     }
-                    bitmap.recycle()
                 },
             )
             .build()
@@ -90,16 +91,17 @@ object PaletteExtractor {
             .allowHardware(false)
             .target(
                 onSuccess = { result ->
-                    val bitmap = result.toBitmap()
-                    Palette.from(bitmap).generate { palette ->
-                        val rgb = palette?.mutedSwatch?.rgb
-                        if (rgb != null) {
-                            val color = Color(rgb or (0xFF shl 24))
-                            mutedCache.put(imageUrl, color)
-                            onColorExtracted(color)
+                    runCatching {
+                        val bitmap = result.toBitmap()
+                        Palette.from(bitmap).generate { palette ->
+                            val rgb = palette?.mutedSwatch?.rgb
+                            if (rgb != null) {
+                                val color = Color(rgb or (0xFF shl 24))
+                                mutedCache.put(imageUrl, color)
+                                onColorExtracted(color)
+                            }
                         }
                     }
-                    bitmap.recycle()
                 },
             )
             .build()

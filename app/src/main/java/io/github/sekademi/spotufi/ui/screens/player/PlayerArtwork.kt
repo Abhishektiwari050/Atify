@@ -17,8 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.entity.SongsModel
 
 /**
@@ -55,7 +57,9 @@ fun PlayerArtwork(
                     .padding(20.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .alpha(artworkAlpha),
-                model = currentCoverUri,
+                model = currentCoverUri.takeIf { it.isNotBlank() } ?: R.drawable.placeholder,
+                placeholder = painterResource(R.drawable.placeholder),
+                error = painterResource(R.drawable.placeholder),
                 contentScale = ContentScale.Crop,
                 contentDescription = "Cover Art"
             )
@@ -66,13 +70,18 @@ fun PlayerArtwork(
                     .sizeIn(maxWidth = 385.dp, maxHeight = 385.dp)
                     .aspectRatio(1f),
             ) { page ->
+                val trackCover = queueSongs.getOrNull(page)?.coverUri?.takeIf { it.isNotBlank() }
+                    ?: currentCoverUri.takeIf { it.isNotBlank() }
+                    ?: R.drawable.placeholder
                 AsyncImage(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .alpha(artworkAlpha),
-                    model = queueSongs.getOrNull(page)?.coverUri ?: currentCoverUri,
+                    model = trackCover,
+                    placeholder = painterResource(R.drawable.placeholder),
+                    error = painterResource(R.drawable.placeholder),
                     contentScale = ContentScale.Crop,
                     contentDescription = "Cover Art"
                 )

@@ -2,7 +2,6 @@ package io.github.sekademi.spotufi.ui.navigation
 
 import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -41,7 +40,6 @@ import io.github.sekademi.spotufi.ui.screens.SearchScreen
 import io.github.sekademi.spotufi.ui.screens.SettingsScreen
 import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 
-@RequiresApi(Build.VERSION_CODES.S)
 @Composable
 fun MyNavHost(
     navHostController: NavHostController

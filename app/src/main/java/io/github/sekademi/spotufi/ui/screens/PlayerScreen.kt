@@ -411,10 +411,13 @@ fun PlayerScreen(navController: NavController) {
     // ── Now-playing swipe pager ──
     // Index of the playing track in the queue (fallback to 0 so the pager is valid
     // even before the queue/current id line up).
-    val currentIndex = queueSongs.indexOfFirst { it.id == playerViewModel.currentSongId.value }
-        .let { if (it >= 0) it else 0 }
+    val currentSongIdVal = playerViewModel.currentSongId.value
+    val targetIndex = queueSongs.indexOfFirst { it.id == currentSongIdVal }
+    val currentIndex = if (targetIndex in 0 until queueSongs.size) targetIndex else 0
+    val totalPages = queueSongs.size.coerceAtLeast(1)
+    val safeInitialPage = currentIndex.coerceIn(0, totalPages - 1)
     val artworkPagerState = rememberPagerState(
-        initialPage = currentIndex,
+        initialPage = safeInitialPage,
         pageCount = { queueSongs.size.coerceAtLeast(1) },
     )
     // External track changes (auto-advance, prev/next buttons, queue edits) → snap the
@@ -433,7 +436,8 @@ fun PlayerScreen(navController: NavController) {
         snapshotFlow { artworkPagerState.settledPage }
             .distinctUntilChanged()
             .collect { page ->
-                queueSongs.getOrNull(page)?.let { target ->
+                if (page in queueSongs.indices) {
+                    val target = queueSongs[page]
                     if (target.id != playerViewModel.currentSongId.value) {
                         playerViewModel.playSongAt(queueSongs, page, context)
                         isLiked.value = isSongLiked(context, target.id.toString())

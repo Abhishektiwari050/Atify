@@ -167,9 +167,6 @@ object SongPlayer {
                                 val bitmap = result.toBitmap()
                                 val stream = ByteArrayOutputStream()
                                 bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-                                // Release the decoded bitmap immediately — the JPEG bytes
-                                // are the only thing we need to keep.
-                                bitmap.recycle()
                                 val bytes = stream.toByteArray()
                                 metaArtworkData = bytes
                                 updatePlayerArtwork(bytes, coverUri)
@@ -188,7 +185,11 @@ object SongPlayer {
             val currentItem = p.currentMediaItem ?: return@launch
             val newMetadata = currentItem.mediaMetadata.buildUpon()
                 .setArtworkData(bytes, androidx.media3.common.MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                .apply { if (coverUri.isNotBlank()) setArtworkUri(android.net.Uri.parse(coverUri)) }
+                .apply {
+                    if (coverUri.isNotBlank()) {
+                        runCatching { setArtworkUri(android.net.Uri.parse(coverUri)) }
+                    }
+                }
                 .build()
             val newItem = currentItem.buildUpon()
                 .setMediaMetadata(newMetadata)
@@ -224,7 +225,9 @@ object SongPlayer {
             .setTitle(metaTitle)
             .setArtist(metaArtist)
             .apply {
-                if (metaCover.isNotBlank()) setArtworkUri(android.net.Uri.parse(metaCover))
+                if (metaCover.isNotBlank()) {
+                    runCatching { setArtworkUri(android.net.Uri.parse(metaCover)) }
+                }
                 metaArtworkData?.let { setArtworkData(it, androidx.media3.common.MediaMetadata.PICTURE_TYPE_FRONT_COVER) }
             }
             .build()
@@ -248,7 +251,9 @@ object SongPlayer {
             .setArtist(song.singer)
             .setAlbumTitle(song.album)
             .apply {
-                if (song.coverUri.isNotBlank()) setArtworkUri(android.net.Uri.parse(song.coverUri))
+                if (song.coverUri.isNotBlank()) {
+                    runCatching { setArtworkUri(android.net.Uri.parse(song.coverUri)) }
+                }
             }
             .build()
         return MediaItem.Builder()

@@ -1,7 +1,6 @@
 package io.github.sekademi.spotufi
 
 import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -21,7 +20,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import kotlinx.coroutines.delay
 
 
-@RequiresApi(Build.VERSION_CODES.S)
 @Composable
 fun App() {
     val bottomBarState = rememberSaveable { (mutableStateOf(true)) }

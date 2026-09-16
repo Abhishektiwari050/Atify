@@ -345,7 +345,7 @@ fun DownloadsScreen(navController: NavController) {
             }
 
             // ── In-progress downloads (with live progress bar) ──
-            items(inProgress, key = { it.first.id }) { (song, pct) ->
+            items(inProgress, key = { "${it.first.id}_${it.first.url}" }) { (song, pct) ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -413,7 +413,7 @@ fun DownloadsScreen(navController: NavController) {
                         )
                     }
                 } else {
-                    itemsIndexed(displayedSongs, key = { _, song -> song.id }) { index, song ->
+                    itemsIndexed(displayedSongs, key = { index, song -> "${song.id}_${song.url}_$index" }) { index, song ->
                         val currentColor = if (song.id == playerViewModel.currentSongId.value)
                             Color(AppPalette.toArgb()) else Color.White
 
