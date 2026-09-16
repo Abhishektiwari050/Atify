@@ -73,8 +73,8 @@ class VocalRemoverAudioProcessor : BaseAudioProcessor() {
         if (sr <= 0) return
         val q = 0.7071067811865476 // Butterworth Q
 
-        // 1. Sub-bass LPF at 200 Hz
-        val lpCutoff = 200.0.coerceAtMost(sr / 2.0 - 1.0)
+        // 1. Sub-bass LPF at 180 Hz (kick drum, 808s, bassline)
+        val lpCutoff = 180.0.coerceAtMost(sr / 2.0 - 1.0)
         val lpOmega = 2.0 * PI * lpCutoff / sr
         val lpSin = sin(lpOmega)
         val lpCos = cos(lpOmega)
@@ -87,8 +87,8 @@ class VocalRemoverAudioProcessor : BaseAudioProcessor() {
         lp_a1 = (-2.0 * lpCos) / lpA0
         lp_a2 = (1.0 - lpAlpha) / lpA0
 
-        // 2. High-treble HPF at 6000 Hz
-        val hpCutoff = 6000.0.coerceAtMost(sr / 2.0 - 1.0)
+        // 2. High-treble HPF at 7500 Hz (cymbals, high-end presence)
+        val hpCutoff = 7500.0.coerceAtMost(sr / 2.0 - 1.0)
         val hpOmega = 2.0 * PI * hpCutoff / sr
         val hpSin = sin(hpOmega)
         val hpCos = cos(hpOmega)
@@ -137,35 +137,38 @@ class VocalRemoverAudioProcessor : BaseAudioProcessor() {
 
     private fun processStereo16(input: ByteBuffer, output: ByteBuffer, alpha: Double) {
         val maxVal = Short.MAX_VALUE.toDouble()
-        val vocalGain = (1.0 - alpha).coerceIn(0.0, 1.0)
 
         while (input.remaining() >= 4) {
             val left = input.short.toDouble() / maxVal
             val right = input.short.toDouble() / maxVal
 
-            // Orthogonal Mid/Side decomposition
+            // 1. Center / Mid signal
             val mid = (left + right) * 0.5
-            val side = (left - right) * 0.5
 
-            // Sub-bass preservation via LPF
+            // 2. Sub-bass preservation via LPF (kick drum, 808s, bassline)
             val midBass = lp_b0 * mid + lp_b1 * lp_x1 + lp_b2 * lp_x2 - lp_a1 * lp_y1 - lp_a2 * lp_y2
             lp_x2 = lp_x1; lp_x1 = mid
             lp_y2 = lp_y1; lp_y1 = midBass
 
-            // Treble presence preservation via HPF
+            // 3. Treble presence preservation via HPF (cymbals, high shimmer)
             val midTreble = hp_b0 * mid + hp_b1 * hp_x1 + hp_b2 * hp_x2 - hp_a1 * hp_y1 - hp_a2 * hp_y2
             hp_x2 = hp_x1; hp_x1 = mid
             hp_y2 = hp_y1; hp_y1 = midTreble
 
-            // Center vocal formant band is the remaining mid spectrum
-            val midVocal = mid - midBass - midTreble
+            // 4. Center-channel phase cancellation: (left - right) removes the center lead vocal
+            // Boost differential slightly (1.25x) so instrumental track matches nominal loudness
+            val diff = (left - right) * 1.25
 
-            // Attenuate only the vocal formant band, preserving sub-bass and high air
-            val midOut = midBass + midTreble + vocalGain * midVocal
+            // 5. In-phase karaoke instrumental: diff + bass + high shimmer
+            // Crucial: Kept IN-PHASE across both Left and Right so it NEVER cancels on phone speakers!
+            val karaoke = (diff + midBass + 0.25 * midTreble).coerceIn(-1.0, 1.0)
 
-            // Recombine with untouched stereo side channel
-            val outL = (midOut + side).coerceIn(-1.0, 1.0)
-            val outR = (midOut - side).coerceIn(-1.0, 1.0)
+            // 6. Smooth crossfade based on vocal attenuation slider:
+            // alpha = 0.0 -> 100% original full stereo track
+            // alpha = 0.5 -> 50% guide vocals (vocals reduced, instrumental boosted)
+            // alpha = 1.0 -> 100% pure karaoke instrumental (vocals eliminated, beat & bass loud)
+            val outL = ((1.0 - alpha) * left + alpha * karaoke).coerceIn(-1.0, 1.0)
+            val outR = ((1.0 - alpha) * right + alpha * karaoke).coerceIn(-1.0, 1.0)
 
             output.putShort((outL * maxVal).toInt().toShort())
             output.putShort((outR * maxVal).toInt().toShort())
@@ -173,34 +176,25 @@ class VocalRemoverAudioProcessor : BaseAudioProcessor() {
     }
 
     private fun processStereoFloat(input: ByteBuffer, output: ByteBuffer, alpha: Double) {
-        val vocalGain = (1.0 - alpha).coerceIn(0.0, 1.0)
-
         while (input.remaining() >= 8) {
             val left = input.float.toDouble()
             val right = input.float.toDouble()
 
-            // Orthogonal Mid/Side decomposition
             val mid = (left + right) * 0.5
-            val side = (left - right) * 0.5
 
-            // Sub-bass preservation via LPF
             val midBass = lp_b0 * mid + lp_b1 * lp_x1 + lp_b2 * lp_x2 - lp_a1 * lp_y1 - lp_a2 * lp_y2
             lp_x2 = lp_x1; lp_x1 = mid
             lp_y2 = lp_y1; lp_y1 = midBass
 
-            // Treble presence preservation via HPF
             val midTreble = hp_b0 * mid + hp_b1 * hp_x1 + hp_b2 * hp_x2 - hp_a1 * hp_y1 - hp_a2 * hp_y2
             hp_x2 = hp_x1; hp_x1 = mid
             hp_y2 = hp_y1; hp_y1 = midTreble
 
-            // Center vocal formant band is the remaining mid spectrum
-            val midVocal = mid - midBass - midTreble
+            val diff = (left - right) * 1.25
+            val karaoke = (diff + midBass + 0.25 * midTreble).coerceIn(-1.0, 1.0)
 
-            // Attenuate only the vocal formant band, preserving sub-bass and high air
-            val midOut = midBass + midTreble + vocalGain * midVocal
-
-            val outL = (midOut + side).coerceIn(-1.0, 1.0).toFloat()
-            val outR = (midOut - side).coerceIn(-1.0, 1.0).toFloat()
+            val outL = ((1.0 - alpha) * left + alpha * karaoke).coerceIn(-1.0, 1.0).toFloat()
+            val outR = ((1.0 - alpha) * right + alpha * karaoke).coerceIn(-1.0, 1.0).toFloat()
 
             output.putFloat(outL)
             output.putFloat(outR)

@@ -124,11 +124,10 @@ object StreamResolver {
         return key?.let { io.github.sekademi.spotufi.data.preferences.getAlternativeStream(appContext, it) }
     }
 
-    @Volatile private var hasPurgedNegativeCache = false
-
     private fun ensureNegativeCachePurged(appContext: Context) {
-        if (!hasPurgedNegativeCache) {
-            hasPurgedNegativeCache = true
+        val prefs = appContext.getSharedPreferences("spotufi_migration", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("purged_neg_cache_v112", false)) {
+            prefs.edit().putBoolean("purged_neg_cache_v112", true).apply()
             io.github.sekademi.spotufi.data.preferences.clearNegativeAvailabilityCache(appContext)
         }
     }
@@ -204,7 +203,7 @@ object StreamResolver {
             } else null
 
             if (shouldTryLossless) {
-                val flacResult = withTimeoutOrNull(2_800) {
+                val flacResult = withTimeoutOrNull(1_000) {
                     com.metrolist.spotify.SpotiFlac.resolve(
                         sid,
                         isrc = null,
@@ -238,12 +237,15 @@ object StreamResolver {
                         flacQuality,
                     )
                     return@coroutineScope flacResult.track.url
-                } else if (flacResult is com.metrolist.spotify.SpotiFlac.Result.NotFound) {
-                    Log.d(TAG, "lossless not found for: $song")
-                } else if (flacResult == null) {
-                    Log.d(TAG, "lossless resolution timed out, utilizing parallel YouTube stream for: $song")
-                } else if (flacResult is com.metrolist.spotify.SpotiFlac.Result.Error) {
-                    Log.d(TAG, "lossless error (${flacResult.message}), utilizing parallel YouTube stream for: $song")
+                } else {
+                    if (flacResult is com.metrolist.spotify.SpotiFlac.Result.NotFound) {
+                        Log.d(TAG, "lossless not found for: $song")
+                        io.github.sekademi.spotufi.data.preferences.flagLosslessUnavailable(appContext, song)
+                    } else if (flacResult == null) {
+                        Log.d(TAG, "lossless resolution timed out, utilizing parallel YouTube stream for: $song")
+                    } else if (flacResult is com.metrolist.spotify.SpotiFlac.Result.Error) {
+                        Log.d(TAG, "lossless error (${flacResult.message}), utilizing parallel YouTube stream for: $song")
+                    }
                 }
             }
 

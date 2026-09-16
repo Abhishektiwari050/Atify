@@ -145,9 +145,9 @@ object SpotiFlac {
         HttpClient(OkHttp) {
             engine {
                 config {
-                    connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-                    readTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
-                    writeTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    connectTimeout(1500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    readTimeout(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    writeTimeout(1500, java.util.concurrent.TimeUnit.MILLISECONDS)
                 }
             }
             expectSuccess = false
@@ -163,13 +163,15 @@ object SpotiFlac {
     suspend fun upLosslessProviders(): Set<String> {
         upProvidersCache?.let { if (System.currentTimeMillis() - upProvidersAt < 60_000L) return it }
         val up = runCatching {
-            val r = client.get(STATUS_URL) { header("User-Agent", UA) }
-            if (r.status.value !in 200..299) return@runCatching null
-            val root = json.parseToJsonElement(r.bodyAsText()).jsonObject
-            root["spotiflac"]
-                ?.jsonObject?.get("status")?.jsonObject
-                ?.filterValues { it.jsonPrimitive.contentOrNull.equals("up", true) }
-                ?.keys?.toSet()
+            kotlinx.coroutines.withTimeoutOrNull(1000) {
+                val r = client.get(STATUS_URL) { header("User-Agent", UA) }
+                if (r.status.value !in 200..299) return@withTimeoutOrNull null
+                val root = json.parseToJsonElement(r.bodyAsText()).jsonObject
+                root["spotiflac"]
+                    ?.jsonObject?.get("status")?.jsonObject
+                    ?.filterValues { it.jsonPrimitive.contentOrNull.equals("up", true) }
+                    ?.keys?.toSet()
+            }
         }.getOrNull()
         val result = if (up.isNullOrEmpty()) allProviders else up
         upProvidersCache = result
