@@ -113,7 +113,6 @@ import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.di.RepeatMode
 import io.github.sekademi.spotufi.ui.components.AudioDetailsSheet
-import io.github.sekademi.spotufi.ui.components.AudioVisualizer
 import io.github.sekademi.spotufi.ui.components.Snackbar
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.navigation.albumRoute
@@ -608,12 +607,6 @@ fun PlayerScreen(navController: NavController) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-            )
-
-            AudioVisualizer(
-                isPlaying = songPlayingState,
-                primaryColor = dominentColor,
-                modifier = Modifier.padding(vertical = 2.dp),
             )
 
             Column(

@@ -168,7 +168,7 @@ fun SumUpSearchScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 6.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 SearchFilter.entries.forEach { filter ->
@@ -178,12 +178,12 @@ fun SumUpSearchScreen(
                             .clip(RoundedCornerShape(20.dp))
                             .background(if (isSelected) AppPalette else Color(0xFF242428))
                             .clickable { selectedFilter = filter }
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                            .padding(horizontal = 12.dp, vertical = 5.dp),
                     ) {
                         Text(
                             text = filter.label,
                             color = if (isSelected) Color.White else Color(0xFFCCCCCC),
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         )
                     }
@@ -865,9 +865,9 @@ fun SearchStickyBar(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .height(52.dp)
+            .height(48.dp)
             .background(Color(0xFF242428))
             .padding(horizontal = 12.dp),
     ) {

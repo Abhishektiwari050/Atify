@@ -116,44 +116,46 @@ fun PlayerInfo(
                     val hasError = !resolveError.isNullOrBlank()
                     val displaySource = if (isResolvingState) "Resolving" else if (hasError) "Error" else source
                     if (displaySource.isNotBlank()) {
-                        val badgeColor = when {
-                            hasError -> Color(0xFFFF6B6B)
-                            isResolvingState -> Color(0xFF3DABFF)
-                            source == "Spotify" -> Color(0xFF1ED760)
-                            source.startsWith("Lossless") -> Color(0xFFFFD54F)
-                            source == "Downloaded" -> Color(0xFF81C784)
-                            else -> Color(0xFF4FC3F7)
-                        }
+                        var showDetails by remember(songId) { mutableStateOf(false) }
+                        val badgeRed = Color(0xFFFF334B)
                         val isLossless = source.startsWith("Lossless")
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .padding(top = 4.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(badgeColor.copy(alpha = 0.16f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(top = 3.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(badgeRed.copy(alpha = 0.14f))
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
-                                ) { onQualityClick?.invoke() },
+                                ) {
+                                    showDetails = !showDetails
+                                    onQualityClick?.invoke()
+                                }
+                                .padding(horizontal = 5.dp, vertical = 2.dp),
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(6.dp)
+                                    .size(4.dp)
                                     .clip(CircleShape)
-                                    .background(badgeColor)
+                                    .background(badgeRed)
                             )
                             Text(
                                 text = when {
                                     hasError -> resolveError
-                                    isResolvingState -> resolveStatus
-                                    isLossless -> "HI-RES LOSSLESS" + (if (quality.isNotBlank()) " • $quality" else " • FLAC")
-                                    source == "Spotify" -> "SPOTIFY" + (if (quality.isNotBlank()) " • $quality" else " • 320k")
-                                    source == "Downloaded" -> "OFFLINE" + (if (quality.isNotBlank()) " • $quality" else "")
-                                    else -> "STREAM" + (if (quality.isNotBlank()) " • $quality" else " • OPUS")
+                                    isResolvingState -> if (showDetails) resolveStatus else "CONNECTING"
+                                    showDetails -> when {
+                                        isLossless -> "LOSSLESS FLAC" + (if (quality.isNotBlank()) " • $quality" else "")
+                                        source == "Spotify" -> "SPOTIFY 320k" + (if (quality.isNotBlank()) " • $quality" else "")
+                                        source == "Downloaded" -> "OFFLINE" + (if (quality.isNotBlank()) " • $quality" else "")
+                                        else -> "STREAM OPUS" + (if (quality.isNotBlank()) " • $quality" else "")
+                                    }
+                                    isLossless -> "LOSSLESS"
+                                    source == "Downloaded" -> "OFFLINE"
+                                    else -> "STREAM"
                                 },
-                                color = badgeColor,
-                                fontSize = 10.sp,
+                                color = badgeRed,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 modifier = Modifier.padding(start = 4.dp),
