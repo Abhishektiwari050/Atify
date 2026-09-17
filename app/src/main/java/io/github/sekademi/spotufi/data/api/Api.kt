@@ -285,13 +285,18 @@ class Api @Inject constructor(
 
     private fun com.metrolist.spotify.models.SpotifyEpisode.toEpisodeSongModel(showName: String?): SongsModel {
         val subtitle = show?.name ?: showName ?: "Podcast"
+        val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(name)
+        val playQuery = "episode:$id|$cleanTitle $subtitle"
         return SongsModel(
             id = stableId("episode:$id"),
             title = name,
             album = subtitle,
             singer = subtitle,
             coverUri = images.firstOrNull()?.url ?: (show?.images?.firstOrNull()?.url ?: ""),
-            url = "episode:$id",
+            url = playQuery,
+            spotifyTrackId = "",
+            explicit = false,
+            durationMs = durationMs,
         )
     }
 

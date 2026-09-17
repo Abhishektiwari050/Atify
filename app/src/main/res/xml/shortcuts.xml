@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <capability android:name="actions.intent.PLAY_MUSIC">
+        <intent
+            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            <parameter
+                android:name="music.recording.name"
+                android:key="query" />
+        </intent>
+    </capability>
+    <capability android:name="actions.intent.PLAY_PODCAST">
+        <intent
+            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            <parameter
+                android:name="podcast.name"
+                android:key="query" />
+        </intent>
+    </capability>
+</shortcuts>

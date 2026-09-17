@@ -277,6 +277,21 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) {
+            val query = intent.getStringExtra(android.app.SearchManager.QUERY)
+                ?: intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_TITLE)
+                ?: listOfNotNull(
+                    intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_ARTIST),
+                    intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_ALBUM),
+                ).joinToString(" ").takeIf { it.isNotBlank() }
+            if (!query.isNullOrBlank()) {
+                handleVoiceQuery(query)
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     /** Point the media session at whichever engine is currently producing audio. */
     private fun syncSessionPlayer() {
         val wantWeb = SongPlayer.webPlaybackActive()
@@ -299,11 +314,14 @@ class PlaybackService : MediaLibraryService() {
                 .add(COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
                 .add(COMMAND_SEEK_TO_PREVIOUS)
                 .add(COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                .add(COMMAND_SEEK_BACK)
+                .add(COMMAND_SEEK_FORWARD)
                 .build()
 
         override fun isCommandAvailable(command: Int): Boolean = when (command) {
             COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-            COMMAND_SEEK_TO_PREVIOUS, COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> true
+            COMMAND_SEEK_TO_PREVIOUS, COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+            COMMAND_SEEK_BACK, COMMAND_SEEK_FORWARD -> true
             else -> super.isCommandAvailable(command)
         }
 
@@ -643,6 +661,30 @@ class PlaybackService : MediaLibraryService() {
             LibraryResult.ofItemList(ImmutableList.copyOf(paged), params)
         }
 
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+        ): ListenableFuture<MutableList<MediaItem>> {
+            val requested = mediaItems.firstOrNull()
+            if (requested != null) {
+                val song = trackById[requested.mediaId]
+                if (song != null) {
+                    val queue = queueByTrackId[requested.mediaId] ?: listOf(song)
+                    currentSongState.updateQueue(queue)
+                    val idx = queue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                    currentSongState.updateSongState(
+                        song.coverUri, song.title, song.singer, true,
+                        song.id, idx, song.album,
+                    )
+                    SongPlayer.playSong(song.url, applicationContext)
+                } else {
+                    extractSearchQuery(requested)?.let { handleVoiceQuery(it) }
+                }
+            }
+            return Futures.immediateFuture(mediaItems)
+        }
+
         // A browsed track was tapped in the car: queue the list it came from and
         // play through our own engine (streams are resolved lazily per track, so
         // we never hand the session a playlist of URIs).
@@ -664,10 +706,115 @@ class PlaybackService : MediaLibraryService() {
                     song.id, idx, song.album,
                 )
                 SongPlayer.playSong(song.url, applicationContext)
+            } else if (requested != null) {
+                extractSearchQuery(requested)?.let { handleVoiceQuery(it) }
             }
             return Futures.immediateFuture(
                 MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET),
             )
+        }
+    }
+
+    private fun extractSearchQuery(item: MediaItem): String? {
+        val req = item.requestMetadata
+        val query = req.searchQuery?.takeIf { it.isNotBlank() }
+            ?: req.extras?.getString(android.app.SearchManager.QUERY)?.takeIf { it.isNotBlank() }
+            ?: req.extras?.getString(android.provider.MediaStore.EXTRA_MEDIA_TITLE)?.takeIf { it.isNotBlank() }
+            ?: listOfNotNull(
+                req.extras?.getString(android.provider.MediaStore.EXTRA_MEDIA_ARTIST),
+                req.extras?.getString(android.provider.MediaStore.EXTRA_MEDIA_ALBUM),
+            ).joinToString(" ").takeIf { it.isNotBlank() }
+            ?: item.mediaId.takeIf {
+                it.isNotBlank() && !it.startsWith("folder/") &&
+                    it !in setOf(ROOT, NODE_LIKED, NODE_DOWNLOADS, NODE_PLAYLISTS, NODE_ALBUMS)
+            }
+        return query?.trim()
+    }
+
+    private fun handleVoiceQuery(query: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val cleanQuery = query.trim()
+            if (cleanQuery.isBlank()) return@launch
+
+            // 1. Unified catalog search (songs, episodes, shows)
+            val searchResults = runCatching {
+                lastSuccess(repository.searchEverything(cleanQuery))
+            }.getOrNull()
+
+            val isPodcastQuery = cleanQuery.contains("podcast", ignoreCase = true) ||
+                cleanQuery.contains("episode", ignoreCase = true)
+
+            if (isPodcastQuery && !searchResults?.episodes.isNullOrEmpty()) {
+                val episode = searchResults.episodes.first()
+                withContext(Dispatchers.Main) {
+                    currentSongState.updateQueue(searchResults.episodes)
+                    currentSongState.updateSongState(
+                        episode.coverUri, episode.title, episode.singer, true,
+                        episode.id, 0, episode.album,
+                    )
+                    SongPlayer.playSong(episode.url, applicationContext)
+                }
+                return@launch
+            }
+
+            if (!searchResults?.songs.isNullOrEmpty()) {
+                val topSong = searchResults.songs.first()
+                withContext(Dispatchers.Main) {
+                    currentSongState.updateQueue(searchResults.songs)
+                    currentSongState.updateSongState(
+                        topSong.coverUri, topSong.title, topSong.singer, true,
+                        topSong.id, 0, topSong.album,
+                    )
+                    SongPlayer.playSong(topSong.url, applicationContext)
+                }
+                return@launch
+            }
+
+            if (!searchResults?.episodes.isNullOrEmpty()) {
+                val episode = searchResults.episodes.first()
+                withContext(Dispatchers.Main) {
+                    currentSongState.updateQueue(searchResults.episodes)
+                    currentSongState.updateSongState(
+                        episode.coverUri, episode.title, episode.singer, true,
+                        episode.id, 0, episode.album,
+                    )
+                    SongPlayer.playSong(episode.url, applicationContext)
+                }
+                return@launch
+            }
+
+            // 2. Fallback: Search via YouTube directly
+            val ytFilter = if (isPodcastQuery) com.metrolist.innertube.YouTube.SearchFilter.FILTER_VIDEO else com.metrolist.innertube.YouTube.SearchFilter.FILTER_SONG
+            val ytHits = runCatching {
+                com.metrolist.innertube.YouTube.search(cleanQuery, ytFilter).getOrNull()?.items
+                    ?.mapNotNull { item ->
+                        when (item) {
+                            is com.metrolist.innertube.models.SongItem -> item
+                            is com.metrolist.innertube.models.EpisodeItem -> item.asSongItem()
+                            else -> null
+                        }
+                    }
+            }.getOrNull()
+            val topYt = ytHits?.firstOrNull()
+            if (topYt != null) {
+                val model = SongsModel(
+                    id = topYt.id.hashCode(),
+                    title = topYt.title,
+                    singer = topYt.artists.joinToString(", ") { it.name }.ifBlank { "Unknown" },
+                    album = topYt.album?.name ?: "Voice Search",
+                    coverUri = topYt.thumbnail,
+                    url = topYt.id,
+                    durationMs = (topYt.duration ?: 0) * 1000
+                )
+                withContext(Dispatchers.Main) {
+                    currentSongState.updateQueue(listOf(model))
+                    currentSongState.updateSongState(
+                        model.coverUri, model.title, model.singer, true,
+                        model.id, 0, model.album,
+                    )
+                    SongPlayer.playSong(model.url, applicationContext)
+                }
+            }
         }
     }
 

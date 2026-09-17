@@ -47,6 +47,13 @@
                 <data android:scheme="atify" android:host="callback" />
                 <data android:scheme="atify" android:host="login" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- Android Auto: declares the app as a media app for the car. -->
@@ -66,6 +73,7 @@
                 <action android:name="androidx.media3.session.MediaLibraryService" />
                 <!-- Legacy action Android Auto uses to discover browsable media apps. -->
                 <action android:name="android.media.browse.MediaBrowserService" />
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
             </intent-filter>
         </service>
 

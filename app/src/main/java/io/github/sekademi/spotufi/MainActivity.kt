@@ -60,12 +60,24 @@ class MainActivity : ComponentActivity() {
         io.github.sekademi.spotufi.di.SpotifyWebPlayer.attach(this)
 
         handleDeepLink(intent)
+        handleVoiceIntent(intent)
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleDeepLink(intent)
+        handleVoiceIntent(intent)
+    }
+
+    private fun handleVoiceIntent(intent: android.content.Intent?) {
+        if (intent?.action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) {
+            val serviceIntent = android.content.Intent(this, PlaybackService::class.java).apply {
+                action = android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH
+                intent.extras?.let { putExtras(it) }
+            }
+            ContextCompat.startForegroundService(this, serviceIntent)
+        }
     }
 
     private fun handleDeepLink(intent: android.content.Intent?) {

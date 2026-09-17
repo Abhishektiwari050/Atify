@@ -456,7 +456,8 @@ object SongPlayer {
             io.github.sekademi.spotufi.data.preferences.isWebPlaybackEnabled(appContext)
         ) {
             runCatching { player?.pause() }
-            SpotifyWebPlayer.playEpisode(song.removePrefix("episode:"))
+            val rawEpisodeId = song.removePrefix("episode:").substringBefore('|')
+            SpotifyWebPlayer.playEpisode(rawEpisodeId)
             return
         }
 

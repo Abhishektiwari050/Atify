@@ -100,8 +100,11 @@ object StreamResolver {
         title.replace(featSearchPattern, "").trim()
 
     fun searchTextForPlayback(song: String): String =
-        if (song.startsWith(SPOTIFY_TRACK_PREFIX) && song.contains('|')) {
+        if ((song.startsWith(SPOTIFY_TRACK_PREFIX) || song.startsWith("episode:")) && song.contains('|')) {
             song.substringAfter('|').ifBlank { song }
+        } else if (song.startsWith("episode:")) {
+            metadataRegistry[song]?.let { "${it.title} ${it.artist}" }
+                ?: song.removePrefix("episode:")
         } else {
             song
         }
@@ -304,6 +307,12 @@ object StreamResolver {
         appContext: Context,
         filter: YouTube.SearchFilter = YouTube.SearchFilter.FILTER_SONG,
     ): List<String> {
+        val isEpisode = query.startsWith("episode:")
+        val effectiveFilter = if (isEpisode && filter == YouTube.SearchFilter.FILTER_SONG) {
+            YouTube.SearchFilter.FILTER_VIDEO
+        } else {
+            filter
+        }
         val searchText = searchTextForPlayback(query)
         if (searchText.length == 11 && !searchText.contains(' ')) return listOf(searchText)
 
@@ -312,14 +321,37 @@ object StreamResolver {
             if (cachedIds.isNotEmpty()) return cachedIds
         }
 
-        val hits = YouTube.search(searchText, filter)
+        val primaryHits = YouTube.search(searchText, effectiveFilter)
             .onFailure { Log.w(TAG, "resolveVideoId: YouTube search failed for: $searchText", it) }
             .getOrNull()
             ?.items
-            ?.filterIsInstance<SongItem>()
+            ?.mapNotNull { item ->
+                when (item) {
+                    is SongItem -> item
+                    is com.metrolist.innertube.models.EpisodeItem -> item.asSongItem()
+                    else -> null
+                }
+            }
             .orEmpty()
+
+        val hits = if (primaryHits.isEmpty() && isEpisode && effectiveFilter == YouTube.SearchFilter.FILTER_VIDEO) {
+            YouTube.search(searchText, YouTube.SearchFilter.FILTER_SONG)
+                .getOrNull()
+                ?.items
+                ?.mapNotNull { item ->
+                    when (item) {
+                        is SongItem -> item
+                        is com.metrolist.innertube.models.EpisodeItem -> item.asSongItem()
+                        else -> null
+                    }
+                }
+                .orEmpty()
+        } else {
+            primaryHits
+        }
+
         if (hits.isEmpty()) {
-            Log.w(TAG, "resolveVideoId: no YouTube song results for: $searchText")
+            Log.w(TAG, "resolveVideoId: no YouTube results for: $searchText")
             return emptyList()
         }
         fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
@@ -329,10 +361,14 @@ object StreamResolver {
         val scored = hits.map { h ->
             val cleanTitle = norm(h.title.substringBefore('(').substringBefore('['))
             var s = 0
-            if (cleanTitle.isNotEmpty() && qn.contains(cleanTitle)) s += 1
+            if (cleanTitle.isNotEmpty() && qn.contains(cleanTitle)) s += 2
             if (h.artists.any { a -> norm(a.name).let { it.isNotEmpty() && qn.contains(it) } }) s += 2
             val hDur = h.duration
-            if (wantSec != null && hDur != null && kotlin.math.abs(hDur - wantSec) <= 4) s += 2
+            if (wantSec != null && hDur != null) {
+                val diff = kotlin.math.abs(hDur - wantSec)
+                if (diff <= 4) s += 3
+                else if (isEpisode && diff <= 120) s += 2
+            }
             h to s
         }
         val transferScored = if (exactMeta != null) {
@@ -342,9 +378,11 @@ object StreamResolver {
         }
         fun verified(h: SongItem): Boolean {
             val artistOk = h.artists.any { a -> norm(a.name).let { it.isNotEmpty() && qn.contains(it) } }
+            val cleanTitle = norm(h.title.substringBefore('(').substringBefore('['))
+            val titleOk = cleanTitle.isNotEmpty() && qn.contains(cleanTitle)
             val d = h.duration
-            val durOk = wantSec != null && d != null && kotlin.math.abs(d - wantSec) <= 4
-            return artistOk || durOk
+            val durOk = wantSec != null && d != null && (kotlin.math.abs(d - wantSec) <= (if (isEpisode) 120 else 4))
+            return if (isEpisode) (titleOk || artistOk || durOk) else (artistOk || durOk)
         }
         val wantExplicit = explicitRegistry[query]
         fun explicitFirst(list: List<SongItem>) =
