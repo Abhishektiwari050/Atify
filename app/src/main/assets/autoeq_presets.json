@@ -1,0 +1,274 @@
+[
+  {
+    "name": "Sony WH-1000XM5",
+    "aliases": ["WH-1000XM5", "SONY WH-1000XM5", "WH1000XM5"],
+    "type": "Over-Ear (ANC)",
+    "preampDb": -4.2,
+    "bands": [
+      { "freq": 32, "gain": -1.2, "q": 0.7 },
+      { "freq": 64, "gain": -2.8, "q": 1.1 },
+      { "freq": 125, "gain": -3.5, "q": 1.4 },
+      { "freq": 250, "gain": -1.8, "q": 1.0 },
+      { "freq": 1000, "gain": 1.5, "q": 1.2 },
+      { "freq": 2000, "gain": 2.2, "q": 1.5 },
+      { "freq": 4000, "gain": 1.0, "q": 2.0 },
+      { "freq": 8000, "gain": 2.5, "q": 1.8 },
+      { "freq": 16000, "gain": -1.0, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Sony WH-1000XM4",
+    "aliases": ["WH-1000XM4", "SONY WH-1000XM4", "WH1000XM4"],
+    "type": "Over-Ear (ANC)",
+    "preampDb": -4.5,
+    "bands": [
+      { "freq": 32, "gain": -1.0, "q": 0.7 },
+      { "freq": 64, "gain": -3.2, "q": 1.2 },
+      { "freq": 125, "gain": -4.0, "q": 1.5 },
+      { "freq": 250, "gain": -2.2, "q": 1.1 },
+      { "freq": 1000, "gain": 1.8, "q": 1.3 },
+      { "freq": 2000, "gain": 2.5, "q": 1.6 },
+      { "freq": 4000, "gain": 0.8, "q": 2.0 },
+      { "freq": 8000, "gain": 2.0, "q": 1.7 },
+      { "freq": 16000, "gain": -0.8, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Apple AirPods Pro 2",
+    "aliases": ["AirPods Pro", "AirPods Pro - Find My", "AirPods Pro 2"],
+    "type": "TWS Earbuds",
+    "preampDb": -2.1,
+    "bands": [
+      { "freq": 32, "gain": 1.0, "q": 0.8 },
+      { "freq": 64, "gain": 0.5, "q": 1.0 },
+      { "freq": 125, "gain": -0.5, "q": 1.0 },
+      { "freq": 250, "gain": -0.8, "q": 1.2 },
+      { "freq": 1000, "gain": 0.5, "q": 1.0 },
+      { "freq": 2000, "gain": 1.2, "q": 1.4 },
+      { "freq": 4000, "gain": -1.5, "q": 2.2 },
+      { "freq": 8000, "gain": 2.8, "q": 2.0 },
+      { "freq": 16000, "gain": 1.5, "q": 0.8 }
+    ]
+  },
+  {
+    "name": "Apple AirPods Max",
+    "aliases": ["AirPods Max"],
+    "type": "Over-Ear (ANC)",
+    "preampDb": -3.0,
+    "bands": [
+      { "freq": 32, "gain": -0.5, "q": 0.7 },
+      { "freq": 64, "gain": -1.5, "q": 1.0 },
+      { "freq": 125, "gain": -2.0, "q": 1.3 },
+      { "freq": 250, "gain": -1.0, "q": 1.1 },
+      { "freq": 1000, "gain": 1.2, "q": 1.0 },
+      { "freq": 2000, "gain": 1.8, "q": 1.5 },
+      { "freq": 4000, "gain": -1.2, "q": 2.0 },
+      { "freq": 8000, "gain": 2.2, "q": 1.6 },
+      { "freq": 16000, "gain": 0.5, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Sennheiser HD 600",
+    "aliases": ["HD600", "Sennheiser HD600", "HD 600"],
+    "type": "Open-Back Studio",
+    "preampDb": -4.8,
+    "bands": [
+      { "freq": 32, "gain": 5.5, "q": 0.7 },
+      { "freq": 64, "gain": 3.8, "q": 0.9 },
+      { "freq": 125, "gain": 1.5, "q": 1.2 },
+      { "freq": 250, "gain": -0.5, "q": 1.0 },
+      { "freq": 1000, "gain": -1.0, "q": 1.2 },
+      { "freq": 2000, "gain": 0.0, "q": 1.0 },
+      { "freq": 4000, "gain": 1.2, "q": 1.8 },
+      { "freq": 8000, "gain": -1.5, "q": 2.0 },
+      { "freq": 16000, "gain": 0.8, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Sennheiser HD 650 / HD 6XX",
+    "aliases": ["HD650", "HD6XX", "Sennheiser HD650", "HD 650", "HD 6XX"],
+    "type": "Open-Back Studio",
+    "preampDb": -4.6,
+    "bands": [
+      { "freq": 32, "gain": 5.8, "q": 0.7 },
+      { "freq": 64, "gain": 3.2, "q": 0.9 },
+      { "freq": 125, "gain": 0.8, "q": 1.2 },
+      { "freq": 250, "gain": -1.0, "q": 1.1 },
+      { "freq": 1000, "gain": -0.8, "q": 1.2 },
+      { "freq": 2000, "gain": 0.5, "q": 1.2 },
+      { "freq": 4000, "gain": 2.0, "q": 1.6 },
+      { "freq": 8000, "gain": -0.8, "q": 1.8 },
+      { "freq": 16000, "gain": 1.2, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Sennheiser Momentum 4",
+    "aliases": ["MOMENTUM 4", "Momentum 4", "Sennheiser Momentum 4"],
+    "type": "Over-Ear (ANC)",
+    "preampDb": -3.8,
+    "bands": [
+      { "freq": 32, "gain": -1.5, "q": 0.7 },
+      { "freq": 64, "gain": -2.5, "q": 1.1 },
+      { "freq": 125, "gain": -3.0, "q": 1.3 },
+      { "freq": 250, "gain": -1.2, "q": 1.0 },
+      { "freq": 1000, "gain": 1.0, "q": 1.1 },
+      { "freq": 2000, "gain": 2.0, "q": 1.5 },
+      { "freq": 4000, "gain": 0.5, "q": 1.8 },
+      { "freq": 8000, "gain": 1.8, "q": 1.6 },
+      { "freq": 16000, "gain": -0.5, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Bose QuietComfort 45 / SE",
+    "aliases": ["Bose QC45", "QC45", "Bose QuietComfort 45", "Bose QC SE"],
+    "type": "Over-Ear (ANC)",
+    "preampDb": -3.5,
+    "bands": [
+      { "freq": 32, "gain": 1.2, "q": 0.8 },
+      { "freq": 64, "gain": 0.8, "q": 1.0 },
+      { "freq": 125, "gain": -1.5, "q": 1.2 },
+      { "freq": 250, "gain": -2.0, "q": 1.4 },
+      { "freq": 1000, "gain": 0.8, "q": 1.1 },
+      { "freq": 2000, "gain": 1.5, "q": 1.5 },
+      { "freq": 4000, "gain": -1.0, "q": 2.0 },
+      { "freq": 8000, "gain": -2.5, "q": 1.8 },
+      { "freq": 16000, "gain": 1.0, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Bose QuietComfort Ultra",
+    "aliases": ["Bose QC Ultra", "Bose QuietComfort Ultra", "QC Ultra"],
+    "type": "Over-Ear (ANC)",
+    "preampDb": -3.2,
+    "bands": [
+      { "freq": 32, "gain": 0.5, "q": 0.8 },
+      { "freq": 64, "gain": -1.0, "q": 1.0 },
+      { "freq": 125, "gain": -2.2, "q": 1.3 },
+      { "freq": 250, "gain": -1.5, "q": 1.2 },
+      { "freq": 1000, "gain": 1.2, "q": 1.1 },
+      { "freq": 2000, "gain": 1.8, "q": 1.4 },
+      { "freq": 4000, "gain": -0.5, "q": 1.8 },
+      { "freq": 8000, "gain": 1.5, "q": 1.6 },
+      { "freq": 16000, "gain": -0.8, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Samsung Galaxy Buds 2 Pro",
+    "aliases": ["Galaxy Buds2 Pro", "Buds2 Pro", "Galaxy Buds Pro 2"],
+    "type": "TWS Earbuds",
+    "preampDb": -2.4,
+    "bands": [
+      { "freq": 32, "gain": -0.5, "q": 0.8 },
+      { "freq": 64, "gain": -0.8, "q": 1.0 },
+      { "freq": 125, "gain": -1.2, "q": 1.2 },
+      { "freq": 250, "gain": -0.5, "q": 1.0 },
+      { "freq": 1000, "gain": 0.5, "q": 1.0 },
+      { "freq": 2000, "gain": 1.0, "q": 1.3 },
+      { "freq": 4000, "gain": -0.8, "q": 1.8 },
+      { "freq": 8000, "gain": 1.5, "q": 1.5 },
+      { "freq": 16000, "gain": 0.5, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Moondrop Aria",
+    "aliases": ["Moondrop Aria", "Aria"],
+    "type": "IEM",
+    "preampDb": -2.8,
+    "bands": [
+      { "freq": 32, "gain": 0.8, "q": 0.7 },
+      { "freq": 64, "gain": 0.2, "q": 1.0 },
+      { "freq": 125, "gain": -0.8, "q": 1.2 },
+      { "freq": 250, "gain": -0.5, "q": 1.0 },
+      { "freq": 1000, "gain": 0.2, "q": 1.0 },
+      { "freq": 2000, "gain": 0.8, "q": 1.2 },
+      { "freq": 4000, "gain": 1.2, "q": 1.8 },
+      { "freq": 8000, "gain": -2.0, "q": 2.0 },
+      { "freq": 16000, "gain": 2.2, "q": 0.8 }
+    ]
+  },
+  {
+    "name": "Moondrop Blessing 2 / Dusk",
+    "aliases": ["Blessing 2", "Blessing 2 Dusk", "Blessing2"],
+    "type": "IEM",
+    "preampDb": -2.5,
+    "bands": [
+      { "freq": 32, "gain": 1.8, "q": 0.8 },
+      { "freq": 64, "gain": 1.2, "q": 1.0 },
+      { "freq": 125, "gain": 0.2, "q": 1.2 },
+      { "freq": 250, "gain": -0.5, "q": 1.0 },
+      { "freq": 1000, "gain": -0.2, "q": 1.0 },
+      { "freq": 2000, "gain": 0.5, "q": 1.2 },
+      { "freq": 4000, "gain": 0.8, "q": 1.6 },
+      { "freq": 8000, "gain": -1.2, "q": 1.8 },
+      { "freq": 16000, "gain": 1.5, "q": 0.8 }
+    ]
+  },
+  {
+    "name": "Audio-Technica ATH-M50x",
+    "aliases": ["ATH-M50x", "M50x", "ATH-M50", "Audio-Technica M50x"],
+    "type": "Closed-Back Studio",
+    "preampDb": -4.0,
+    "bands": [
+      { "freq": 32, "gain": -1.8, "q": 0.8 },
+      { "freq": 64, "gain": -3.0, "q": 1.2 },
+      { "freq": 125, "gain": -3.5, "q": 1.4 },
+      { "freq": 250, "gain": -1.5, "q": 1.1 },
+      { "freq": 1000, "gain": 1.0, "q": 1.1 },
+      { "freq": 2000, "gain": 1.5, "q": 1.4 },
+      { "freq": 4000, "gain": -0.5, "q": 1.8 },
+      { "freq": 8000, "gain": -3.2, "q": 2.0 },
+      { "freq": 16000, "gain": -1.5, "q": 0.7 }
+    ]
+  },
+  {
+    "name": "Beyerdynamic DT 770 Pro (80 Ohm)",
+    "aliases": ["DT 770", "DT770", "DT 770 PRO", "Beyerdynamic DT 770"],
+    "type": "Closed-Back Studio",
+    "preampDb": -5.2,
+    "bands": [
+      { "freq": 32, "gain": -2.0, "q": 0.8 },
+      { "freq": 64, "gain": -3.5, "q": 1.2 },
+      { "freq": 125, "gain": -2.8, "q": 1.3 },
+      { "freq": 250, "gain": -1.0, "q": 1.0 },
+      { "freq": 1000, "gain": 1.2, "q": 1.1 },
+      { "freq": 2000, "gain": 2.0, "q": 1.4 },
+      { "freq": 4000, "gain": 0.5, "q": 1.8 },
+      { "freq": 8000, "gain": -5.5, "q": 2.2 },
+      { "freq": 16000, "gain": -2.0, "q": 0.8 }
+    ]
+  },
+  {
+    "name": "Beyerdynamic DT 990 Pro (250 Ohm)",
+    "aliases": ["DT 990", "DT990", "DT 990 PRO", "Beyerdynamic DT 990"],
+    "type": "Open-Back Studio",
+    "preampDb": -5.8,
+    "bands": [
+      { "freq": 32, "gain": 4.5, "q": 0.7 },
+      { "freq": 64, "gain": 2.0, "q": 0.9 },
+      { "freq": 125, "gain": -1.2, "q": 1.2 },
+      { "freq": 250, "gain": -1.8, "q": 1.3 },
+      { "freq": 1000, "gain": 0.8, "q": 1.1 },
+      { "freq": 2000, "gain": 1.5, "q": 1.4 },
+      { "freq": 4000, "gain": 0.0, "q": 1.8 },
+      { "freq": 8000, "gain": -6.2, "q": 2.4 },
+      { "freq": 16000, "gain": -2.5, "q": 0.8 }
+    ]
+  },
+  {
+    "name": "Harman Target Flat Reference",
+    "aliases": ["Harman Flat", "Reference Studio"],
+    "type": "Studio Reference Target",
+    "preampDb": 0.0,
+    "bands": [
+      { "freq": 32, "gain": 0.0, "q": 1.0 },
+      { "freq": 64, "gain": 0.0, "q": 1.0 },
+      { "freq": 125, "gain": 0.0, "q": 1.0 },
+      { "freq": 250, "gain": 0.0, "q": 1.0 },
+      { "freq": 1000, "gain": 0.0, "q": 1.0 },
+      { "freq": 2000, "gain": 0.0, "q": 1.0 },
+      { "freq": 4000, "gain": 0.0, "q": 1.0 },
+      { "freq": 8000, "gain": 0.0, "q": 1.0 },
+      { "freq": 16000, "gain": 0.0, "q": 1.0 }
+    ]
+  }
+]

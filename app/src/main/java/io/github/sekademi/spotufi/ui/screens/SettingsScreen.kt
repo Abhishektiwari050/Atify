@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.toArgb
+import io.github.sekademi.spotufi.ui.theme.AppPalette
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -181,6 +184,104 @@ fun SettingsScreen(navController: NavController) {
                 selected = cellQ,
             ) { cellQ = it; setCellularQuality(context, it) }
 
+            QualityPicker(
+                title = "Download audio quality",
+                selected = dlQ,
+            ) { dlQ = it; io.github.sekademi.spotufi.data.preferences.setDownloadQuality(context, it) }
+
+            var autoplayEnabled by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isAutoplayEnabled(context)) }
+            SettingsSwitchRow(
+                title = "Autoplay (Infinite Radio)",
+                subtitle = "Keep listening — similar tracks are dynamically queued when your music ends",
+                checked = autoplayEnabled,
+            ) {
+                autoplayEnabled = it
+                io.github.sekademi.spotufi.data.preferences.setAutoplayEnabled(context, it)
+            }
+
+            // Crossfade with selectable curves
+            var crossfadeSeconds by remember { mutableStateOf((getCrossfadeMs(context) / 1000).toFloat()) }
+            var crossfadeCurve by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.getCrossfadeCurve(context)) }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF1A1A20))
+                    .padding(14.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Crossfade", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = if (crossfadeSeconds.toInt() == 0) "Off" else "${crossfadeSeconds.toInt()}s overlap (${crossfadeCurve.label})",
+                            color = Color.Gray,
+                            fontSize = 13.sp,
+                        )
+                    }
+                }
+                Slider(
+                    value = crossfadeSeconds,
+                    onValueChange = { s ->
+                        crossfadeSeconds = s
+                        val ms = s.toInt() * 1000
+                        io.github.sekademi.spotufi.data.preferences.setCrossfadeMs(context, ms)
+                    },
+                    valueRange = 0f..12f,
+                    steps = 11,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color(AppPalette.toArgb()),
+                        activeTrackColor = Color(AppPalette.toArgb()),
+                        inactiveTrackColor = Color(0xFF333333),
+                    ),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                if (crossfadeSeconds.toInt() > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        for (curve in io.github.sekademi.spotufi.data.preferences.CrossfadeCurve.entries) {
+                            val selected = crossfadeCurve == curve
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selected) Color(AppPalette.toArgb()) else Color(0xFF2A2A32))
+                                    .clickable {
+                                        crossfadeCurve = curve
+                                        io.github.sekademi.spotufi.data.preferences.setCrossfadeCurve(context, curve)
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = curve.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selected) Color.Black else Color.White,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            var visualizerEnabled by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isVisualizerEnabled(context)) }
+            SettingsSwitchRow(
+                title = "Beat-reactive audio visualizer",
+                subtitle = "60fps dancing spectrum waveform on the Now Playing screen",
+                checked = visualizerEnabled,
+            ) {
+                visualizerEnabled = it
+                io.github.sekademi.spotufi.data.preferences.setVisualizerEnabled(context, it)
+            }
+
             SettingsSwitchRow(
                 title = "Allow video fallback",
                 subtitle = "Use regular YouTube videos only after Music song results fail",
@@ -193,7 +294,7 @@ fun SettingsScreen(navController: NavController) {
             var volumeNormalization by remember { mutableStateOf(isVolumeNormalizationEnabled(context)) }
             SettingsSwitchRow(
                 title = "Normalize volume",
-                subtitle = "Set the same volume level for all songs",
+                subtitle = "EBU R128 dynamic gain evening (-14 LUFS standard)",
                 checked = volumeNormalization,
             ) {
                 volumeNormalization = it
@@ -232,6 +333,119 @@ fun SettingsScreen(navController: NavController) {
             ) {
                 spotifyCanvas = it
                 io.github.sekademi.spotufi.data.preferences.setSpotifyCanvasEnabled(context, it)
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { navController.navigate(io.github.sekademi.spotufi.ui.navigation.Routes.Connect.route) }
+                    .background(Color(0xFF1A1A20))
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Atify Connect", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (io.github.sekademi.spotufi.connect.AtifyConnectServer.isRunning) "Broadcasting at http://${io.github.sekademi.spotufi.connect.AtifyConnectServer.getLocalIpAddress()}:8080"
+                        else "Web remote control & Party Sync",
+                        color = if (io.github.sekademi.spotufi.connect.AtifyConnectServer.isRunning) Color(AppPalette.toArgb()) else Color(0xFFB3B3B3),
+                        fontSize = 12.sp,
+                    )
+                }
+                Text(
+                    ">",
+                    color = Color.Gray,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { navController.navigate(io.github.sekademi.spotufi.ui.navigation.Routes.CarMode.route) }
+                    .background(Color(0xFF1A1A20))
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Car Mode", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Oversized high-contrast dashboard with swipe gestures", color = Color(0xFFB3B3B3), fontSize = 12.sp)
+                }
+                Text(
+                    ">",
+                    color = Color.Gray,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+            }
+
+            Spacer(Modifier.height(6.dp))
+            var showAutoEqSheet by remember { mutableStateOf(false) }
+            if (showAutoEqSheet) {
+                io.github.sekademi.spotufi.ui.components.AutoEqPickerSheet(
+                    context = context,
+                    onDismiss = { showAutoEqSheet = false }
+                )
+            }
+
+            val activeAutoEq = io.github.sekademi.spotufi.audio.AutoEqEngine.getActiveProfile(context)
+            val autoEqEnabled = io.github.sekademi.spotufi.audio.AutoEqEngine.isEnabled(context)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { showAutoEqSheet = true }
+                    .background(Color(0xFF1A1A20))
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("AutoEQ Headphone Studio", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (autoEqEnabled && activeAutoEq != null) "${activeAutoEq.name} (${activeAutoEq.type})"
+                        else "Off • 4,000+ calibration curves",
+                        color = if (autoEqEnabled && activeAutoEq != null) Color(AppPalette.toArgb()) else Color(0xFFB3B3B3),
+                        fontSize = 12.sp,
+                    )
+                }
+                Text(
+                    ">",
+                    color = Color.Gray,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+            }
+
+            var spatialCrossfeed by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isSpatialCrossfeedEnabled(context)) }
+            SettingsSwitchRow(
+                title = "Binaural spatial crossfeed",
+                subtitle = "700Hz Chu Moy/Meier crossfeed DSP simulating room speaker acoustics on headphones",
+                checked = spatialCrossfeed,
+            ) {
+                spatialCrossfeed = it
+                io.github.sekademi.spotufi.data.preferences.setSpatialCrossfeedEnabled(context, it)
+                io.github.sekademi.spotufi.di.SongPlayer.setSpatialCrossfeed(it)
+            }
+
+            val connectedDac = remember { io.github.sekademi.spotufi.audio.DirectUsbDacHelper.getConnectedUsbDac(context) }
+            var directDacMode by remember { mutableStateOf(io.github.sekademi.spotufi.audio.DirectUsbDacHelper.isDirectDacModeEnabled(context)) }
+            SettingsSwitchRow(
+                title = "Bit-perfect direct USB DAC",
+                subtitle = if (connectedDac != null) "Detected: ${connectedDac.name} (${connectedDac.formats.joinToString()})"
+                           else "Bypass Android 48kHz audio resampler for external USB DACs & dongles",
+                checked = directDacMode,
+            ) {
+                directDacMode = it
+                io.github.sekademi.spotufi.audio.DirectUsbDacHelper.setDirectDacModeEnabled(context, it)
             }
 
             Spacer(Modifier.height(6.dp))

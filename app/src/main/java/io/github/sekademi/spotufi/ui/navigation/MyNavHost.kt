@@ -224,5 +224,13 @@ fun MyNavHost(
         composable(Routes.Equalizer.route) {
             EqualizerScreen(navHostController)
         }
+
+        composable(Routes.Connect.route) {
+            io.github.sekademi.spotufi.ui.screens.AtifyConnectScreen(navHostController)
+        }
+
+        composable(Routes.CarMode.route) {
+            io.github.sekademi.spotufi.ui.screens.CarModeScreen(navHostController)
+        }
     }
 }

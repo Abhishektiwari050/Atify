@@ -120,14 +120,18 @@ fun PlayerInfo(
                             hasError -> Color(0xFFFF6B6B)
                             isResolvingState -> Color(0xFF3DABFF)
                             source == "Spotify" -> Color(0xFF1ED760)
-                            source.startsWith("Lossless") -> Color(0xFFFFC862)
-                            source == "Downloaded" -> Color(0xFF9C9C9C)
-                            else -> Color(0xFFFF6B6B)
+                            source.startsWith("Lossless") -> Color(0xFFFFD54F)
+                            source == "Downloaded" -> Color(0xFF81C784)
+                            else -> Color(0xFF4FC3F7)
                         }
+                        val isLossless = source.startsWith("Lossless")
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .padding(top = 3.dp)
+                                .padding(top = 4.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(badgeColor.copy(alpha = 0.16f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
@@ -135,7 +139,7 @@ fun PlayerInfo(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(7.dp)
+                                    .size(6.dp)
                                     .clip(CircleShape)
                                     .background(badgeColor)
                             )
@@ -143,16 +147,16 @@ fun PlayerInfo(
                                 text = when {
                                     hasError -> resolveError
                                     isResolvingState -> resolveStatus
-                                    else -> {
-                                        (if (source == "YouTube") "Streamed" else source) +
-                                            (if (quality.isNotBlank()) " • $quality" else "")
-                                    }
+                                    isLossless -> "HI-RES LOSSLESS" + (if (quality.isNotBlank()) " • $quality" else " • FLAC")
+                                    source == "Spotify" -> "SPOTIFY" + (if (quality.isNotBlank()) " • $quality" else " • 320k")
+                                    source == "Downloaded" -> "OFFLINE" + (if (quality.isNotBlank()) " • $quality" else "")
+                                    else -> "STREAM" + (if (quality.isNotBlank()) " • $quality" else " • OPUS")
                                 },
                                 color = badgeColor,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
                                 maxLines = 1,
-                                modifier = Modifier.padding(start = 5.dp),
+                                modifier = Modifier.padding(start = 4.dp),
                             )
                         }
                     }

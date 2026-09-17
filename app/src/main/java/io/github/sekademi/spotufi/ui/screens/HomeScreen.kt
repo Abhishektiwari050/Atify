@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -31,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -63,6 +65,7 @@ import io.github.sekademi.spotufi.ui.components.Loader
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.navigation.albumRoute
 import io.github.sekademi.spotufi.ui.navigation.artistRoute
+import io.github.sekademi.spotufi.ui.navigation.categoryRoute
 import io.github.sekademi.spotufi.ui.navigation.playlistRoute
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
@@ -79,6 +82,12 @@ fun HomeScreen(navController: NavController){
     val home by homeViewModel.home.collectAsState()
     val albums by homeViewModel.albums.collectAsState()
     val artists by homeViewModel.artists.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        io.github.sekademi.spotufi.data.recommendation.SmartOfflinePredictor.triggerPreCache(context, scope)
+    }
 
     Surface(
         modifier = Modifier
@@ -173,6 +182,9 @@ fun HomeFeedContent(navController: NavController, feed: HomeFeedModel) {
         item {
             HomeHeaderRow(navController)
         }
+        item {
+            HomeMoodRadiosRow(navController)
+        }
         gridSection?.let { section ->
             item {
                 HomeShortcutGrid(navController, section.items.take(8))
@@ -260,6 +272,42 @@ private fun HomeHeaderRow(navController: NavController) {
                         fontWeight = FontWeight.Medium,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeMoodRadiosRow(navController: NavController) {
+    val items = listOf(
+        Triple("🎯 Deep Focus", Color(0xFF1E3A8A), categoryRoute("Focus", "Deep Focus")),
+        Triple("⚡ Gym Adrenaline", Color(0xFF991B1B), categoryRoute("Workout", "Gym Adrenaline")),
+        Triple("🌙 Night Drive", Color(0xFF4C1D95), categoryRoute("Electronic", "Night Drive")),
+        Triple("🚗 Car Mode", Color(0xFF065F46), Routes.CarMode.route),
+        Triple("🌐 Connect", Color(0xFF1F2937), Routes.Connect.route),
+    )
+
+    LazyRow(
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(items.size) { i ->
+            val (title, tintBg, route) = items[i]
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(tintBg.copy(alpha = 0.45f))
+                    .border(1.dp, tintBg.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
+                    .clickable { navController.navigate(route) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
     }

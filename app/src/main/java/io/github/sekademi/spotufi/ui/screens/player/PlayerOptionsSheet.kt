@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -307,6 +308,17 @@ fun PlayerOptionsSheet(
                     label = timerLabel,
                     trailingArrow = true
                 ) { showSleep = true }
+
+                var autoplay by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isAutoplayEnabled(context)) }
+                PlayerMenuRow(
+                    icon = Icons.Default.Refresh,
+                    iconTint = if (autoplay) Color(AppPalette.toArgb()) else Color.White,
+                    label = if (autoplay) "Autoplay (Infinite Radio): On" else "Autoplay (Infinite Radio): Off",
+                ) {
+                    autoplay = !autoplay
+                    io.github.sekademi.spotufi.data.preferences.setAutoplayEnabled(context, autoplay)
+                    Toast.makeText(context, if (autoplay) "Autoplay enabled" else "Autoplay disabled", Toast.LENGTH_SHORT).show()
+                }
             } else {
                 Row(
                     modifier = Modifier

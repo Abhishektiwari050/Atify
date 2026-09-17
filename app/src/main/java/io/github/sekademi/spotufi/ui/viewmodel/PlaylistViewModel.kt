@@ -1,14 +1,17 @@
 package io.github.sekademi.spotufi.ui.viewmodel
 
+import android.content.Context
 import androidx.compose.runtime.State
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.data.entity.AlbumsModel
 import io.github.sekademi.spotufi.data.entity.SongsModel
+import io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager
 import io.github.sekademi.spotufi.di.CurrentSongState
 import io.github.sekademi.spotufi.ui.repository.AppRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +22,7 @@ import javax.inject.Inject
 class PlaylistViewModel @Inject constructor(
     private val repository: AppRepository,
     private val currentSongState: CurrentSongState,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     val currentSongPlayingState: State<Boolean> get() = currentSongState.playingState
@@ -59,6 +63,30 @@ class PlaylistViewModel @Inject constructor(
     fun loadPlaylist(playlistId: String) {
         if (playlistKey == playlistId) return
         playlistKey = playlistId
+
+        if (playlistId.startsWith("local_")) {
+            val rawId = playlistId.removePrefix("local_")
+            viewModelScope.launch(Dispatchers.IO) {
+                val local = LocalPlaylistManager.getPlaylist(context, rawId)
+                if (local != null) {
+                    _playlist.value = Response.Success(
+                        AlbumsModel(
+                            id = rawId.hashCode() and 0x7fffffff,
+                            artists = if (local.description.isNotBlank()) local.description else "Custom Local Playlist",
+                            coverUri = local.coverUri,
+                            name = local.title,
+                            time = "${local.songs.size} tracks",
+                        )
+                    )
+                    _songs.value = Response.Success(local.songs)
+                } else {
+                    _playlist.value = Response.Error("Local playlist not found")
+                    _songs.value = Response.Error("Local playlist not found")
+                }
+            }
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             repository.providePlaylist(playlistId).collect { _playlist.value = it }
         }
@@ -69,6 +97,29 @@ class PlaylistViewModel @Inject constructor(
                 } else {
                     response
                 }
+            }
+        }
+    }
+
+    fun deleteLocalPlaylist(rawPlaylistId: String) {
+        LocalPlaylistManager.deletePlaylist(context, rawPlaylistId)
+    }
+
+    fun removeLocalSong(songId: Int, rawPlaylistId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            LocalPlaylistManager.removeSongFromPlaylist(context, rawPlaylistId, songId)
+            val local = LocalPlaylistManager.getPlaylist(context, rawPlaylistId)
+            if (local != null) {
+                _playlist.value = Response.Success(
+                    AlbumsModel(
+                        id = rawPlaylistId.hashCode() and 0x7fffffff,
+                        artists = if (local.description.isNotBlank()) local.description else "Custom Local Playlist",
+                        coverUri = local.coverUri,
+                        name = local.title,
+                        time = "${local.songs.size} tracks",
+                    )
+                )
+                _songs.value = Response.Success(local.songs)
             }
         }
     }

@@ -47,14 +47,14 @@ import io.github.sekademi.spotufi.ui.components.KaraokeControlSheet
 import io.github.sekademi.spotufi.ui.viewmodel.LyricsViewModel
 import kotlinx.coroutines.delay
 
-/** Polls ExoPlayer's position every 250ms so the active lyric line tracks the music. */
+/** Polls ExoPlayer's position every 60ms so the active lyric line and syllable progress track fluidly. */
 @Composable
 private fun rememberPlaybackPositionMs(): State<Long> {
     val pos = remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) {
         while (true) {
             pos.value = SongPlayer.getCurrentPosition().coerceAtLeast(0L)
-            delay(250L)
+            delay(60L)
         }
     }
     return pos
@@ -82,6 +82,7 @@ fun LyricsScreen(
     artist: String,
     album: String,
     accentColor: Color,
+    coverUrl: String = "",
     onClose: () -> Unit,
 ) {
     val vm: LyricsViewModel = hiltViewModel()
@@ -92,6 +93,9 @@ fun LyricsScreen(
     val state by vm.state.collectAsState()
     val positionMs by rememberPlaybackPositionMs()
     var showKaraokeSheet by remember { mutableStateOf(false) }
+    var showQuoteCardDialog by remember { mutableStateOf(false) }
+    var showPitchGuide by remember { mutableStateOf(false) }
+    var showTransliteration by remember { mutableStateOf(true) }
     val attenuation by SongPlayer.vocalAttenuation.collectAsState()
     val isKaraokeActive = attenuation > 0.01f
 
@@ -115,31 +119,91 @@ fun LyricsScreen(
                 .fillMaxWidth()
                 .padding(16.dp, 8.dp)
         ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                 Text("Lyrics", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Pitch Guide toggle button
+                Box(
+                    modifier = Modifier
+                        .background(
+                            if (showPitchGuide) Color(0xFF1ED760).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.12f),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { showPitchGuide = !showPitchGuide }
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "♫ Pitch",
+                        color = if (showPitchGuide) Color(0xFF1ED760) else Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(10.dp))
+
+                // Transliteration toggle button
+                Box(
+                    modifier = Modifier
+                        .background(
+                            if (showTransliteration) Color(0xFF1ED760).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.12f),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { showTransliteration = !showTransliteration }
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "A⇄文",
+                        color = if (showTransliteration) Color(0xFF1ED760) else Color.White.copy(alpha = 0.8f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(10.dp))
+
+                // Share Lyrics Quote Card button
+                if (state is LyricsViewModel.State.Loaded) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_share),
+                        contentDescription = "Share Quote Card",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { showQuoteCardDialog = true },
+                            ),
+                    )
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(12.dp))
+                }
                 // Karaoke / Sing-Along microphone button
                 Icon(
                     painter = painterResource(id = R.drawable.ic_microphone),
                     contentDescription = "Sing Along Karaoke",
                     tint = if (isKaraokeActive) Color(0xFF1ED760) else Color.White,
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(22.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = { showKaraokeSheet = !showKaraokeSheet },
                         ),
                 )
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(16.dp))
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(12.dp))
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription = "Close",
                     tint = Color.White,
                     modifier = Modifier
-                        .size(30.dp)
+                        .size(28.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -148,10 +212,28 @@ fun LyricsScreen(
             }
         }
 
+        if (showPitchGuide) {
+            io.github.sekademi.spotufi.ui.components.PitchGuideMeter(
+                onClose = { showPitchGuide = false }
+            )
+        }
+
         KaraokeControlSheet(
             visible = showKaraokeSheet,
             onDismiss = { showKaraokeSheet = false },
         )
+
+        if (showQuoteCardDialog && state is LyricsViewModel.State.Loaded) {
+            val lyricsData = (state as LyricsViewModel.State.Loaded).lyrics
+            io.github.sekademi.spotufi.ui.components.LyricsQuoteCardDialog(
+                lyrics = lyricsData,
+                title = title,
+                artist = artist,
+                coverUrl = coverUrl,
+                accentColor = accentColor,
+                onDismiss = { showQuoteCardDialog = false },
+            )
+        }
 
         when (val s = state) {
             is LyricsViewModel.State.Loading ->
@@ -164,6 +246,7 @@ fun LyricsScreen(
                 }
             is LyricsViewModel.State.Loaded -> {
                 val lyrics = s.lyrics
+                val syllableLines = remember(lyrics) { io.github.sekademi.spotufi.data.lyrics.SyllableLyricsParser.parse(lyrics) }
                 val activeIndex = activeIndexFor(lyrics, positionMs)
                 val listState = rememberLazyListState()
                 LaunchedEffect(activeIndex) {
@@ -175,15 +258,17 @@ fun LyricsScreen(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(24.dp, 16.dp, 24.dp, 160.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    itemsIndexed(lyrics.lines) { index, line ->
-                        LyricLineText(
-                            text = line.text,
+                    itemsIndexed(syllableLines) { index, line ->
+                        SyllableLyricLineText(
+                            line = line,
                             isActive = index == activeIndex,
                             synced = lyrics.synced,
+                            positionMs = positionMs,
+                            showTransliteration = showTransliteration,
                             fontSize = 24.sp,
-                            onTap = if (lyrics.synced) ({ jumpTo(line.timeMs) }) else null,
+                            onTap = if (lyrics.synced) ({ jumpTo(line.startMs) }) else null,
                         )
                     }
                 }
@@ -302,4 +387,82 @@ private fun LyricLineText(
             indication = null,
         ) { onTap() } else Modifier,
     )
+}
+
+@Composable
+private fun SyllableLyricLineText(
+    line: io.github.sekademi.spotufi.data.lyrics.SyllableLine,
+    isActive: Boolean,
+    synced: Boolean,
+    positionMs: Long,
+    showTransliteration: Boolean,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    onTap: (() -> Unit)?,
+) {
+    if (line.originalText.isBlank()) {
+        Box(modifier = Modifier.size(1.dp))
+        return
+    }
+
+    Column(
+        modifier = if (onTap != null) Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+        ) { onTap() } else Modifier
+    ) {
+        if (!isActive || !synced || line.words.isEmpty()) {
+            val target = when {
+                !synced -> Color.White.copy(alpha = 0.9f)
+                isActive -> Color.White
+                else -> Color.White.copy(alpha = 0.45f)
+            }
+            val color by animateColorAsState(targetValue = target, label = "syllableLineColor")
+            Text(
+                text = line.originalText,
+                color = color,
+                fontSize = fontSize,
+                fontWeight = FontWeight.Bold,
+                lineHeight = (fontSize.value * 1.3f).sp,
+            )
+        } else {
+            val annotated = androidx.compose.ui.text.buildAnnotatedString {
+                for (i in line.words.indices) {
+                    val w = line.words[i]
+                    val prog = w.progressAt(positionMs)
+                    val spanColor = when {
+                        prog >= 1f -> Color.White
+                        prog > 0f -> Color(0xFF1ED760) // Glowing active singing highlight
+                        else -> Color.White.copy(alpha = 0.5f)
+                    }
+                    pushStyle(
+                        androidx.compose.ui.text.SpanStyle(
+                            color = spanColor,
+                            fontWeight = if (prog > 0f) FontWeight.ExtraBold else FontWeight.Bold
+                        )
+                    )
+                    append(w.text)
+                    pop()
+                    if (i < line.words.size - 1) {
+                        append(" ")
+                    }
+                }
+            }
+            Text(
+                text = annotated,
+                fontSize = fontSize,
+                fontWeight = FontWeight.Bold,
+                lineHeight = (fontSize.value * 1.3f).sp,
+            )
+        }
+
+        if (showTransliteration && !line.transliteration.isNullOrBlank()) {
+            Text(
+                text = line.transliteration,
+                color = if (isActive) Color(0xFF1ED760).copy(alpha = 0.85f) else Color.White.copy(alpha = 0.45f),
+                fontSize = (fontSize.value * 0.62f).sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
 }

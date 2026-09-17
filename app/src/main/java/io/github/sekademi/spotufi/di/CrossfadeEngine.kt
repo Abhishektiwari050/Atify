@@ -195,15 +195,30 @@ object CrossfadeEngine {
             }
         }
         crossfadeJob?.cancel()
+        val curve = appCtx?.let { io.github.sekademi.spotufi.data.preferences.getCrossfadeCurve(it) }
+            ?: io.github.sekademi.spotufi.data.preferences.CrossfadeCurve.EQUAL_POWER
         val job = scope.launch {
             try {
                 for (step in 0..steps) {
                     if (!isActive) break
-                    val progress = step.toFloat() / steps
-                    val angle = (progress * PI / 2).toFloat()
+                    val progress = (step.toFloat() / steps).coerceIn(0f, 1f)
+                    val (volOut, volIn) = when (curve) {
+                        io.github.sekademi.spotufi.data.preferences.CrossfadeCurve.LINEAR -> {
+                            (1f - progress) to progress
+                        }
+                        io.github.sekademi.spotufi.data.preferences.CrossfadeCurve.LOGARITHMIC -> {
+                            val vOut = (ln(1.0 + 9.0 * (1.0 - progress)) / ln(10.0)).toFloat()
+                            val vIn = (ln(1.0 + 9.0 * progress.toDouble()) / ln(10.0)).toFloat()
+                            vOut to vIn
+                        }
+                        io.github.sekademi.spotufi.data.preferences.CrossfadeCurve.EQUAL_POWER -> {
+                            val angle = (progress * PI / 2).toFloat()
+                            cos(angle) to sin(angle)
+                        }
+                    }
                     withContext(Dispatchers.Main) {
-                        SongPlayer.exoPlayer?.volume = cos(angle)
-                        secondaryPlayer?.volume = sin(angle)
+                        SongPlayer.exoPlayer?.volume = volOut
+                        secondaryPlayer?.volume = volIn
                         if (djMode) {
                             val fp = sigmoid(progress)
                             currentPlayerFilter?.cutoffFrequencyHz = expInterpolate(CF_LPF_START_HZ, CF_LPF_END_HZ, fp)

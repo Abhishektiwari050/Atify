@@ -26,14 +26,22 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,13 +92,197 @@ fun LibraryScreen(navController: NavController) {
     // Spotify-style layout toggle: rows or a 3-column grid, persisted across runs.
     var gridView by remember { mutableStateOf(isLibraryGridView(context))     }
 
+    LaunchedEffect(Unit) {
+        libraryViewModel.refreshLocalPlaylists()
+    }
+
+    var showAddOptions by remember { mutableStateOf(false) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var showUniversalPorterDialog by remember { mutableStateOf(false) }
+    var newPlaylistName by remember { mutableStateOf("") }
+    var newPlaylistDesc by remember { mutableStateOf("") }
+
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val pl = libraryViewModel.importM3u8(uri)
+            if (pl != null) {
+                android.widget.Toast.makeText(context, "Imported \"${pl.title}\" (${pl.songs.size} tracks)", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                android.widget.Toast.makeText(context, "Failed to import playlist", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showCreateDialog = false
+                newPlaylistName = ""
+                newPlaylistDesc = ""
+            },
+            title = {
+                Text("New Playlist", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column {
+                    TextField(
+                        value = newPlaylistName,
+                        onValueChange = { newPlaylistName = it },
+                        placeholder = { Text("Playlist name", color = Color.Gray) },
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFF2A2A2A),
+                            unfocusedContainerColor = Color(0xFF2A2A2A),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color.White,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    TextField(
+                        value = newPlaylistDesc,
+                        onValueChange = { newPlaylistDesc = it },
+                        placeholder = { Text("Description (optional)", color = Color.Gray) },
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFF2A2A2A),
+                            unfocusedContainerColor = Color(0xFF2A2A2A),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color.White,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val name = newPlaylistName.trim().ifBlank { "My Playlist" }
+                        val desc = newPlaylistDesc.trim()
+                        val created = libraryViewModel.createLocalPlaylist(name, desc)
+                        showCreateDialog = false
+                        newPlaylistName = ""
+                        newPlaylistDesc = ""
+                        navController.navigate(playlistRoute("local_" + created.id, created.title))
+                    }
+                ) {
+                    Text("Create", color = Color(io.github.sekademi.spotufi.ui.theme.AppPalette.toArgb()), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showCreateDialog = false
+                        newPlaylistName = ""
+                        newPlaylistDesc = ""
+                    }
+                ) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            },
+            containerColor = Color(0xFF1E1E1E),
+        )
+    }
+
+    if (showAddOptions) {
+        ModalBottomSheet(
+            onDismissRequest = { showAddOptions = false },
+            containerColor = Color(0xFF1E1E1E)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+            ) {
+                Text(
+                    text = "Add to Library",
+                    color = Color.White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                )
+                HorizontalDivider(color = Color(0xFF2A2A2A))
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showAddOptions = false
+                            showCreateDialog = true
+                        }
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(text = "Create new playlist", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showAddOptions = false
+                            importLauncher.launch(arrayOf("audio/*", "application/*", "*/*"))
+                        }
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(text = "Import playlist (.m3u8)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showAddOptions = false
+                            showUniversalPorterDialog = true
+                        }
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                ) {
+                    Icon(painter = painterResource(id = R.drawable.ic_share), contentDescription = null, tint = Color(0xFF1ED760), modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(text = "Universal Playlist Porter", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        Text(text = "Apple Music, YouTube Music, Deezer links", color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+
+    if (showUniversalPorterDialog) {
+        io.github.sekademi.spotufi.ui.components.UniversalPorterDialog(
+            onDismiss = { showUniversalPorterDialog = false },
+            onSuccess = { playlistId ->
+                showUniversalPorterDialog = false
+                libraryViewModel.refreshLocalPlaylists()
+                navController.navigate(playlistRoute(playlistId, "Imported Playlist"))
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(AppBackground.toArgb()))
             .statusBarsPadding()
     ) {
-        // Header: title + account avatar. Built by hand (rather than a fixed-height
+        // Header: title + add button + account avatar. Built by hand (rather than a fixed-height
         // TopAppBar) so the title isn't clipped under the status bar.
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -105,6 +297,17 @@ fun LibraryScreen(navController: NavController) {
                 fontSize = 22.sp,
                 modifier = Modifier.weight(1f),
             )
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF3A3A3A))
+                    .clickable { showAddOptions = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add Playlist", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(10.dp))
             Box(
                 modifier = Modifier
                     .size(34.dp)

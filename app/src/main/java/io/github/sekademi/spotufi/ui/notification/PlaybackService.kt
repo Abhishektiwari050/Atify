@@ -37,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -127,7 +128,7 @@ class PlaybackService : MediaLibraryService() {
                             val cur = queue.indexOfFirst { it.id == curId }
                                 .let { if (it >= 0) it else currentSongState.songIndex.value }
                                 .coerceIn(0, queue.size - 1)
-                            if (cur < queue.size - 1) {
+                            if (cur < queue.size - 1 || io.github.sekademi.spotufi.data.preferences.isAutoplayEnabled(applicationContext)) {
                                 advance(forward = true)
                             }
                         }
@@ -267,6 +268,13 @@ class PlaybackService : MediaLibraryService() {
                 currentSongState.updatePlayingState(SpotifyWebPlayer.isPlaying)
             }
         }
+
+        io.github.sekademi.spotufi.connect.AtifyConnectServer.currentSongState = currentSongState
+        io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionNext = { advance(forward = true) }
+        io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionPrev = { advance(forward = false) }
+        if (io.github.sekademi.spotufi.data.preferences.isWebRemoteEnabled(this)) {
+            io.github.sekademi.spotufi.connect.AtifyConnectServer.start(this)
+        }
     }
 
     /** Point the media session at whichever engine is currently producing audio. */
@@ -308,25 +316,114 @@ class PlaybackService : MediaLibraryService() {
     }
 
     @Volatile private var radioLoading = false
+    @Volatile private var autoplayTriggering = false
 
     private fun maybeExtendRadio(queueSongs: List<SongsModel>, cur: Int) {
+        if (!io.github.sekademi.spotufi.data.preferences.isAutoplayEnabled(applicationContext)) return
         if (radioLoading || cur < queueSongs.size - 2) return
         val seeds = queueSongs.takeLast(5)
             .mapNotNull { it.spotifyTrackId.ifBlank { null } }
             .distinct()
-        if (seeds.isEmpty()) return
         radioLoading = true
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val recs = repository.provideRecommendations(seeds)
+                val newTracks = mutableListOf<SongsModel>()
+                if (seeds.isNotEmpty()) {
+                    val recs = runCatching { repository.provideRecommendations(seeds) }.getOrNull()
+                    if (!recs.isNullOrEmpty()) newTracks.addAll(recs)
+                }
+                if (newTracks.isEmpty()) {
+                    val lastSong = queueSongs.lastOrNull()
+                    if (lastSong != null) {
+                        val query = "${lastSong.singer} ${lastSong.title}"
+                        val searchRes = com.metrolist.innertube.YouTube.search(query, com.metrolist.innertube.YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                        val items = searchRes?.items?.filterIsInstance<com.metrolist.innertube.models.SongItem>()
+                        if (!items.isNullOrEmpty()) {
+                            newTracks.addAll(items.take(10).map { songItem ->
+                                SongsModel(
+                                    id = songItem.id.hashCode(),
+                                    title = songItem.title,
+                                    singer = songItem.artists.joinToString(", ") { it.name },
+                                    album = songItem.album?.name ?: "",
+                                    coverUri = songItem.thumbnail,
+                                    durationMs = (songItem.duration ?: 0) * 1000,
+                                    spotifyTrackId = "",
+                                    url = "https://music.youtube.com/watch?v=${songItem.id}",
+                                )
+                            })
+                        }
+                    }
+                }
                 val existing = currentSongState.queue.value
                 val existingIds = existing.map { it.id }.toSet()
-                val fresh = recs.filter { it.id !in existingIds }
-                if (fresh.isNotEmpty()) currentSongState.updateQueue(existing + fresh)
+                val fresh = newTracks.filter { it.id !in existingIds }
+                if (fresh.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        currentSongState.updateQueue(existing + fresh)
+                    }
+                }
             } catch (e: Exception) {
                 android.util.Log.w("PlaybackService", "Autoplay radio extension failed: ${e.message}")
             } finally {
                 radioLoading = false
+            }
+        }
+    }
+
+    private fun triggerAutoplay(seedSong: SongsModel) {
+        if (autoplayTriggering) return
+        autoplayTriggering = true
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val newTracks = mutableListOf<SongsModel>()
+                val seeds = currentSongState.queue.value.takeLast(5)
+                    .mapNotNull { it.spotifyTrackId.ifBlank { null } }
+                    .distinct()
+                if (seeds.isNotEmpty()) {
+                    val recs = runCatching { repository.provideRecommendations(seeds) }.getOrNull()
+                    if (!recs.isNullOrEmpty()) newTracks.addAll(recs)
+                }
+                if (newTracks.isEmpty()) {
+                    val query = "${seedSong.singer} ${seedSong.title}"
+                    val searchRes = com.metrolist.innertube.YouTube.search(query, com.metrolist.innertube.YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    val items = searchRes?.items?.filterIsInstance<com.metrolist.innertube.models.SongItem>()
+                    if (!items.isNullOrEmpty()) {
+                        newTracks.addAll(items.take(15).map { songItem ->
+                            SongsModel(
+                                id = songItem.id.hashCode(),
+                                title = songItem.title,
+                                singer = songItem.artists.joinToString(", ") { it.name },
+                                album = songItem.album?.name ?: "",
+                                coverUri = songItem.thumbnail,
+                                durationMs = (songItem.duration ?: 0) * 1000,
+                                spotifyTrackId = "",
+                                url = "https://music.youtube.com/watch?v=${songItem.id}",
+                            )
+                        })
+                    }
+                }
+                val existing = currentSongState.queue.value
+                val existingIds = existing.map { it.id }.toSet()
+                val fresh = newTracks.filter { it.id !in existingIds }
+                withContext(Dispatchers.Main) {
+                    if (fresh.isNotEmpty()) {
+                        val newQueue = existing + fresh
+                        currentSongState.updateQueue(newQueue)
+                        val nextSong = fresh[0]
+                        val newIdx = existing.size
+                        currentSongState.updateSongState(
+                            nextSong.coverUri, nextSong.title, nextSong.singer,
+                            true, nextSong.id, newIdx, nextSong.album
+                        )
+                        SongPlayer.playSong(nextSong.url, applicationContext)
+                    }
+                    autoplayTriggering = false
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PlaybackService", "Autoplay failed: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    autoplayTriggering = false
+                }
             }
         }
     }
@@ -362,30 +459,8 @@ class PlaybackService : MediaLibraryService() {
                 if (currentSongState.repeat.value == RepeatMode.ALL) {
                     nextIdx = 0
                 } else {
-                    // At end of queue with repeat OFF: fetch recommendations to continue playback seamlessly
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        val seeds = queue.takeLast(5)
-                            .mapNotNull { it.spotifyTrackId.ifBlank { null } }
-                            .distinct()
-                        if (seeds.isNotEmpty()) {
-                            val recs = runCatching { repository.provideRecommendations(seeds) }.getOrNull()
-                            if (!recs.isNullOrEmpty()) {
-                                val existing = currentSongState.queue.value
-                                val existingIds = existing.map { it.id }.toSet()
-                                val fresh = recs.filter { it.id !in existingIds }
-                                if (fresh.isNotEmpty()) {
-                                    val newQueue = existing + fresh
-                                    currentSongState.updateQueue(newQueue)
-                                    val nextSong = fresh[0]
-                                    val newIdx = existing.size
-                                    currentSongState.updateSongState(
-                                        nextSong.coverUri, nextSong.title, nextSong.singer,
-                                        true, nextSong.id, newIdx, nextSong.album
-                                    )
-                                    SongPlayer.playSong(nextSong.url, applicationContext)
-                                }
-                            }
-                        }
+                    if (io.github.sekademi.spotufi.data.preferences.isAutoplayEnabled(applicationContext)) {
+                        triggerAutoplay(queue[cur])
                     }
                     return
                 }
@@ -734,6 +809,9 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionNext = null
+        io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionPrev = null
+        io.github.sekademi.spotufi.connect.AtifyConnectServer.stop()
         SongPlayer.exoPlayer?.removeListener(playerListener)
         SongPlayer.onPlayerSwapped = null
         SpotifyWebPlayer.onStateChanged = null

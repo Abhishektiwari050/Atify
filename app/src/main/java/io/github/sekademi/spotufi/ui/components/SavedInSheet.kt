@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
@@ -78,6 +79,7 @@ fun SavedInSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var liked by remember { mutableStateOf(isSongLiked(context, song.id.toString())) }
+    var localPlaylists by remember { mutableStateOf(io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager.getPlaylists(context)) }
     var playlists by remember { mutableStateOf<List<SpotifyPlaylist>?>(null) }
     // playlistId → does it contain this track (filled lazily per row).
     val membership = remember { mutableStateMapOf<String, Boolean>() }
@@ -94,7 +96,11 @@ fun SavedInSheet(
         val name = newName.trim().ifBlank { "My Playlist" }
         creating = false
         newName = ""
-        SpotifySync.createPlaylistWithTrack(context, name, song.spotifyTrackId)
+        io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager.createPlaylist(context, name, initialSong = song)
+        if (song.spotifyTrackId.isNotBlank()) {
+            SpotifySync.createPlaylistWithTrack(context, name, song.spotifyTrackId)
+        }
+        localPlaylists = io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager.getPlaylists(context)
         onDismiss()
     }
 
@@ -196,42 +202,88 @@ fun SavedInSheet(
                 onLikedChanged(liked)
             }
 
-            when (val list = playlists) {
-                null -> Text("Loading playlists…", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(20.dp, 12.dp))
-                else -> LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                    items(list.size) { i ->
-                        val pl = list[i]
-                        // Resolve membership lazily (cached per session in SpotifySync).
-                        LaunchedEffect(pl.id, song.spotifyTrackId) {
-                            if (membership[pl.id] == null && song.spotifyTrackId.isNotBlank()) {
-                                membership[pl.id] = withContext(Dispatchers.IO) {
-                                    SpotifySync.playlistTrackIds(context, pl.id).contains(song.spotifyTrackId)
-                                }
-                            }
-                        }
-                        val saved = membership[pl.id] == true
-                        SavedInRow(
-                            name = pl.name,
-                            subtitle = pl.tracks?.total?.let { n -> "$n song" + (if (n == 1) "" else "s") } ?: "",
-                            saved = saved,
-                            cover = {
+            LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+                // Local custom playlists
+                items(localPlaylists.size) { i ->
+                    val pl = localPlaylists[i]
+                    val saved = pl.songs.any { it.id == song.id || (it.url.isNotBlank() && it.url == song.url) }
+                    SavedInRow(
+                        name = pl.title,
+                        subtitle = "${pl.trackCount} song" + (if (pl.trackCount == 1) "" else "s") + " (Local)",
+                        saved = saved,
+                        cover = {
+                            if (pl.coverUri.isNotBlank()) {
                                 AsyncImage(
                                     modifier = Modifier
                                         .size(48.dp)
                                         .clip(RoundedCornerShape(4.dp)),
-                                    model = pl.images.firstOrNull()?.url,
+                                    model = pl.coverUri,
                                     contentScale = ContentScale.Crop,
                                     error = painterResource(R.drawable.placeholder),
                                     placeholder = painterResource(R.drawable.placeholder),
                                     contentDescription = "",
                                 )
-                            },
-                        ) {
-                            if (song.spotifyTrackId.isBlank()) return@SavedInRow
-                            membership[pl.id] = !saved
-                            if (saved) SpotifySync.removeTrackFromPlaylist(context, pl.id, song.spotifyTrackId)
-                            else SpotifySync.addTrackToPlaylist(context, pl.id, song.spotifyTrackId)
+                            } else {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFF2E2E36)),
+                                ) {
+                                     Icon(
+                                         imageVector = Icons.AutoMirrored.Filled.List,
+                                         contentDescription = null,
+                                         tint = Color.White,
+                                         modifier = Modifier.size(22.dp),
+                                     )
+                                }
+                            }
+                        },
+                    ) {
+                        if (saved) {
+                            io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager.removeSongFromPlaylist(context, pl.id, song.id)
+                        } else {
+                            io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager.addSongToPlaylist(context, pl.id, song)
                         }
+                        localPlaylists = io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager.getPlaylists(context)
+                    }
+                }
+
+                // Spotify playlists
+                val list = playlists.orEmpty()
+                items(list.size) { i ->
+                    val pl = list[i]
+                    // Resolve membership lazily (cached per session in SpotifySync).
+                    LaunchedEffect(pl.id, song.spotifyTrackId) {
+                        if (membership[pl.id] == null && song.spotifyTrackId.isNotBlank()) {
+                            membership[pl.id] = withContext(Dispatchers.IO) {
+                                SpotifySync.playlistTrackIds(context, pl.id).contains(song.spotifyTrackId)
+                            }
+                        }
+                    }
+                    val saved = membership[pl.id] == true
+                    SavedInRow(
+                        name = pl.name,
+                        subtitle = pl.tracks?.total?.let { n -> "$n song" + (if (n == 1) "" else "s") + " (Spotify)" } ?: "Spotify",
+                        saved = saved,
+                        cover = {
+                            AsyncImage(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                model = pl.images.firstOrNull()?.url,
+                                contentScale = ContentScale.Crop,
+                                error = painterResource(R.drawable.placeholder),
+                                placeholder = painterResource(R.drawable.placeholder),
+                                contentDescription = "",
+                            )
+                        },
+                    ) {
+                        if (song.spotifyTrackId.isBlank()) return@SavedInRow
+                        membership[pl.id] = !saved
+                        if (saved) SpotifySync.removeTrackFromPlaylist(context, pl.id, song.spotifyTrackId)
+                        else SpotifySync.addTrackToPlaylist(context, pl.id, song.spotifyTrackId)
                     }
                 }
             }

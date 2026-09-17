@@ -44,6 +44,8 @@ object DownloadManager {
 
     fun isDownloading(query: String): Boolean = downloading.contains(query)
 
+    fun activeCount(): Int = downloading.size
+
     fun downloadProgress(query: String): Int = downloadProgress[query] ?: -1
 
     fun downloadingSnapshot(): List<Pair<io.github.sekademi.spotufi.data.entity.SongsModel, Int>> =
@@ -142,7 +144,7 @@ object DownloadManager {
         appContext: Context,
     ): Boolean {
         val dlQuality = io.github.sekademi.spotufi.data.preferences.getDownloadQuality(appContext)
-        if (song.spotifyTrackId.isNotBlank()) {
+        if (dlQuality.lossless && song.spotifyTrackId.isNotBlank()) {
             val flacOk = kotlinx.coroutines.withTimeoutOrNull(30_000) {
                 runCatching { downloadFlacToFile(song, appContext) }.getOrDefault(false)
             } ?: false
@@ -392,6 +394,7 @@ object DownloadManager {
         downloadingSongs[query] = song
         downloadProgress[query] = 0
         onDownloadsChanged?.invoke()
+        DownloadService.start(appContext)
         updateNotification(appContext)
         lastDownloadError = null
         scope.launch {

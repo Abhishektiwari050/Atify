@@ -108,6 +108,14 @@ object SongPlayer {
 
     fun getVocalAttenuation(): Float = _vocalAttenuation.value
 
+    private val spatialCrossfeeds = java.util.Collections.synchronizedList(mutableListOf<io.github.sekademi.spotufi.audio.SpatialCrossfeedAudioProcessor>())
+
+    fun setSpatialCrossfeed(enabled: Boolean) {
+        synchronized(spatialCrossfeeds) {
+            spatialCrossfeeds.forEach { it.isEnabled = enabled }
+        }
+    }
+
     private fun updateResolveStatus(isResolving: Boolean, status: String = "") {
         boundState?.updateResolveState(isResolving, status)
     }
@@ -307,11 +315,20 @@ object SongPlayer {
                     }
                 }
 
+                val spatialCrossfeed = io.github.sekademi.spotufi.audio.SpatialCrossfeedAudioProcessor()
+                spatialCrossfeed.isEnabled = io.github.sekademi.spotufi.data.preferences.isSpatialCrossfeedEnabled(context)
+                synchronized(spatialCrossfeeds) {
+                    spatialCrossfeeds.add(spatialCrossfeed)
+                    if (spatialCrossfeeds.size > 4) {
+                        spatialCrossfeeds.removeAt(0)
+                    }
+                }
+
                 val sink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(true)
                     .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
                     .setAudioProcessorChain(
-                        androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain(filter, silenceProcessor, vocalRemover),
+                        androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain(filter, silenceProcessor, vocalRemover, spatialCrossfeed),
                     )
                     .build()
                 if (io.github.sekademi.spotufi.data.preferences.isAudioOffloadEnabled(context) && _vocalAttenuation.value <= 0.005f) {
@@ -350,8 +367,10 @@ object SongPlayer {
             if (io.github.sekademi.spotufi.data.preferences.isVolumeNormalizationEnabled(context) &&
                 audioSessionId != androidx.media3.common.C.AUDIO_SESSION_ID_UNSET
             ) {
+                val targetLufs = io.github.sekademi.spotufi.data.preferences.getTargetLufs(context)
+                val gainMb = ((targetLufs - (-14)) * 30 + 150).coerceIn(0, 400)
                 loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
-                    setTargetGain(150)
+                    setTargetGain(gainMb)
                     enabled = true
                 }
             }

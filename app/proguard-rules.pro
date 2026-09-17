@@ -78,6 +78,11 @@
 -keep class com.metrolist.spotify.models.** { *; }
 -keep class com.metrolist.innertube.models.** { *; }
 -keep class io.github.sekademi.spotufi.data.entity.** { *; }
+-keep class io.github.sekademi.spotufi.data.playlist.** { *; }
+-keep class io.github.sekademi.spotufi.data.porter.** { *; }
+-keep class io.github.sekademi.spotufi.data.lyrics.** { *; }
+-keep class io.github.sekademi.spotufi.audio.** { *; }
+-keep class io.github.sekademi.spotufi.connect.** { *; }
 
 # WebView JavaScript interfaces (SpotifyWebPlayer bridge)
 -keepclassmembers class * {

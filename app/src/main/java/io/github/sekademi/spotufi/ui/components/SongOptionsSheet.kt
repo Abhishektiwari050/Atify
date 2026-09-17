@@ -77,6 +77,7 @@ fun SongOptionsSheet(
     navController: NavController,
     context: Context,
     onDismiss: () -> Unit,
+    onRemoveFromPlaylist: (() -> Unit)? = null,
 ) {
     val playerViewModel: io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel =
         androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
@@ -211,6 +212,12 @@ fun SongOptionsSheet(
                 }
                 context.startActivity(Intent.createChooser(send, "Share"))
                 onDismiss()
+            }
+            if (onRemoveFromPlaylist != null) {
+                SongMenuRow(ImageVector.vectorResource(R.drawable.ic_close), "Remove from this playlist", iconTint = Color(0xFFFF5252)) {
+                    onRemoveFromPlaylist()
+                    onDismiss()
+                }
             }
             Spacer(modifier = Modifier.padding(8.dp))
         }

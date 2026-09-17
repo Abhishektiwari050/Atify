@@ -175,6 +175,57 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
         }
     }
 
+    val isLocalPlaylist = remember(playlistId) { playlistId.startsWith("local_") }
+    val rawPlaylistId = remember(playlistId) { if (isLocalPlaylist) playlistId.removePrefix("local_") else "" }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("audio/x-mpegurl")
+    ) { uri ->
+        if (uri != null) {
+            val pl = io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager.getPlaylist(context, rawPlaylistId)
+            if (pl != null) {
+                val ok = try {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        io.github.sekademi.spotufi.data.playlist.LocalPlaylistManager.exportToM3u8(pl, out)
+                    } ?: false
+                } catch (e: Exception) {
+                    false
+                }
+                if (ok) {
+                    android.widget.Toast.makeText(context, "Exported ${pl.title}.m3u8", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    android.widget.Toast.makeText(context, "Failed to export playlist", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(text = "Delete Playlist", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text(text = "Are you sure you want to delete \"${playlist.name}\"? This cannot be undone.", color = Color.LightGray) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        playlistViewModel.deleteLocalPlaylist(rawPlaylistId)
+                        navController.navigateUp()
+                    }
+                ) {
+                    Text("Delete", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF222222),
+        )
+    }
+
     var menuSong by remember { mutableStateOf<io.github.sekademi.spotufi.data.entity.SongsModel?>(null) }
     menuSong?.let { sel ->
         io.github.sekademi.spotufi.ui.components.SongOptionsSheet(
@@ -182,6 +233,9 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
             navController = navController,
             context = context,
             onDismiss = { menuSong = null },
+            onRemoveFromPlaylist = if (isLocalPlaylist) {
+                { playlistViewModel.removeLocalSong(sel.id, rawPlaylistId) }
+            } else null,
         )
     }
 
@@ -229,7 +283,41 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
                         containerColor = Color.Transparent,
                         titleContentColor = Color.White,
                     ),
-                    title = { Text(text = "") }
+                    title = { Text(text = "") },
+                    actions = {
+                        if (isLocalPlaylist) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_share),
+                                    contentDescription = "Export M3U8",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            exportLauncher.launch("${playlist.name.ifBlank { "playlist" }}.m3u8")
+                                        }
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_close),
+                                    contentDescription = "Delete Playlist",
+                                    tint = Color(0xFFFF5252),
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            showDeleteConfirm = true
+                                        }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                        }
+                    }
                 )
             }
         ) {

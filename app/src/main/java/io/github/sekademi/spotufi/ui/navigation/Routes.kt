@@ -25,6 +25,8 @@ sealed class Routes(
     object Settings : Routes(0, "Settings", "settings")
     object History : Routes(0, "History", "history")
     object Equalizer : Routes(0, "Equalizer", "equalizer")
+    object Connect : Routes(0, "Connect", "connect")
+    object CarMode : Routes(0, "CarMode", "carmode")
 }
 
 /** Builds a Browse-category route carrying the search genre and a display title. */

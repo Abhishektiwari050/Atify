@@ -20,6 +20,13 @@ enum class StreamQuality(
     LOSSLESS("Lossless", "FLAC when available, else High", AudioQuality.HIGH, true),
 }
 
+/** Crossfade interpolation curve. */
+enum class CrossfadeCurve(val label: String, val detail: String) {
+    EQUAL_POWER("Equal Power", "Constant acoustic energy (S-Curve)"),
+    LINEAR("Linear", "Straight-line gain transition"),
+    LOGARITHMIC("Logarithmic", "Smooth gradual blend for acoustic/classical"),
+}
+
 private const val PREF = "settings_prefs"
 private const val KEY_WIFI_Q = "stream_quality_wifi"
 private const val KEY_CELL_Q = "stream_quality_cellular"
@@ -174,4 +181,40 @@ fun setSkipSilenceEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBoo
 private const val KEY_SPOTIFY_CANVAS = "spotify_canvas_enabled"
 fun isSpotifyCanvasEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_SPOTIFY_CANVAS, true)
 fun setSpotifyCanvasEnabled(c: Context, enabled: Boolean) = prefs(c).edit().putBoolean(KEY_SPOTIFY_CANVAS, enabled).apply()
+
+private const val KEY_AUTOPLAY = "autoplay_infinite_radio_enabled"
+fun isAutoplayEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_AUTOPLAY, true)
+fun setAutoplayEnabled(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_AUTOPLAY, v).apply()
+
+private const val KEY_CROSSFADE_CURVE = "crossfade_curve"
+fun getCrossfadeCurve(c: Context): CrossfadeCurve {
+    val name = prefs(c).getString(KEY_CROSSFADE_CURVE, CrossfadeCurve.EQUAL_POWER.name) ?: CrossfadeCurve.EQUAL_POWER.name
+    return runCatching { CrossfadeCurve.valueOf(name) }.getOrDefault(CrossfadeCurve.EQUAL_POWER)
+}
+fun setCrossfadeCurve(c: Context, curve: CrossfadeCurve) =
+    prefs(c).edit().putString(KEY_CROSSFADE_CURVE, curve.name).apply()
+
+private const val KEY_TARGET_LUFS = "volume_norm_target_lufs"
+fun getTargetLufs(c: Context): Int = prefs(c).getInt(KEY_TARGET_LUFS, -14)
+fun setTargetLufs(c: Context, lufs: Int) = prefs(c).edit().putInt(KEY_TARGET_LUFS, lufs).apply()
+
+private const val KEY_VISUALIZER_ENABLED = "audio_visualizer_enabled"
+fun isVisualizerEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_VISUALIZER_ENABLED, true)
+fun setVisualizerEnabled(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_VISUALIZER_ENABLED, v).apply()
+
+private const val KEY_VISUALIZER_STYLE = "audio_visualizer_style"
+fun getVisualizerStyle(c: Context): Int = prefs(c).getInt(KEY_VISUALIZER_STYLE, 0)
+fun setVisualizerStyle(c: Context, style: Int) = prefs(c).edit().putInt(KEY_VISUALIZER_STYLE, style).apply()
+
+private const val KEY_SPATIAL_CROSSFEED = "spatial_crossfeed_enabled"
+fun isSpatialCrossfeedEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_SPATIAL_CROSSFEED, false)
+fun setSpatialCrossfeedEnabled(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_SPATIAL_CROSSFEED, v).apply()
+
+private const val KEY_CAR_MODE_SCREEN_ON = "car_mode_keep_screen_on"
+fun isCarModeKeepScreenOn(c: Context): Boolean = prefs(c).getBoolean(KEY_CAR_MODE_SCREEN_ON, true)
+fun setCarModeKeepScreenOn(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_CAR_MODE_SCREEN_ON, v).apply()
+
+private const val KEY_WEB_REMOTE_ENABLED = "web_remote_server_enabled"
+fun isWebRemoteEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_WEB_REMOTE_ENABLED, false)
+fun setWebRemoteEnabled(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_WEB_REMOTE_ENABLED, v).apply()
 
