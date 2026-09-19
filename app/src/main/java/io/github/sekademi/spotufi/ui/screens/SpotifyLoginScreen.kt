@@ -95,15 +95,15 @@ import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "SpotifyLogin"
-private const val DESKTOP_USER_AGENT =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+private const val MOBILE_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
 private const val LOGIN_URL =
     "https://accounts.spotify.com/en/login?continue=https%3A%2F%2Fopen.spotify.com%2F"
 
-private val DESKTOP_HEADERS = mapOf(
+private val MOBILE_HEADERS = mapOf(
     "Sec-CH-UA" to "\"Google Chrome\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
-    "Sec-CH-UA-Mobile" to "?0",
-    "Sec-CH-UA-Platform" to "\"Windows\"",
+    "Sec-CH-UA-Mobile" to "?1",
+    "Sec-CH-UA-Platform" to "\"Android\"",
     "Accept-Language" to "en-US,en;q=0.9",
     "Upgrade-Insecure-Requests" to "1"
 )
@@ -117,7 +117,34 @@ private const val VIEWPORT_OVERRIDE_JS = """
                 meta.name = 'viewport';
                 document.head.appendChild(meta);
             }
-            meta.setAttribute('content', 'width=1280, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes');
+            meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+
+            var style = document.getElementById('atify-responsive-login-style');
+            if (!style) {
+                style = document.createElement('style');
+                style.id = 'atify-responsive-login-style';
+                document.head.appendChild(style);
+            }
+            style.textContent = `
+                html, body {
+                    width: 100% !important;
+                    max-width: 100vw !important;
+                    overflow-x: hidden !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    padding-bottom: 80px !important;
+                    box-sizing: border-box !important;
+                }
+                #root, main, [data-testid="login-container"], .main-container, [data-encore-id="card"] {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    min-width: 0 !important;
+                    margin: 0 auto !important;
+                    box-sizing: border-box !important;
+                    padding-left: 16px !important;
+                    padding-right: 16px !important;
+                }
+            `;
         } catch(e) {}
     })();
 """
@@ -135,8 +162,8 @@ private const val ANTI_BOT_SPOOF_JS = """
                                 {brand: 'Chromium', version: '131'},
                                 {brand: 'Not_A Brand', version: '24'}
                             ],
-                            mobile: false,
-                            platform: 'Windows'
+                            mobile: true,
+                            platform: 'Android'
                         };
                     }
                 });
@@ -145,8 +172,8 @@ private const val ANTI_BOT_SPOOF_JS = """
                 configurable: true,
                 get: function() { return undefined; }
             });
-            Object.defineProperty(window.screen, 'width', { configurable: true, get: function() { return 1280; } });
-            Object.defineProperty(window.screen, 'availWidth', { configurable: true, get: function() { return 1280; } });
+            Object.defineProperty(window.screen, 'width', { configurable: true, get: function() { return window.innerWidth; } });
+            Object.defineProperty(window.screen, 'availWidth', { configurable: true, get: function() { return window.innerWidth; } });
         } catch(e) {}
     })();
 """
@@ -332,7 +359,7 @@ fun SpotifyLoginScreen(
                 .background(AtifyDark)
         ) {
             if (selectedTab == 0) {
-                // WEB LOGIN TAB (1280px Desktop Viewport Emulation)
+                // WEB LOGIN TAB (Responsive Mobile Web View)
                 Box(modifier = Modifier.fillMaxSize()) {
                     AndroidView(
                         modifier = Modifier.fillMaxSize(),
@@ -350,14 +377,21 @@ fun SpotifyLoginScreen(
                                 setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                                 cookieManager.setAcceptThirdPartyCookies(this, true)
 
+                                if (SpotifySession.spDc(ctx).isBlank()) {
+                                    cookieManager.removeAllCookies(null)
+                                    cookieManager.flush()
+                                    clearCache(true)
+                                    clearHistory()
+                                }
+
                                 val webSettings = this.settings
                                 webSettings.apply {
                                     javaScriptEnabled = true
                                     domStorageEnabled = true
-                                    loadWithOverviewMode = true
-                                    useWideViewPort = true
-                                    setSupportZoom(true)
-                                    builtInZoomControls = true
+                                    loadWithOverviewMode = false
+                                    useWideViewPort = false
+                                    setSupportZoom(false)
+                                    builtInZoomControls = false
                                     displayZoomControls = false
                                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                     setSupportMultipleWindows(false)
@@ -365,16 +399,16 @@ fun SpotifyLoginScreen(
                                     allowContentAccess = true
                                     allowFileAccess = false
                                     cacheMode = WebSettings.LOAD_DEFAULT
-                                    userAgentString = DESKTOP_USER_AGENT
+                                    userAgentString = MOBILE_USER_AGENT
                                 }
 
                                 if (WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
                                     val metadata = UserAgentMetadata.Builder()
-                                        .setPlatform("Windows")
-                                        .setPlatformVersion("10.0.0")
-                                        .setArchitecture("x86")
-                                        .setModel("")
-                                        .setMobile(false)
+                                        .setPlatform("Android")
+                                        .setPlatformVersion("15.0.0")
+                                        .setArchitecture("")
+                                        .setModel("Pixel 9")
+                                        .setMobile(true)
                                         .setBitness(64)
                                         .setFullVersion("131.0.6778.86")
                                         .setBrandVersionList(
@@ -479,7 +513,7 @@ fun SpotifyLoginScreen(
                                     }
                                 }
 
-                                loadUrl(LOGIN_URL, DESKTOP_HEADERS)
+                                loadUrl(LOGIN_URL, MOBILE_HEADERS)
                             }
                         },
                         onRelease = { wv ->
@@ -562,7 +596,7 @@ fun SpotifyLoginScreen(
                                 onClick = {
                                     webError = null
                                     isWebLoading = true
-                                    webViewRef?.loadUrl(LOGIN_URL, DESKTOP_HEADERS)
+                                    webViewRef?.loadUrl(LOGIN_URL, MOBILE_HEADERS)
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = AtifySage)
                             ) {

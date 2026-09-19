@@ -101,6 +101,7 @@ fun SettingsScreen(navController: NavController) {
     var downloadFolderName by remember { mutableStateOf(getDownloadFolderName(context)) }
     var cacheBreakdown by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.StorageManager.getCacheBreakdown(context)) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     val batteryOptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -114,18 +115,18 @@ fun SettingsScreen(navController: NavController) {
     if (showClearCacheDialog) {
         AlertDialog(
             onDismissRequest = { showClearCacheDialog = false },
-            title = { Text("Clear all cache?", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Clear Cache", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "This will free up space by removing cached audio chunks, artwork images, and lyrics. Your downloaded offline songs and playlists will NOT be deleted.",
-                    color = Color(0xFFB3B3B3),
+                    "This will clear stream caches, lyrics cache, image cache, and temporary files. Downloaded tracks will NOT be deleted.",
+                    color = Color.LightGray,
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
+                    showClearCacheDialog = false
                     val prevTotal = cacheBreakdown.totalBytes
                     cacheBreakdown = io.github.sekademi.spotufi.data.preferences.StorageManager.clearAllCaches(context)
-                    showClearCacheDialog = false
                     val freedMb = String.format(java.util.Locale.US, "%.1f", (prevTotal - cacheBreakdown.totalBytes).coerceAtLeast(0L) / (1024f * 1024f))
                     android.widget.Toast.makeText(context, "Cache cleared ($freedMb MB freed)", android.widget.Toast.LENGTH_SHORT).show()
                 }) {
@@ -134,6 +135,37 @@ fun SettingsScreen(navController: NavController) {
             },
             dismissButton = {
                 TextButton(onClick = { showClearCacheDialog = false }) {
+                    Text("Cancel", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF1A1A1A),
+            titleContentColor = Color.White,
+        )
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Log out of Spotify?", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "You will be logged out of your Spotify session and returned to the login screen.",
+                    color = Color.LightGray,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutDialog = false
+                    io.github.sekademi.spotufi.data.api.SpotifySession.logout(context)
+                    navController.navigate(io.github.sekademi.spotufi.ui.navigation.Routes.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }) {
+                    Text("Log out", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
                     Text("Cancel", color = Color.White)
                 }
             },
@@ -717,6 +749,15 @@ fun SettingsScreen(navController: NavController) {
 
             Spacer(Modifier.height(12.dp))
             SectionTitle("Account")
+            val profileName = io.github.sekademi.spotufi.data.api.ProfileCache.name
+            if (!profileName.isNullOrBlank()) {
+                Text(
+                    text = "Signed in as $profileName",
+                    color = Color.LightGray,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
             Text(
                 text = "Log out",
                 color = Color(0xFFE57373),
@@ -725,13 +766,7 @@ fun SettingsScreen(navController: NavController) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable {
-                        io.github.sekademi.spotufi.data.api.SpotifySession.setSpDc(context, "")
-                        io.github.sekademi.spotufi.data.api.Api.HomeCache.clear()
-                        navController.navigate(io.github.sekademi.spotufi.ui.navigation.Routes.Login.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
+                    .clickable { showLogoutDialog = true }
                     .padding(vertical = 14.dp)
             )
             Spacer(Modifier.height(12.dp))

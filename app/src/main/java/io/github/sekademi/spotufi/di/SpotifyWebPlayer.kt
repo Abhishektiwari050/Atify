@@ -557,4 +557,23 @@ object SpotifyWebPlayer {
           return t2s(pe&&pe.textContent)+'|'+t2s(de&&de.textContent)+'|'+playing;
         })();
         """.trimIndent()
+
+    fun reset() {
+        pollHandler.removeCallbacks(pollRunnable)
+        val wv = webView
+        if (wv != null) {
+            runCatching {
+                wv.stopLoading()
+                wv.loadUrl("about:blank")
+                wv.clearCache(true)
+            }
+        }
+        pageReady = false
+        commandReady = false
+        activated = false
+        isPlaying = false
+        positionMs = 0L
+        durationMs = 0L
+        onStateChanged?.invoke()
+    }
 }

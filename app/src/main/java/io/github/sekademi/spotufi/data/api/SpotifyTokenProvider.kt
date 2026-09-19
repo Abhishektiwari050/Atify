@@ -44,4 +44,9 @@ object SpotifyTokenProvider {
             },
         )
     }
+
+    fun reset() {
+        Spotify.accessToken = null
+        expiresAtMs = 0L
+    }
 }

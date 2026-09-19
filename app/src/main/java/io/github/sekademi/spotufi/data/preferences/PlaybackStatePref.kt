@@ -121,3 +121,8 @@ fun loadRestorePoint(context: Context): RestorePoint? {
     val repeatMode = loadRepeatMode(context)
     return RestorePoint(song, positionMs, queue, repeatMode)
 }
+
+fun clearPlaybackState(context: Context) {
+    context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().clear().apply()
+    context.getSharedPreferences(PREF_QUEUE, Context.MODE_PRIVATE).edit().clear().apply()
+}

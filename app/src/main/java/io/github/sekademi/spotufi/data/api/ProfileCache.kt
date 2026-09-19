@@ -41,4 +41,10 @@ object ProfileCache {
             }
         }
     }
+
+    fun clear() {
+        name = null
+        imageUrl = null
+        fetching.set(false)
+    }
 }
