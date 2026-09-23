@@ -17,9 +17,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -165,26 +168,29 @@ fun SumUpSearchScreen(
         }
 
         if (text.isNotBlank()) {
-            Row(
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 4.dp),
+                    .padding(bottom = 4.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SearchFilter.entries.forEach { filter ->
+                items(SearchFilter.entries) { filter ->
                     val isSelected = filter == selectedFilter
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .background(if (isSelected) AppPalette else Color(0xFF242428))
                             .clickable { selectedFilter = filter }
-                            .padding(horizontal = 12.dp, vertical = 5.dp),
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                     ) {
                         Text(
                             text = filter.label,
                             color = if (isSelected) Color.White else Color(0xFFCCCCCC),
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }
