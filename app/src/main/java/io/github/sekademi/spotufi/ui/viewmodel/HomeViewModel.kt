@@ -6,6 +6,8 @@ import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.data.entity.AlbumsModel
 import io.github.sekademi.spotufi.data.entity.ArtistsModel
 import io.github.sekademi.spotufi.data.entity.HomeFeedModel
+import io.github.sekademi.spotufi.data.entity.SongsModel
+import io.github.sekademi.spotufi.di.CurrentSongState
 import io.github.sekademi.spotufi.ui.repository.AppRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -15,8 +17,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class HomeViewModel @Inject constructor(private val repository: AppRepository)  : ViewModel() {
-
+class HomeViewModel @Inject constructor(
+    private val repository: AppRepository,
+    private val currentSongState: CurrentSongState,
+) : ViewModel() {
 
     private val _albums : MutableStateFlow<Response<List<AlbumsModel>>> = MutableStateFlow(Response.Loading())
     val albums : StateFlow<Response<List<AlbumsModel>>> = _albums
@@ -27,11 +31,14 @@ class HomeViewModel @Inject constructor(private val repository: AppRepository)  
     private val _home : MutableStateFlow<Response<HomeFeedModel>> = MutableStateFlow(Response.Loading())
     val home : StateFlow<Response<HomeFeedModel>> = _home
 
+    private val _quickPicks : MutableStateFlow<List<SongsModel>> = MutableStateFlow(emptyList())
+    val quickPicks : StateFlow<List<SongsModel>> = _quickPicks
 
     init {
         fetchHome()
         fetchArtists()
         fetchAlbums()
+        fetchQuickPicks()
     }
 
     private fun fetchHome() = viewModelScope.launch(Dispatchers.IO) {
@@ -52,6 +59,22 @@ class HomeViewModel @Inject constructor(private val repository: AppRepository)  
         }
     }
 
+    private fun fetchQuickPicks() = viewModelScope.launch(Dispatchers.IO) {
+        val picks = repository.providePersonalizedQuickPicks()
+        _quickPicks.value = picks
+    }
 
-
+    fun playTrack(song: SongsModel, playlist: List<SongsModel>) {
+        val index = playlist.indexOf(song).coerceAtLeast(0)
+        currentSongState.updateQueue(playlist)
+        currentSongState.updateSongState(
+            coverUri = song.coverUri,
+            title = song.title,
+            singer = song.singer,
+            playingState = true,
+            songId = song.id,
+            songIndex = index,
+            album = song.album,
+        )
+    }
 }

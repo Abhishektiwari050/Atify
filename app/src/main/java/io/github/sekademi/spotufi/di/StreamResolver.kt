@@ -100,11 +100,13 @@ object StreamResolver {
         title.replace(featSearchPattern, "").trim()
 
     fun searchTextForPlayback(song: String): String =
-        if ((song.startsWith(SPOTIFY_TRACK_PREFIX) || song.startsWith("episode:")) && song.contains('|')) {
+        if ((song.startsWith(SPOTIFY_TRACK_PREFIX) || song.startsWith("episode:") || song.startsWith("youtube:")) && song.contains('|')) {
             song.substringAfter('|').ifBlank { song }
         } else if (song.startsWith("episode:")) {
             metadataRegistry[song]?.let { "${it.title} ${it.artist}" }
                 ?: song.removePrefix("episode:")
+        } else if (song.startsWith("youtube:")) {
+            song.removePrefix("youtube:")
         } else {
             song
         }
@@ -312,6 +314,12 @@ object StreamResolver {
             YouTube.SearchFilter.FILTER_VIDEO
         } else {
             filter
+        }
+        if (query.startsWith("youtube:")) {
+            val videoId = query.removePrefix("youtube:").substringBefore('|').trim()
+            if (videoId.length == 11 && !videoId.contains(' ')) {
+                return listOf(videoId)
+            }
         }
         val searchText = searchTextForPlayback(query)
         if (searchText.length == 11 && !searchText.contains(' ')) return listOf(searchText)

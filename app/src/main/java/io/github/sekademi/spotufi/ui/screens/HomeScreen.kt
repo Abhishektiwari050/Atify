@@ -26,11 +26,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
+import io.github.sekademi.spotufi.data.entity.SongsModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -105,7 +109,7 @@ fun HomeScreen(navController: NavController){
         when {
             // Preferred: the real personalized Spotify home feed.
             feed != null && feed.sections.isNotEmpty() -> {
-                HomeFeedContent(navController, feed)
+                HomeFeedContent(navController, feed, homeViewModel)
             }
 
             // Still resolving the real personalized home feed. Show the loader even
@@ -118,7 +122,7 @@ fun HomeScreen(navController: NavController){
 
             // Fallback: home feed errored but new-releases / artists came through.
             albumsList.isNotEmpty() || artistsList.isNotEmpty() -> {
-                SumUpHomeScreen(navController = navController, albums = albumsList, artists = artistsList)
+                SumUpHomeScreen(navController = navController, albums = albumsList, artists = artistsList, homeViewModel = homeViewModel)
             }
 
             else -> {
@@ -164,7 +168,8 @@ private fun onHomeItemClick(navController: NavController, item: HomeItem) {
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun HomeFeedContent(navController: NavController, feed: HomeFeedModel) {
+fun HomeFeedContent(navController: NavController, feed: HomeFeedModel, homeViewModel: HomeViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     // Mirror open.spotify.com exactly: sections render in the order the feed
     // returns them. The 2-column "shortcuts" grid is only used for the UNTITLED
     // section the web home starts with — if the feed leads with a titled section
@@ -173,6 +178,7 @@ fun HomeFeedContent(navController: NavController, feed: HomeFeedModel) {
     val sections = feed.sections
     val gridSection = sections.firstOrNull()?.takeIf { it.title.isBlank() }
     val carousels = if (gridSection != null) sections.drop(1) else sections
+    val quickPicks by homeViewModel.quickPicks.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -184,6 +190,14 @@ fun HomeFeedContent(navController: NavController, feed: HomeFeedModel) {
         }
         item {
             HomeMoodRadiosRow(navController)
+        }
+        if (quickPicks.isNotEmpty()) {
+            item {
+                HomeQuickPicksSection(quickPicks = quickPicks) { selectedSong ->
+                    homeViewModel.playTrack(selectedSong, quickPicks)
+                    io.github.sekademi.spotufi.di.SongPlayer.playSong(selectedSong.url, context)
+                }
+            }
         }
         gridSection?.let { section ->
             item {
@@ -425,17 +439,28 @@ private fun HomeFeedCard(item: HomeItem, onClick: () -> Unit) {
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun SumUpHomeScreen(navController : NavController, albums: List<AlbumsModel>, artists: List<ArtistsModel>) {
+fun SumUpHomeScreen(
+    navController: NavController,
+    albums: List<AlbumsModel>,
+    artists: List<ArtistsModel>,
+    homeViewModel: HomeViewModel,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val quickPicks by homeViewModel.quickPicks.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .background(Color(AppBackground.toArgb()))
     ){
-
         GreetingSection()
-        //ChipSection(chip = listOf(" All ", "Music", "Podcasts"))
-
+        if (quickPicks.isNotEmpty()) {
+            HomeQuickPicksSection(quickPicks = quickPicks) { selectedSong ->
+                homeViewModel.playTrack(selectedSong, quickPicks)
+                io.github.sekademi.spotufi.di.SongPlayer.playSong(selectedSong.url, context)
+            }
+        }
         if (albums.isNotEmpty()) {
             HomePlaylistGrid(navController, albums)
             HomeAlbums(album = albums, navController)
@@ -757,6 +782,118 @@ fun ImageCard(
         Spacer(modifier = Modifier.height(100.dp))
     }
 }
+
+@Composable
+fun HomeQuickPicksSection(
+    quickPicks: List<SongsModel>,
+    onSongClick: (SongsModel) -> Unit,
+) {
+    if (quickPicks.isEmpty()) return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Text(
+                text = "START RADIO FROM A SONG",
+                color = Color(0xFFB3B3B3),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Quick Picks • Made For You",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(quickPicks.size) { index ->
+                val song = quickPicks[index]
+                QuickPickCard(song = song, onClick = { onSongClick(song) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickPickCard(
+    song: SongsModel,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(120.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { onClick() },
+    ) {
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF282828)),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            AsyncImage(
+                model = song.coverUri,
+                contentDescription = song.title,
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(R.drawable.placeholder),
+                error = painterResource(R.drawable.placeholder),
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .padding(6.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.play_svgrepo_com),
+                    contentDescription = "Play",
+                    tint = AppPalette,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = song.title,
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        Text(
+            text = song.singer,
+            color = Color(0xFFB3B3B3),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 
 
 

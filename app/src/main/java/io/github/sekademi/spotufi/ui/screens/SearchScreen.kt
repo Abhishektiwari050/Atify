@@ -285,7 +285,13 @@ fun SumUpSearchScreen(
                     // Real Spotify opens a genre *catalogue* (a page of curated
                     // playlists) rather than running a keyword song search.
                     BrowseAllSection { genre, title ->
-                        navController.navigate(categoryRoute(genre, title))
+                        if (title.equals("Podcasts", ignoreCase = true) || genre.equals("Podcast", ignoreCase = true)) {
+                            selectedFilter = SearchFilter.SHOWS
+                            text = "Podcast"
+                            searchViewModel.search("Podcast")
+                        } else {
+                            navController.navigate(categoryRoute(genre, title))
+                        }
                     }
                 }
             }
@@ -859,7 +865,6 @@ fun SearchTopBar() {
 
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchStickyBar(
     text: String,
@@ -884,35 +889,37 @@ fun SearchStickyBar(
             modifier = Modifier.size(20.dp),
         )
 
-        TextField(
-            enabled = true,
+        Spacer(modifier = Modifier.width(10.dp))
+
+        androidx.compose.foundation.text.BasicTextField(
+            value = text,
+            onValueChange = onTextChange,
             modifier = Modifier
                 .weight(1f)
                 .onFocusChanged { onFocusChange(it.isFocused) },
-            value = text,
             textStyle = TextStyle.Default.copy(
                 fontSize = 15.sp,
                 color = Color.White,
                 fontWeight = FontWeight.Medium,
             ),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-                focusedContainerColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = AppPalette,
-            ),
             singleLine = true,
-            onValueChange = onTextChange,
-            placeholder = {
-                Text(
-                    fontWeight = FontWeight.Normal,
-                    text = "What do you want to listen to?",
-                    color = Color(0xFF888888),
-                    fontSize = 14.sp,
-                )
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(AppPalette),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (text.isEmpty()) {
+                        Text(
+                            text = "What do you want to listen to?",
+                            color = Color(0xFF888888),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                        )
+                    }
+                    innerTextField()
+                }
             },
         )
 

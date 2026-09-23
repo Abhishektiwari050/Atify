@@ -18,8 +18,15 @@ import io.github.sekademi.spotufi.data.entity.HomeSection
 import io.github.sekademi.spotufi.data.entity.SearchResults
 import io.github.sekademi.spotufi.data.entity.SongsModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import com.metrolist.innertube.YouTube
+import com.metrolist.innertube.models.SongItem
+import com.metrolist.innertube.models.EpisodeItem
+import com.metrolist.innertube.models.PodcastItem
 import javax.inject.Inject
 
 /**
@@ -223,36 +230,179 @@ class Api @Inject constructor(
     }
 
     /**
-     * Combined search: tracks + albums + artists in a single GraphQL call
-     * (searchDesktop, not rate-limited). Powers the Search screen so users can
-     * find albums and artists, not just songs.
+     * Combined search: tracks + albums + artists + podcasts across Spotify
+     * and InnerTube (YouTube Music) in parallel.
+     * Guarantees songs not on Spotify (remixes, leaks, unreleased tracks,
+     * regional music) are discoverable and playable.
+     * Also falls back to YouTube podcasts and episodes if Spotify's podcast
+     * search is empty or unauthenticated.
      */
     suspend fun searchEverything(query: String): Flow<Response<SearchResults>> = flow {
         emit(Response.Loading())
-        if (query.isBlank()) {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) {
             emit(Response.Success(SearchResults())); return@flow
         }
-        if (!SpotifyTokenProvider.ensureToken(context)) {
-            emit(Response.Error("Spotify not authenticated — set sp_dc cookie")); return@flow
-        }
-        Spotify.search(query, types = listOf("track", "album", "artist"), limit = 20).fold(
-            onSuccess = { res ->
-                // Podcasts come from the REST catalog search (best-effort — a failure
-                // there must not blank out the music results).
-                val podcasts = Spotify.searchPodcasts(query, limit = 12)
-                    .onFailure { Log.e("Api", "searchPodcasts FAILED: ${it.message}", it) }
-                    .getOrNull()
-                Log.d("Api", "podcasts: shows=${podcasts?.shows?.items?.size ?: -1} episodes=${podcasts?.episodes?.items?.size ?: -1}")
+        val hasSpotify = SpotifyTokenProvider.ensureToken(context)
+
+        coroutineScope {
+            val spDeferred = async(Dispatchers.IO) {
+                if (hasSpotify) {
+                    Spotify.search(trimmed, types = listOf("track", "album", "artist"), limit = 20).getOrNull()
+                } else null
+            }
+            val spPodcastsDeferred = async(Dispatchers.IO) {
+                if (hasSpotify) {
+                    Spotify.searchPodcasts(trimmed, limit = 12).getOrNull()
+                } else null
+            }
+            val ytSongsDeferred = async(Dispatchers.IO) {
+                runCatching {
+                    YouTube.search(trimmed, YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                }.getOrNull()
+            }
+            val ytVideosDeferred = async(Dispatchers.IO) {
+                runCatching {
+                    YouTube.search(trimmed, YouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+                }.getOrNull()
+            }
+
+            val spRes = spDeferred.await()
+            val spPodcasts = spPodcastsDeferred.await()
+            val ytSongRes = ytSongsDeferred.await()
+            val ytVideoRes = ytVideosDeferred.await()
+
+            // 1. Process Spotify songs, albums, artists
+            val spSongs = spRes?.tracks?.items.orEmpty().map { it.toSongModel() }
+            val albums = spRes?.albums?.items.orEmpty().map { it.toAlbumModel() }
+            val artists = spRes?.artists?.items.orEmpty().map { it.toArtistModel() }
+
+            // 2. Process YouTube songs
+            val ytSongs = ytSongRes?.items.orEmpty().mapNotNull { item ->
+                when (item) {
+                    is SongItem -> {
+                        val artistName = item.artists.joinToString(", ") { it.name }.ifBlank { "YouTube" }
+                        val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                        SongsModel(
+                            id = stableId("yt:${item.id}"),
+                            title = item.title,
+                            album = item.album?.name ?: "Single",
+                            singer = artistName,
+                            coverUri = item.thumbnail,
+                            url = "youtube:${item.id}|$cleanTitle $artistName",
+                            spotifyTrackId = "",
+                            explicit = item.explicit,
+                            durationMs = (item.duration ?: 0) * 1000,
+                        )
+                    }
+                    else -> null
+                }
+            }
+
+            // Deduplicate: start with Spotify songs, then append unique YouTube songs
+            val spSongKeys = spSongs.map {
+                "${it.title.lowercase().trim()}|${it.singer.lowercase().trim()}"
+            }.toSet()
+            val uniqueYtSongs = ytSongs.filterNot { yt ->
+                val key = "${yt.title.lowercase().trim()}|${yt.singer.lowercase().trim()}"
+                key in spSongKeys
+            }
+            val combinedSongs = spSongs + uniqueYtSongs
+
+            // 3. Process Podcasts: Spotify + YouTube fallback
+            val spShows = spPodcasts?.shows?.items.orEmpty().map { it.toPodcastModel() }
+            val spEpisodes = spPodcasts?.episodes?.items.orEmpty().map { it.toEpisodeSongModel(null) }
+
+            val ytEpisodes = (ytVideoRes?.items.orEmpty() + ytSongRes?.items.orEmpty()).mapNotNull { item ->
+                when (item) {
+                    is EpisodeItem -> {
+                        val showTitle = item.podcast?.name ?: item.author?.name ?: "Podcast"
+                        val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                        SongsModel(
+                            id = stableId("yt_ep:${item.id}"),
+                            title = item.title,
+                            album = showTitle,
+                            singer = showTitle,
+                            coverUri = item.thumbnail,
+                            url = "youtube:${item.id}|$cleanTitle $showTitle",
+                            spotifyTrackId = "",
+                            explicit = item.explicit,
+                            durationMs = (item.duration ?: 0) * 1000,
+                        )
+                    }
+                    is SongItem -> {
+                        if (item.isEpisode) {
+                            val showTitle = item.album?.name ?: item.artists.joinToString(", ") { it.name }.ifBlank { "Podcast" }
+                            val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                            SongsModel(
+                                id = stableId("yt_ep:${item.id}"),
+                                title = item.title,
+                                album = showTitle,
+                                singer = showTitle,
+                                coverUri = item.thumbnail,
+                                url = "youtube:${item.id}|$cleanTitle $showTitle",
+                                spotifyTrackId = "",
+                                explicit = item.explicit,
+                                durationMs = (item.duration ?: 0) * 1000,
+                            )
+                        } else null
+                    }
+                    else -> null
+                }
+            }.distinctBy { it.id }
+
+            val ytShows = ytVideoRes?.items.orEmpty().mapNotNull { item ->
+                when (item) {
+                    is PodcastItem -> {
+                        PodcastModel(
+                            id = item.id,
+                            name = item.title,
+                            publisher = item.author?.name ?: "Podcast",
+                            coverUri = item.thumbnail ?: "",
+                        )
+                    }
+                    else -> null
+                }
+            }
+
+            // Fallback video episodes when no explicit podcast items returned
+            val fallbackVideoEpisodes = if (spEpisodes.isEmpty() && ytEpisodes.isEmpty()) {
+                ytVideoRes?.items.orEmpty().filterIsInstance<SongItem>().take(10).map { item ->
+                    val creator = item.artists.joinToString(", ") { it.name }.ifBlank { "Creator" }
+                    val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                    SongsModel(
+                        id = stableId("yt_vid:${item.id}"),
+                        title = item.title,
+                        album = "Video",
+                        singer = creator,
+                        coverUri = item.thumbnail,
+                        url = "youtube:${item.id}|$cleanTitle $creator",
+                        spotifyTrackId = "",
+                        explicit = item.explicit,
+                        durationMs = (item.duration ?: 0) * 1000,
+                    )
+                }
+            } else emptyList()
+
+            val combinedShows = (spShows + ytShows).distinctBy { it.id }
+            val combinedEpisodes = (spEpisodes + ytEpisodes + fallbackVideoEpisodes).distinctBy { it.id }
+
+            if (combinedSongs.isEmpty() && albums.isEmpty() && artists.isEmpty() && combinedShows.isEmpty() && combinedEpisodes.isEmpty()) {
+                if (!hasSpotify) {
+                    emit(Response.Error("No results found across Spotify & YouTube"))
+                } else {
+                    emit(Response.Success(SearchResults()))
+                }
+            } else {
                 emit(Response.Success(SearchResults(
-                    songs = res.tracks?.items.orEmpty().map { it.toSongModel() },
-                    albums = res.albums?.items.orEmpty().map { it.toAlbumModel() },
-                    artists = res.artists?.items.orEmpty().map { it.toArtistModel() },
-                    shows = podcasts?.shows?.items.orEmpty().map { it.toPodcastModel() },
-                    episodes = podcasts?.episodes?.items.orEmpty().map { it.toEpisodeSongModel(null) },
+                    songs = combinedSongs,
+                    albums = albums,
+                    artists = artists,
+                    shows = combinedShows,
+                    episodes = combinedEpisodes,
                 )))
-            },
-            onFailure = { Log.e("Api", "searchEverything failed", it); emit(Response.Error(it.message ?: "error")) },
-        )
+            }
+        }
     }
 
     /** A podcast show's episodes, as playable [SongsModel] (url = "episode:<id>"). */
@@ -368,6 +518,114 @@ class Api @Inject constructor(
             }
         }
         return out.shuffled().take(30)
+    }
+
+    /**
+     * Generates a personalized "Quick Picks • Made For You" track list for the Home Screen.
+     * Incorporates user's listening history, liked tracks, taste profile, and Spotify
+     * algorithmic recommendations. Never returns an empty list on a working network connection.
+     */
+    suspend fun getPersonalizedQuickPicks(): List<SongsModel> {
+        val hasSpotify = SpotifyTokenProvider.ensureToken(context)
+
+        // 1. Seed from user's local listening history (most recent played tracks)
+        val history = runCatching {
+            io.github.sekademi.spotufi.data.preferences.getListeningHistory(context)
+        }.getOrDefault(emptyList())
+
+        val historySeeds = history
+            .mapNotNull { entry ->
+                io.github.sekademi.spotufi.di.StreamResolver.spotifyTrackIdForPlayback(entry.url)
+            }
+            .distinct()
+            .take(5)
+
+        if (hasSpotify && historySeeds.isNotEmpty()) {
+            val recs = runCatching { getRecommendations(historySeeds) }.getOrDefault(emptyList())
+            if (recs.isNotEmpty()) {
+                val recentModels = history.take(4).map { entry ->
+                    val sid = io.github.sekademi.spotufi.di.StreamResolver.spotifyTrackIdForPlayback(entry.url).orEmpty()
+                    SongsModel(
+                        id = entry.songId,
+                        title = entry.title,
+                        album = entry.album,
+                        singer = entry.singer,
+                        coverUri = entry.image,
+                        url = entry.url.ifBlank {
+                            if (sid.isNotBlank()) {
+                                io.github.sekademi.spotufi.di.SongPlayer.buildSpotifyPlayQuery(sid, entry.title, entry.singer)
+                            } else entry.title
+                        },
+                        spotifyTrackId = sid,
+                    )
+                }
+                return (recentModels + recs).distinctBy { it.id }.take(20)
+            }
+        }
+
+        // 2. Seed from Spotify Liked Songs / Saved Tracks
+        if (hasSpotify) {
+            val liked = runCatching { Spotify.likedSongs(limit = 20).getOrNull()?.items }.getOrNull()
+            if (!liked.isNullOrEmpty()) {
+                val likedModels = liked.map { it.track.toSongModel() }
+                val likedSeeds = likedModels.map { it.spotifyTrackId }.filter { it.isNotBlank() }.take(5)
+                val recs = if (likedSeeds.isNotEmpty()) {
+                    runCatching { getRecommendations(likedSeeds) }.getOrDefault(emptyList())
+                } else emptyList()
+                val blended = (likedModels.shuffled().take(6) + recs).distinctBy { it.id }.take(20)
+                if (blended.isNotEmpty()) return blended
+            }
+        }
+
+        // 3. Seed from local taste profile affinities
+        val tasteProfile = runCatching {
+            io.github.sekademi.spotufi.data.recommendation.TasteProfileEngine.getProfile(context)
+        }.getOrNull()
+        val topArtist = tasteProfile?.artistAffinities?.maxByOrNull { it.value }?.key
+        if (hasSpotify && !topArtist.isNullOrBlank()) {
+            val artistSearch = runCatching {
+                Spotify.search(topArtist, types = listOf("track"), limit = 15).getOrNull()
+            }.getOrNull()
+            val tracks = artistSearch?.tracks?.items.orEmpty().map { it.toSongModel() }
+            if (tracks.isNotEmpty()) return tracks
+        }
+
+        // 4. Fallback to Spotify's top global hits / new releases
+        if (hasSpotify) {
+            val topTracks = runCatching {
+                Spotify.search("Top 50", types = listOf("track"), limit = 20).getOrNull()
+            }.getOrNull()
+            val tracks = topTracks?.tracks?.items.orEmpty().map { it.toSongModel() }
+            if (tracks.isNotEmpty()) return tracks
+        }
+
+        // 5. Ultimate network fallback: InnerTube trending / popular music
+        val ytTrending = runCatching {
+            YouTube.search("Popular Music Hits", YouTube.SearchFilter.FILTER_SONG).getOrNull()
+        }.getOrNull()
+        val ytTracks = ytTrending?.items.orEmpty().mapNotNull { item ->
+            when (item) {
+                is SongItem -> {
+                    val artistName = item.artists.joinToString(", ") { it.name }.ifBlank { "Top Artist" }
+                    val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                    SongsModel(
+                        id = stableId("yt_trend:${item.id}"),
+                        title = item.title,
+                        album = item.album?.name ?: "Trending",
+                        singer = artistName,
+                        coverUri = item.thumbnail,
+                        url = "youtube:${item.id}|$cleanTitle $artistName",
+                        spotifyTrackId = "",
+                        explicit = item.explicit,
+                        durationMs = (item.duration ?: 0) * 1000,
+                    )
+                }
+                else -> null
+            }
+        }
+        if (ytTracks.isNotEmpty()) return ytTracks
+
+        return emptyList()
     }
 
     /**
