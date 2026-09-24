@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -308,6 +309,46 @@ fun PlayerOptionsSheet(
                     label = timerLabel,
                     trailingArrow = true
                 ) { showSleep = true }
+
+                var currentSpeed by remember { mutableFloatStateOf(SongPlayer.exoPlayer?.playbackParameters?.speed ?: 1.0f) }
+                val nextSpeed = when {
+                    currentSpeed < 0.9f -> 1.0f
+                    currentSpeed < 1.15f -> 1.25f
+                    currentSpeed < 1.35f -> 1.5f
+                    currentSpeed < 1.75f -> 2.0f
+                    else -> 0.8f
+                }
+                PlayerMenuRow(
+                    icon = ImageVector.vectorResource(R.drawable.ic_player_skip),
+                    iconTint = if (currentSpeed != 1.0f) Color(AppPalette.toArgb()) else Color.White,
+                    label = "Playback speed: ${String.format(java.util.Locale.US, "%.2fx", currentSpeed).replace(".00", "")}",
+                ) {
+                    SongPlayer.exoPlayer?.setPlaybackSpeed(nextSpeed)
+                    currentSpeed = nextSpeed
+                    Toast.makeText(context, "Playback speed: ${nextSpeed}x", Toast.LENGTH_SHORT).show()
+                }
+
+                PlayerMenuRow(
+                    icon = ImageVector.vectorResource(R.drawable.ic_player_back),
+                    label = "Jump backward 15s",
+                ) {
+                    val p = SongPlayer.exoPlayer
+                    if (p != null) {
+                        p.seekTo((p.currentPosition - 15_000L).coerceAtLeast(0L))
+                        Toast.makeText(context, "Rewound 15s", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                PlayerMenuRow(
+                    icon = ImageVector.vectorResource(R.drawable.ic_player_skip),
+                    label = "Jump forward 15s",
+                ) {
+                    val p = SongPlayer.exoPlayer
+                    if (p != null) {
+                        p.seekTo((p.currentPosition + 15_000L).coerceAtMost(p.duration.coerceAtLeast(0L)))
+                        Toast.makeText(context, "Skipped 15s", Toast.LENGTH_SHORT).show()
+                    }
+                }
 
                 var autoplay by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isAutoplayEnabled(context)) }
                 PlayerMenuRow(

@@ -191,6 +191,15 @@ fun HomeFeedContent(navController: NavController, feed: HomeFeedModel, homeViewM
         item {
             HomeMoodRadiosRow(navController)
         }
+        val history = io.github.sekademi.spotufi.data.preferences.getListeningHistory(context)
+        if (history.isNotEmpty()) {
+            item {
+                HomeJumpBackInSection(history = history) { selectedSong ->
+                    homeViewModel.playTrack(selectedSong, listOf(selectedSong))
+                    io.github.sekademi.spotufi.di.SongPlayer.playSong(selectedSong.url, context)
+                }
+            }
+        }
         if (quickPicks.isNotEmpty()) {
             item {
                 HomeQuickPicksSection(quickPicks = quickPicks) { selectedSong ->
@@ -447,6 +456,7 @@ fun SumUpHomeScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val quickPicks by homeViewModel.quickPicks.collectAsState()
+    val history = remember { io.github.sekademi.spotufi.data.preferences.getListeningHistory(context) }
 
     Column(
         modifier = Modifier
@@ -455,6 +465,12 @@ fun SumUpHomeScreen(
             .background(Color(AppBackground.toArgb()))
     ){
         GreetingSection()
+        if (history.isNotEmpty()) {
+            HomeJumpBackInSection(history = history) { selectedSong ->
+                homeViewModel.playTrack(selectedSong, listOf(selectedSong))
+                io.github.sekademi.spotufi.di.SongPlayer.playSong(selectedSong.url, context)
+            }
+        }
         if (quickPicks.isNotEmpty()) {
             HomeQuickPicksSection(quickPicks = quickPicks) { selectedSong ->
                 homeViewModel.playTrack(selectedSong, quickPicks)
@@ -780,6 +796,67 @@ fun ImageCard(
             }
         }
         Spacer(modifier = Modifier.height(100.dp))
+    }
+}
+
+@Composable
+fun HomeJumpBackInSection(
+    history: List<io.github.sekademi.spotufi.data.preferences.HistoryEntry>,
+    onSongClick: (SongsModel) -> Unit,
+) {
+    if (history.isEmpty()) return
+    val songs = remember(history) {
+        history.distinctBy { it.songId }.take(10).map { entry ->
+            val sid = io.github.sekademi.spotufi.di.StreamResolver.spotifyTrackIdForPlayback(entry.url).orEmpty()
+            SongsModel(
+                id = entry.songId,
+                title = entry.title,
+                album = entry.album,
+                singer = entry.singer,
+                coverUri = entry.image,
+                url = entry.url.ifBlank {
+                    if (sid.isNotBlank()) {
+                        io.github.sekademi.spotufi.di.SongPlayer.buildSpotifyPlayQuery(sid, entry.title, entry.singer)
+                    } else entry.title
+                },
+                spotifyTrackId = sid,
+            )
+        }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Text(
+                text = "CONTINUE LISTENING",
+                color = Color(0xFFB3B3B3),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Jump Back In",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(songs.size) { index ->
+                val song = songs[index]
+                QuickPickCard(song = song, onClick = { onSongClick(song) })
+            }
+        }
     }
 }
 

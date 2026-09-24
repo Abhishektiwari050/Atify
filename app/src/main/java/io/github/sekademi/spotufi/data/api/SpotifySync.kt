@@ -7,6 +7,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -130,6 +135,30 @@ object SpotifySync {
                 return@launch
             }
             io.github.sekademi.spotufi.di.SpotifyWebPlayer.reportTrackPlay(spotifyTrackId)
+
+            // Direct HTTP beacon to Spotify spclient playback events with the web-player token
+            val token = Spotify.accessToken
+            if (!token.isNullOrBlank()) {
+                runCatching {
+                    val client = OkHttpClient.Builder()
+                        .connectTimeout(5, TimeUnit.SECONDS)
+                        .readTimeout(5, TimeUnit.SECONDS)
+                        .build()
+                    val uri = "spotify:track:$spotifyTrackId"
+                    val jsonBody = """{"event":"track_played","uri":"$uri","ms_played":30000,"timestamp":${System.currentTimeMillis()}}"""
+                    val req = Request.Builder()
+                        .url("https://gew4-spclient.spotify.com/track-playback/v1/playback/events")
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Content-Type", "application/json")
+                        .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                        .build()
+                    client.newCall(req).execute().use { resp ->
+                        Log.d(TAG, "spclient direct report playback $spotifyTrackId -> HTTP ${resp.code}")
+                    }
+                }.onFailure { e ->
+                    Log.w(TAG, "Failed direct spclient report for $spotifyTrackId", e)
+                }
+            }
             Log.d(TAG, "reported qualifying playback (>30s) for Spotify Wrapped: $spotifyTrackId")
         }
     }

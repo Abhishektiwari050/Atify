@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,6 +67,7 @@ fun PlayerFull(
     repeat: RepeatMode,
     queueSongs: List<SongsModel>,
 ) {
+    val haptic = LocalHapticFeedback.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -79,6 +82,7 @@ fun PlayerFull(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     playerViewModel.updateShuffleState(!shuffle)
                 },
             tint = if (shuffle) Color(AppPalette.toArgb()) else Color.White,
@@ -93,6 +97,7 @@ fun PlayerFull(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     playerViewModel.playPreviousSong(queueSongs, context)
                     isLiked.value = isSongLiked(context, playerViewModel.currentSongId.value.toString())
                 },
@@ -136,6 +141,7 @@ fun PlayerFull(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     playerViewModel.playNextSongs(queueSongs, context)
                     isLiked.value = isSongLiked(context, playerViewModel.currentSongId.value.toString())
                 },
@@ -153,6 +159,7 @@ fun PlayerFull(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     val nextRepeat = when (repeat) {
                         RepeatMode.OFF -> RepeatMode.ALL
                         RepeatMode.ALL -> RepeatMode.ONE

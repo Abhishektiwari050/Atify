@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -321,7 +322,7 @@ fun MiniPlayer(navController: NavHostController) {
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1500),
                     )
                     Text(
                         text = songSinger,
@@ -329,7 +330,7 @@ fun MiniPlayer(navController: NavHostController) {
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2000),
                     )
                 }
             }
@@ -351,6 +352,7 @@ fun MiniPlayer(navController: NavHostController) {
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                     removeLikedSongId(context, songId.toString())
                                     isLiked = false
                                     miniPlayerViewModel.updateLikeState(!likeState)
@@ -367,6 +369,7 @@ fun MiniPlayer(navController: NavHostController) {
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                     addLikedSongId(context, songId.toString())
                                     isLiked = true
                                     miniPlayerViewModel.updateLikeState(!likeState)
@@ -405,6 +408,7 @@ fun MiniPlayer(navController: NavHostController) {
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     if (songPlayingState) {
                                         SongPlayer.pause()
                                         miniPlayerViewModel.updateSongState(

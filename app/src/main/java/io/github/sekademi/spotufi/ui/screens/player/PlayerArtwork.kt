@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,7 @@ fun PlayerArtwork(
                     .sizeIn(maxWidth = 385.dp, maxHeight = 385.dp)
                     .aspectRatio(1f)
                     .padding(20.dp)
+                    .shadow(elevation = 16.dp, shape = RoundedCornerShape(10.dp), spotColor = Color.Black.copy(alpha = 0.55f))
                     .clip(RoundedCornerShape(10.dp))
                     .alpha(artworkAlpha),
                 model = currentCoverUri.takeIf { it.isNotBlank() } ?: R.drawable.placeholder,
@@ -77,6 +80,7 @@ fun PlayerArtwork(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp)
+                        .shadow(elevation = 16.dp, shape = RoundedCornerShape(10.dp), spotColor = Color.Black.copy(alpha = 0.55f))
                         .clip(RoundedCornerShape(10.dp))
                         .alpha(artworkAlpha),
                     model = trackCover,

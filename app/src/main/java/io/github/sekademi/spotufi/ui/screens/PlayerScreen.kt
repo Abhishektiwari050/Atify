@@ -16,6 +16,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -400,6 +402,11 @@ fun PlayerScreen(navController: NavController) {
     var dominentColor by remember {
         mutableStateOf(Color(AppBackground.toArgb()))
     }
+    val animatedDominantColor by animateColorAsState(
+        targetValue = dominentColor,
+        animationSpec = tween(durationMillis = 650, easing = FastOutSlowInEasing),
+        label = "ambient_player_color"
+    )
     var showAudioDetails by remember { mutableStateOf(false) }
     LaunchedEffect(songCoverUri) {
         PaletteExtractor.extractSecondColorFromCoverUrl(context = context, imageUrl = songCoverUri) { color ->
@@ -543,7 +550,7 @@ fun PlayerScreen(navController: NavController) {
             }
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(dominentColor, Color.Black),
+                    colors = listOf(animatedDominantColor, Color.Black),
                     startY = 100f
                 )
             )

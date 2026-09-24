@@ -8,7 +8,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,6 +68,7 @@ fun PlayerInfo(
 ) {
     var snackbarMessage by remember { mutableStateOf("") }
     var snackbarVisible by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(snackbarVisible) {
         if (snackbarVisible) {
@@ -76,7 +80,7 @@ fun PlayerInfo(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(25.dp, 10.dp)
+            .padding(20.dp, 0.dp)
     ) {
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -106,25 +110,36 @@ fun PlayerInfo(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = if (onArtistClick != null) Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onArtistClick() } else Modifier,
+                        modifier = Modifier
+                            .basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2000)
+                            .then(
+                                if (onArtistClick != null) Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { onArtistClick() } else Modifier
+                            ),
                     )
                     val isResolvingState = isResolving && resolveStatus.isNotBlank()
                     val hasError = !resolveError.isNullOrBlank()
                     val displaySource = if (isResolvingState) "Resolving" else if (hasError) "Error" else source
                     if (displaySource.isNotBlank()) {
                         var showDetails by remember(songId) { mutableStateOf(false) }
-                        val badgeRed = Color(0xFFFF334B)
                         val isLossless = source.startsWith("Lossless")
+                        val badgeColor = when {
+                            hasError -> Color(0xFFFF334B)
+                            isResolvingState -> Color(0xFFFFB300)
+                            isLossless -> Color(0xFFE5B842)
+                            source == "Spotify" -> Color(0xFF1ED760)
+                            source == "Downloaded" -> Color(0xFF00E5FF)
+                            else -> Color(0xFF7986CB)
+                        }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .padding(top = 3.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(badgeRed.copy(alpha = 0.14f))
+                                .padding(top = 4.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(badgeColor.copy(alpha = 0.12f))
+                                .border(width = 0.75.dp, color = badgeColor.copy(alpha = 0.35f), shape = RoundedCornerShape(6.dp))
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
@@ -132,13 +147,13 @@ fun PlayerInfo(
                                     showDetails = !showDetails
                                     onQualityClick?.invoke()
                                 }
-                                .padding(horizontal = 5.dp, vertical = 2.dp),
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(4.dp)
+                                    .size(4.5.dp)
                                     .clip(CircleShape)
-                                    .background(badgeRed)
+                                    .background(badgeColor)
                             )
                             Text(
                                 text = when {
@@ -147,14 +162,15 @@ fun PlayerInfo(
                                     showDetails -> when {
                                         isLossless -> "LOSSLESS FLAC" + (if (quality.isNotBlank()) " • $quality" else "")
                                         source == "Spotify" -> "SPOTIFY 320k" + (if (quality.isNotBlank()) " • $quality" else "")
-                                        source == "Downloaded" -> "OFFLINE" + (if (quality.isNotBlank()) " • $quality" else "")
+                                        source == "Downloaded" -> "OFFLINE FLAC" + (if (quality.isNotBlank()) " • $quality" else "")
                                         else -> "STREAM OPUS" + (if (quality.isNotBlank()) " • $quality" else "")
                                     }
-                                    isLossless -> "LOSSLESS"
+                                    isLossless -> "LOSSLESS FLAC"
+                                    source == "Spotify" -> "SPOTIFY 320k"
                                     source == "Downloaded" -> "OFFLINE"
-                                    else -> "STREAM"
+                                    else -> "HQ AUDIO"
                                 },
-                                color = badgeRed,
+                                color = badgeColor,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
@@ -172,6 +188,7 @@ fun PlayerInfo(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                         if (isLiked.value && onShowSavedIn != null) {
                             onShowSavedIn()
                             return@clickable

@@ -97,6 +97,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 private const val TAG = "SpotifyLogin"
 private const val MOBILE_USER_AGENT =
     "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
+private const val DESKTOP_USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 private const val LOGIN_URL =
     "https://accounts.spotify.com/en/login?continue=https%3A%2F%2Fopen.spotify.com%2F"
 
@@ -104,6 +106,14 @@ private val MOBILE_HEADERS = mapOf(
     "Sec-CH-UA" to "\"Google Chrome\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
     "Sec-CH-UA-Mobile" to "?1",
     "Sec-CH-UA-Platform" to "\"Android\"",
+    "Accept-Language" to "en-US,en;q=0.9",
+    "Upgrade-Insecure-Requests" to "1"
+)
+
+private val DESKTOP_HEADERS = mapOf(
+    "Sec-CH-UA" to "\"Google Chrome\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "Sec-CH-UA-Mobile" to "?0",
+    "Sec-CH-UA-Platform" to "\"Windows\"",
     "Accept-Language" to "en-US,en;q=0.9",
     "Upgrade-Insecure-Requests" to "1"
 )
@@ -200,6 +210,7 @@ fun SpotifyLoginScreen(
 
     val tokenFetchStarted = remember { AtomicBoolean(false) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var isDesktopMode by remember { mutableStateOf(false) }
 
     val navigateToHome: () -> Unit = {
         io.github.sekademi.spotufi.di.SpotifyWebPlayer.refreshLogin(context)
@@ -286,6 +297,26 @@ fun SpotifyLoginScreen(
             )
 
             if (selectedTab == 0) {
+                IconButton(onClick = {
+                    isDesktopMode = !isDesktopMode
+                    webViewRef?.settings?.apply {
+                        userAgentString = if (isDesktopMode) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
+                        useWideViewPort = isDesktopMode
+                        loadWithOverviewMode = isDesktopMode
+                    }
+                    webError = null
+                    isWebLoading = true
+                    loadProgress = 0.1f
+                    val headers = if (isDesktopMode) DESKTOP_HEADERS else MOBILE_HEADERS
+                    webViewRef?.loadUrl(LOGIN_URL, headers)
+                }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_devices),
+                        contentDescription = if (isDesktopMode) "Desktop View Active" else "Mobile View Active",
+                        tint = if (isDesktopMode) AtifySage else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
                 IconButton(onClick = {
                     webError = null
                     isWebLoading = true

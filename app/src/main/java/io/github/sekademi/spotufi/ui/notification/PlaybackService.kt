@@ -1,8 +1,13 @@
 package io.github.sekademi.spotufi.ui.notification
 
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
@@ -67,6 +72,15 @@ class PlaybackService : MediaLibraryService() {
     private var webPlayer: WebMediaPlayer? = null
     private var showingWeb = false
     @Volatile private var lastReportedTrackId: String? = null
+
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                SongPlayer.pause()
+                currentSongState.updatePlayingState(false)
+            }
+        }
+    }
 
     private val playerListener = object : Player.Listener {
         private var lastErrorSongId: Int? = null
@@ -190,6 +204,14 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
         SongPlayer.ensureCreated(this)
 
+        val noisyFilter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+        ContextCompat.registerReceiver(
+            this,
+            noisyReceiver,
+            noisyFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+
         // explicitly order notification buttons: [Like] [Playback Controls] [Close]
         val notificationProvider = object : DefaultMediaNotificationProvider(this) {
             override fun getMediaButtons(
@@ -222,6 +244,12 @@ class PlaybackService : MediaLibraryService() {
                     currentSongState.playingState.value,
                     currentSongState.coverUri.value,
                 )
+                broadcastMediaMetadata(
+                    currentSongState.title.value,
+                    currentSongState.singer.value,
+                    currentSongState.album.value,
+                    currentSongState.playingState.value,
+                )
             }
         }
 
@@ -233,6 +261,12 @@ class PlaybackService : MediaLibraryService() {
                     currentSongState.singer.value,
                     isPlaying,
                     currentSongState.coverUri.value,
+                )
+                broadcastMediaMetadata(
+                    currentSongState.title.value,
+                    currentSongState.singer.value,
+                    currentSongState.album.value,
+                    isPlaying,
                 )
             }
         }
@@ -984,6 +1018,27 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    private fun broadcastMediaMetadata(title: String, artist: String, album: String, playing: Boolean) {
+        try {
+            val intent = Intent("com.android.music.metachanged").apply {
+                putExtra("track", title)
+                putExtra("artist", artist)
+                putExtra("album", album)
+                putExtra("playing", playing)
+                putExtra("package", packageName)
+            }
+            sendBroadcast(intent)
+
+            val playstateIntent = Intent("com.android.music.playstatechanged").apply {
+                putExtra("track", title)
+                putExtra("artist", artist)
+                putExtra("album", album)
+                putExtra("playing", playing)
+            }
+            sendBroadcast(playstateIntent)
+        } catch (_: Exception) {}
+    }
+
     override fun onDestroy() {
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionNext = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionPrev = null
@@ -996,6 +1051,9 @@ class PlaybackService : MediaLibraryService() {
         mediaSession?.release()
         mediaSession = null
         SongPlayer.release()
+        try {
+            unregisterReceiver(noisyReceiver)
+        } catch (_: Exception) {}
         super.onDestroy()
     }
 }
