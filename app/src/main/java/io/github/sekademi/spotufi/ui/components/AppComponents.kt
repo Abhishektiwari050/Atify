@@ -2,8 +2,14 @@ package io.github.sekademi.spotufi.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -19,6 +25,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -97,6 +104,9 @@ fun Loader() {
 }
 
 @OptIn(ExperimentalFoundationApi::class)
+private enum class MiniPlayerDragAxis { NONE, HORIZONTAL, VERTICAL }
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MiniPlayer(navController: NavHostController) {
     val miniPlayerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
@@ -108,7 +118,9 @@ fun MiniPlayer(navController: NavHostController) {
     val songIndex = miniPlayerViewModel.currentSongIndex.value
     val songAlbum = miniPlayerViewModel.currentSongAlbum.value
 
+    val haptic = LocalHapticFeedback.current
     var swipeOffsetY by remember { mutableFloatStateOf(0f) }
+    var swipeOffsetX by remember { mutableFloatStateOf(0f) }
     val coroutineScope = rememberCoroutineScope()
 
     var songProgress by remember { mutableFloatStateOf(0f) }
@@ -119,9 +131,11 @@ fun MiniPlayer(navController: NavHostController) {
         0f
     }
 
+    LaunchedEffect(songId) {
+        swipeOffsetX = 0f
+    }
+
     val currentRoute = navController.currentBackStackEntry?.destination?.route
-
-
 
     LaunchedEffect(key1 = songPlayingState) {
         while (songPlayingState) {
@@ -164,100 +178,135 @@ fun MiniPlayer(navController: NavHostController) {
         )
     }
 
-
     Column(
         modifier = Modifier
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = 8.dp)
+            .padding(bottom = 2.dp)
+            .shadow(elevation = 6.dp, shape = RoundedCornerShape(8.dp), clip = false)
+            .clip(RoundedCornerShape(8.dp))
+            .background(darkVibrantColor)
             .graphicsLayer {
                 translationY = swipeOffsetY
                 alpha = (1f + swipeOffsetY / 150f).coerceIn(0f, 1f)
             }
-            .clip(RoundedCornerShape(8.dp))
-            .background(darkVibrantColor)
-            .padding(horizontal = 6.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 2.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    navController.navigate(Routes.Player.route)
-                }
-                .pointerInput(Unit) {
-                    var navigated = false
-                    var lastEventTimeMs = 0L
-                    val distThreshold = 20.dp.toPx()
-                    val velThreshold = 1500f
-                    detectDragGestures(
-                        onDragStart = {
-                            navigated = false
-                            lastEventTimeMs = 0L
-                        },
-                        onDragEnd = {
-                            if (!navigated) {
-                                coroutineScope.launch {
-                                    val anim = Animatable(swipeOffsetY)
-                                    anim.animateTo(
-                                        targetValue = 0f,
-                                        animationSpec = spring(
-                                            dampingRatio = 0.7f,
-                                            stiffness = 400f
-                                        )
-                                    ) { swipeOffsetY = value }
-                                }
-                            } else {
-                                coroutineScope.launch {
-                                    val anim = Animatable(swipeOffsetY)
-                                    anim.animateTo(
-                                        targetValue = -300f,
-                                        animationSpec = tween(280)
-                                    ) { swipeOffsetY = value }
-                                    swipeOffsetY = 0f
-                                }
-                            }
-                        },
-                        onDragCancel = {
-                            coroutineScope.launch {
-                                val anim = Animatable(swipeOffsetY)
-                                anim.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = 0.7f,
-                                        stiffness = 400f
-                                    )
-                                ) { swipeOffsetY = value }
-                            }
-                        },
-                    ) { change, dragAmount ->
-                        change.consume()
-                        swipeOffsetY = (swipeOffsetY + dragAmount.y).coerceAtMost(0f)
-                        if (!navigated) {
-                            val now = change.uptimeMillis
-                            val dtMs = if (lastEventTimeMs > 0L) now - lastEventTimeMs else 0L
-                            lastEventTimeMs = now
-                            val velocityPxPerSec = if (dtMs > 5) dragAmount.y / dtMs * 1000f else 0f
-                            if (swipeOffsetY < -distThreshold || velocityPxPerSec < -velThreshold) {
-                                navigated = true
-                                navController.navigate(Routes.Player.route)
-                            }
-                        }
-                    }
-                }
+                .height(56.dp)
+                .padding(start = 8.dp, end = 8.dp)
         ) {
+            // Draggable Track Info (Artwork + Title + Artist)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
+                    .pointerInput(Unit) {
+                        var dragAxis = MiniPlayerDragAxis.NONE
+                        var totalDx = 0f
+                        var totalDy = 0f
+                        val distThresholdY = 25.dp.toPx()
+                        val thresholdX = 50.dp.toPx()
+                        detectDragGestures(
+                            onDragStart = {
+                                dragAxis = MiniPlayerDragAxis.NONE
+                                totalDx = 0f
+                                totalDy = 0f
+                            },
+                            onDragEnd = {
+                                when (dragAxis) {
+                                    MiniPlayerDragAxis.VERTICAL -> {
+                                        if (swipeOffsetY < -distThresholdY) {
+                                            coroutineScope.launch {
+                                                Animatable(swipeOffsetY).animateTo(-250f, tween(180)) { swipeOffsetY = value }
+                                                swipeOffsetY = 0f
+                                                navController.navigate(Routes.Player.route)
+                                            }
+                                        } else {
+                                            coroutineScope.launch {
+                                                Animatable(swipeOffsetY).animateTo(0f, spring(0.75f, 400f)) { swipeOffsetY = value }
+                                            }
+                                        }
+                                    }
+                                    MiniPlayerDragAxis.HORIZONTAL -> {
+                                        val activeQueue = miniPlayerViewModel.queue.value
+                                        if (swipeOffsetX > thresholdX) {
+                                            // Swiped right -> play next track (forward skip)
+                                            coroutineScope.launch {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                val startX = swipeOffsetX
+                                                Animatable(startX).animateTo(350f, tween(140, easing = FastOutSlowInEasing)) { swipeOffsetX = value }
+                                                miniPlayerViewModel.playNextSongs(activeQueue, context)
+                                                swipeOffsetX = -350f
+                                                Animatable(-350f).animateTo(0f, spring(0.8f, 400f)) { swipeOffsetX = value }
+                                            }
+                                        } else if (swipeOffsetX < -thresholdX) {
+                                            // Swiped left -> play previous track
+                                            coroutineScope.launch {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                val startX = swipeOffsetX
+                                                Animatable(startX).animateTo(-350f, tween(140, easing = FastOutSlowInEasing)) { swipeOffsetX = value }
+                                                miniPlayerViewModel.playPreviousSong(activeQueue, context)
+                                                swipeOffsetX = 350f
+                                                Animatable(350f).animateTo(0f, spring(0.8f, 400f)) { swipeOffsetX = value }
+                                            }
+                                        } else {
+                                            coroutineScope.launch {
+                                                Animatable(swipeOffsetX).animateTo(0f, spring(0.75f, 500f)) { swipeOffsetX = value }
+                                            }
+                                        }
+                                    }
+                                    MiniPlayerDragAxis.NONE -> {
+                                        if (kotlin.math.abs(totalDx) < 12f && kotlin.math.abs(totalDy) < 12f) {
+                                            navController.navigate(Routes.Player.route)
+                                        }
+                                    }
+                                }
+                                dragAxis = MiniPlayerDragAxis.NONE
+                            },
+                            onDragCancel = {
+                                coroutineScope.launch {
+                                    launch { Animatable(swipeOffsetY).animateTo(0f, spring(0.75f, 400f)) { swipeOffsetY = value } }
+                                    launch { Animatable(swipeOffsetX).animateTo(0f, spring(0.75f, 400f)) { swipeOffsetX = value } }
+                                }
+                                dragAxis = MiniPlayerDragAxis.NONE
+                            }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            totalDx += dragAmount.x
+                            totalDy += dragAmount.y
+                            if (dragAxis == MiniPlayerDragAxis.NONE) {
+                                if (kotlin.math.abs(totalDx) > 10f || kotlin.math.abs(totalDy) > 10f) {
+                                    dragAxis = if (kotlin.math.abs(totalDx) >= kotlin.math.abs(totalDy)) {
+                                        MiniPlayerDragAxis.HORIZONTAL
+                                    } else {
+                                        MiniPlayerDragAxis.VERTICAL
+                                    }
+                                }
+                            }
+                            when (dragAxis) {
+                                MiniPlayerDragAxis.VERTICAL -> {
+                                    swipeOffsetY = (swipeOffsetY + dragAmount.y).coerceAtMost(0f)
+                                }
+                                MiniPlayerDragAxis.HORIZONTAL -> {
+                                    swipeOffsetX += dragAmount.x
+                                }
+                                MiniPlayerDragAxis.NONE -> {}
+                            }
+                        }
+                    }
+                    .graphicsLayer {
+                        translationX = swipeOffsetX
+                        alpha = (1f - (kotlin.math.abs(swipeOffsetX) / 450f)).coerceIn(0.25f, 1f)
+                    }
                     .clipToBounds()
             ) {
                 AsyncImage(
                     modifier = Modifier
                         .padding(end = 10.dp)
-                        .size(42.dp)
+                        .size(40.dp)
                         .clip(RoundedCornerShape(6.dp)),
                     model = songCoverUri,
                     contentScale = ContentScale.Crop,
@@ -266,25 +315,38 @@ fun MiniPlayer(navController: NavHostController) {
                     contentDescription = ""
                 )
                 Column(Modifier.weight(1f)) {
-                    Text(text = songTitle, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    Text(text = songSinger, color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(
+                        text = songTitle,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = songSinger,
+                        color = Color(0xFFB3B3B3),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
                 }
             }
 
+            // Fixed Action Controls on the right
             Row(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.padding(start = 6.dp)
             ) {
-
-                // Plus = save; green check = already saved. A second tap opens the
-                // "Saved in" sheet (Liked Songs + playlists) instead of unliking.
+                // Plus / Check icon
                 if (isLiked) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         tint = Color(0xFF1ED760),
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(24.dp)
                             .combinedClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -300,7 +362,7 @@ fun MiniPlayer(navController: NavHostController) {
                 } else {
                     Icon(
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(24.dp)
                             .combinedClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -319,12 +381,13 @@ fun MiniPlayer(navController: NavHostController) {
                     )
                 }
 
+                Spacer(modifier = Modifier.width(8.dp))
 
                 val isLocatingOrBuffering = miniPlayerViewModel.isResolving.value || miniPlayerViewModel.isBuffering.value
                 Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                     if (isLocatingOrBuffering) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(28.dp),
+                            modifier = Modifier.size(26.dp),
                             color = Color.White,
                             strokeWidth = 2.5.dp
                         )
@@ -333,9 +396,8 @@ fun MiniPlayer(navController: NavHostController) {
                             painter = if (songPlayingState)
                                 painterResource(id = R.drawable.ic_playing)
                             else
-                                painterResource(id = R.drawable.play_svgrepo_com)
-                            ,
-                            contentDescription = "",
+                                painterResource(id = R.drawable.play_svgrepo_com),
+                            contentDescription = if (songPlayingState) "Pause" else "Play",
                             tint = Color.White,
                             modifier = Modifier
                                 .size(28.dp)
@@ -373,16 +435,27 @@ fun MiniPlayer(navController: NavHostController) {
             }
         }
 
-        CustomSlider(
-            value = songProgress,
-            onValueChange = { newValue ->
-                SongPlayer.seekTo((newValue * SongPlayer.getDuration()).toLong())
-            },
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth(),
+        // Sleek 2dp progress bar flush with bottom edge
+        val animatedProgress by animateFloatAsState(
+            targetValue = songProgress,
+            animationSpec = spring(stiffness = Spring.StiffnessLow),
+            label = "miniPlayerProgress"
         )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .clip(RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
+                .background(Color(0x33FFFFFF))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction = animatedProgress)
+                    .background(Color.White)
+            )
+        }
     }
-
 }
 
 

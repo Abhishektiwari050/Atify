@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -88,7 +89,8 @@ enum class SearchFilter(val label: String) {
     SONGS("Songs"),
     ARTISTS("Artists"),
     ALBUMS("Albums"),
-    SHOWS("Podcasts")
+    SHOWS("Podcasts"),
+    AUDIOBOOKS("Audiobooks")
 }
 
 
@@ -291,6 +293,10 @@ fun SumUpSearchScreen(
                             selectedFilter = SearchFilter.SHOWS
                             text = "Podcast"
                             searchViewModel.search("Podcast")
+                        } else if (title.equals("Audiobooks", ignoreCase = true) || genre.equals("Audiobook", ignoreCase = true)) {
+                            selectedFilter = SearchFilter.AUDIOBOOKS
+                            text = "Audiobook"
+                            searchViewModel.search("Audiobook")
                         } else {
                             navController.navigate(categoryRoute(genre, title))
                         }
@@ -319,6 +325,7 @@ fun SumUpSearchScreen(
                         SearchFilter.ARTISTS -> results.artists.isEmpty()
                         SearchFilter.ALBUMS -> results.albums.isEmpty()
                         SearchFilter.SHOWS -> results.shows.isEmpty() && results.episodes.isEmpty()
+                        SearchFilter.AUDIOBOOKS -> results.songs.isEmpty() && results.albums.isEmpty() && results.episodes.isEmpty()
                     }
 
                     if (isEmpty) {
@@ -441,6 +448,45 @@ fun SumUpSearchScreen(
                                         val ep = results.episodes[i]
                                         SearchSongRow(ep, results.episodes, searchViewModel, navController = navController, onPlayed = {
                                             recordRecent(ep.toRecentItem())
+                                        })
+                                    }
+                                }
+                            }
+                            SearchFilter.AUDIOBOOKS -> {
+                                val isAudiobook = { queryText: String ->
+                                    queryText.contains("audiobook", ignoreCase = true) ||
+                                    queryText.contains("audio book", ignoreCase = true) ||
+                                    queryText.contains("chapter", ignoreCase = true) ||
+                                    queryText.contains("narrat", ignoreCase = true) ||
+                                    queryText.contains("novel", ignoreCase = true) ||
+                                    queryText.contains("story", ignoreCase = true)
+                                }
+                                val audiobookAlbums = results.albums.filter { isAudiobook(it.name) || isAudiobook(it.artists) }.ifEmpty { results.albums }
+                                val allTracks = (results.songs + results.episodes).distinctBy { it.id }
+                                val audiobookTracks = allTracks.filter { isAudiobook(it.title) || isAudiobook(it.album) || isAudiobook(it.singer) }.ifEmpty { allTracks }
+
+                                if (audiobookAlbums.isNotEmpty()) {
+                                    item { SearchSectionHeader("Audiobooks") }
+                                    items(audiobookAlbums.size) { i ->
+                                        val album = audiobookAlbums[i]
+                                        SearchAlbumRow(album) {
+                                            recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                type = "album",
+                                                key = album.name,
+                                                name = album.name,
+                                                singer = album.artists,
+                                                image = album.coverUri,
+                                            ))
+                                            navController.navigate(albumRoute(album.name, album.artists))
+                                        }
+                                    }
+                                }
+                                if (audiobookTracks.isNotEmpty()) {
+                                    item { SearchSectionHeader("Audiobook Tracks & Chapters") }
+                                    items(audiobookTracks.size) { i ->
+                                        val song = audiobookTracks[i]
+                                        SearchSongRow(song, audiobookTracks, searchViewModel, navController = navController, onPlayed = {
+                                            recordRecent(song.toRecentItem())
                                         })
                                     }
                                 }
@@ -788,6 +834,7 @@ fun SearchAlbumRow(album: io.github.sekademi.spotufi.data.entity.AlbumsModel, on
 private val browseCategories: List<Triple<String, Color, String>> = listOf(
     Triple("Music", Color(0xFFDC148C), "Top hits"),
     Triple("Podcasts", Color(0xFF1E3264), "Podcast"),
+    Triple("Audiobooks", Color(0xFF006450), "Audiobook"),
     Triple("Made For You", Color(0xFF8768A8), "Discover weekly"),
     Triple("New Releases", Color(0xFFE8115B), "New releases"),
     Triple("Pop", Color(0xFF8D67AB), "Pop"),
@@ -926,6 +973,7 @@ fun SearchStickyBar(
             onValueChange = onTextChange,
             modifier = Modifier
                 .weight(1f)
+                .fillMaxHeight()
                 .onFocusChanged { onFocusChange(it.isFocused) },
             textStyle = TextStyle.Default.copy(
                 fontSize = 15.sp,
@@ -936,14 +984,14 @@ fun SearchStickyBar(
             cursorBrush = androidx.compose.ui.graphics.SolidColor(AppPalette),
             decorationBox = { innerTextField ->
                 Box(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     if (text.isEmpty()) {
                         Text(
                             text = "What do you want to listen to?",
                             color = Color(0xFF888888),
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Normal,
                             maxLines = 1,
                         )
