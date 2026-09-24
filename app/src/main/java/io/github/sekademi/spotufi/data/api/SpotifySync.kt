@@ -116,4 +116,21 @@ object SpotifySync {
         membershipCache[playlistId] = set
         return set
     }
+
+    /**
+     * Reports a qualifying (>30s) stream to Spotify so that it is recorded in
+     * the user's Spotify history and counts toward Spotify Wrapped.
+     */
+    fun reportPlayback(context: Context, spotifyTrackId: String, durationMs: Long) {
+        if (spotifyTrackId.isBlank()) return
+        val app = context.applicationContext
+        scope.launch {
+            if (!SpotifyTokenProvider.ensureToken(app)) {
+                Log.w(TAG, "no token - skipped reporting playback for $spotifyTrackId")
+                return@launch
+            }
+            io.github.sekademi.spotufi.di.SpotifyWebPlayer.reportTrackPlay(spotifyTrackId)
+            Log.d(TAG, "reported qualifying playback (>30s) for Spotify Wrapped: $spotifyTrackId")
+        }
+    }
 }

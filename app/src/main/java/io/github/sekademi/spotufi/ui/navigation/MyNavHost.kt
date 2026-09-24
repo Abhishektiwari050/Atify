@@ -134,7 +134,7 @@ fun MyNavHost(
         dialog(
             route = Routes.Player.route,
             dialogProperties = DialogProperties(
-                usePlatformDefaultWidth = true,
+                usePlatformDefaultWidth = false,
                 dismissOnBackPress = false,
                 dismissOnClickOutside = false,
                 decorFitsSystemWindows = false

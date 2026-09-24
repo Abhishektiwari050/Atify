@@ -26,20 +26,38 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import io.github.sekademi.spotufi.R
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+
 @Composable
 fun PlayerTopBar(
     navController: NavController,
     onMenuClick: () -> Unit,
     contextName: String = "",
     onBackClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.fillMaxWidth()
     ) {
+        // Tactile drag handle pill for slide-down gesture
+        Box(
+            modifier = Modifier
+                .padding(top = 8.dp, bottom = 4.dp)
+                .size(width = 36.dp, height = 4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.35f))
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
         Icon(
             modifier = Modifier.clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -85,3 +103,5 @@ fun PlayerTopBar(
         }
     }
 }
+}
+

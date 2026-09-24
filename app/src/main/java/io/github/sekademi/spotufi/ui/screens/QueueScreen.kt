@@ -1,5 +1,6 @@
 package io.github.sekademi.spotufi.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -207,6 +208,13 @@ fun QueueScreen(navController: NavController) {
                         QueueRow(
                             song = song,
                             highlight = false,
+                            isFirstUpcoming = upIdx == 0,
+                            onPlayNext = if (upIdx > 0) {
+                                {
+                                    playerViewModel.playNext(song)
+                                    Toast.makeText(context, "Playing next: ${song.title}", Toast.LENGTH_SHORT).show()
+                                }
+                            } else null,
                             onClick = {
                                 val idx = queue.indexOfFirst { it.id == song.id }
                                 playerViewModel.updateSongState(
@@ -252,7 +260,9 @@ fun QueueScreen(navController: NavController) {
 private fun QueueRow(
     song: io.github.sekademi.spotufi.data.entity.SongsModel,
     highlight: Boolean,
+    isFirstUpcoming: Boolean = false,
     onClick: () -> Unit,
+    onPlayNext: (() -> Unit)? = null,
     dragHandle: Modifier? = null,
 ) {
     Row(
@@ -287,23 +297,51 @@ private fun QueueRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = song.singer,
-                color = Color.Gray,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isFirstUpcoming) {
+                    Text(
+                        text = "PLAYING NEXT • ",
+                        color = Color(0xFF1ED760),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Text(
+                    text = song.singer,
+                    color = Color.Gray,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        if (!highlight && dragHandle != null) {
-            Icon(
-                imageVector = Icons.Default.Menu,
-                contentDescription = "Reorder",
-                tint = Color(0xFFB3B3B3),
-                modifier = Modifier
-                    .size(28.dp)
-                    .then(dragHandle)
-            )
+        if (!highlight) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onPlayNext != null) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_queue_add),
+                        contentDescription = "Play Next",
+                        tint = Color(0xFF1ED760),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { onPlayNext() }
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                }
+                if (dragHandle != null) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Reorder",
+                        tint = Color(0xFFB3B3B3),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .then(dragHandle)
+                    )
+                }
+            }
         }
     }
 }

@@ -21,7 +21,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -238,6 +240,11 @@ fun PlayerScreen(navController: NavController) {
             attrs.copyFrom(activityWindow.attributes)
             attrs.type = dialogWindow.attributes.type
             dialogWindow.attributes = attrs
+            // Eliminate system dialog dimming completely so the sliding player
+            // reveals the underlying screen and miniplayer without a black void.
+            dialogWindow.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            dialogWindow.setDimAmount(0f)
+            dialogWindow.setBackgroundDrawableResource(android.R.color.transparent)
             // Resize the dialog's parent view to fill the screen.
             val parentView = view.parent as? android.view.View
             parentView?.layoutParams = android.widget.FrameLayout.LayoutParams(
@@ -533,7 +540,6 @@ fun PlayerScreen(navController: NavController) {
             }
             .graphicsLayer {
                 translationY = offsetY
-                alpha = (1f - (offsetY / screenHeight)).coerceIn(0f, 1f)
             }
             .background(
                 Brush.verticalGradient(
@@ -583,7 +589,30 @@ fun PlayerScreen(navController: NavController) {
                 navController = navController,
                 onMenuClick = { showMenu = true },
                 contextName = playerViewModel.currentSongAlbum.value,
-                onBackClick = { dismissPlayer() }
+                onBackClick = { dismissPlayer() },
+                modifier = Modifier.pointerInput(screenHeight) {
+                    detectVerticalDragGestures(
+                        onDragStart = { cancelRunningAnimation() },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            offsetY = (offsetY + dragAmount).coerceIn(0f, screenHeight)
+                        },
+                        onDragEnd = {
+                            if (offsetY > screenHeight * 0.20f) {
+                                dismissPlayer()
+                            } else {
+                                launchAnimation(0f)
+                            }
+                        },
+                        onDragCancel = {
+                            if (offsetY > screenHeight * 0.20f) {
+                                dismissPlayer()
+                            } else {
+                                launchAnimation(0f)
+                            }
+                        }
+                    )
+                }
             )
             //Spacer(modifier = Modifier.padding(16.dp))
             // Swipe the artwork left/right to skip to the next/previous track. Using a
@@ -644,6 +673,51 @@ fun PlayerScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.padding(5.dp))
                 PlayerFull(songPlayingState, playerViewModel, context, isLiked, shuffle, repeat, queueSongs)
+            }
+
+            // Up Next preview bar: shows upcoming track with 1-tap navigation to change/reorder
+            val playingIdx = queueSongs.indexOfFirst { it.id == playerViewModel.currentSongId.value }
+            val nextTrack = if (playingIdx in 0 until queueSongs.size - 1) queueSongs.getOrNull(playingIdx + 1) else null
+            if (nextTrack != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 25.dp, vertical = 2.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .clickable { navController.navigate(Routes.Queue.route) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "UP NEXT",
+                            color = Color(0xFF1ED760),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${nextTrack.title} • ${nextTrack.singer}",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Text(
+                        text = "Change",
+                        color = Color(0xFFB3B3B3),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
             }
 
             // Spotify-style bottom row: current audio device (Connect) on the left,

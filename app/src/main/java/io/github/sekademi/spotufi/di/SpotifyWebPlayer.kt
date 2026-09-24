@@ -255,6 +255,47 @@ object SpotifyWebPlayer {
 
     fun play(trackId: String) = playUri("spotify:track:$trackId", "track/$trackId")
 
+    /**
+     * Reports a qualifying playback event (>30s) to Spotify's server session
+     * so it registers on the user's Spotify account for Recently Played & Wrapped.
+     */
+    fun reportTrackPlay(trackId: String) {
+        val wv = webView ?: return
+        val uri = "spotify:track:$trackId"
+        wv.post {
+            wv.evaluateJavascript(
+                """
+                (function(){
+                  try {
+                    if (window.__oriFetch && window.__spBase && window.__auth) {
+                      var base = window.__spBase || 'https://gew4-spclient.spotify.com';
+                      var devId = window.__devId || 'spotufi_player';
+                      window.__oriFetch(base + '/track-playback/v1/playback/events', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': window.__auth,
+                          'Client-Token': window.__cliToken || '',
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                          event: 'track_played',
+                          uri: '$uri',
+                          ms_played: 30000,
+                          timestamp: Date.now()
+                        })
+                      }).catch(function(){});
+                      return 'reported';
+                    }
+                  } catch(e){}
+                  return 'no-session';
+                })();
+                """.trimIndent()
+            ) { r ->
+                Log.d(TAG, "reportTrackPlay $trackId -> $r")
+            }
+        }
+    }
+
     /** Play a podcast episode (same engine as tracks). */
     fun playEpisode(episodeId: String) = playUri("spotify:episode:$episodeId", "episode/$episodeId")
 

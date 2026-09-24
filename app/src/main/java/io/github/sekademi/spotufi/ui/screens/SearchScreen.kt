@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -332,7 +334,7 @@ fun SumUpSearchScreen(
                             SearchFilter.ALL -> {
                                 items(mixed.size) { i ->
                                     when (val row = mixed[i]) {
-                                        is SearchRow.Song -> SearchSongRow(row.song, searchedList, searchViewModel, onPlayed = {
+                                        is SearchRow.Song -> SearchSongRow(row.song, searchedList, searchViewModel, navController = navController, onPlayed = {
                                             recordRecent(row.song.toRecentItem())
                                         })
                                         is SearchRow.Artist -> SearchArtistRow(row.artist) {
@@ -376,7 +378,7 @@ fun SumUpSearchScreen(
                                     item { SearchSectionHeader("Episodes") }
                                     items(results.episodes.size) { i ->
                                         val ep = results.episodes[i]
-                                        SearchSongRow(ep, results.episodes, searchViewModel, onPlayed = {
+                                        SearchSongRow(ep, results.episodes, searchViewModel, navController = navController, onPlayed = {
                                             recordRecent(ep.toRecentItem())
                                         })
                                     }
@@ -385,7 +387,7 @@ fun SumUpSearchScreen(
                             SearchFilter.SONGS -> {
                                 items(results.songs.size) { i ->
                                     val song = results.songs[i]
-                                    SearchSongRow(song, results.songs, searchViewModel, onPlayed = {
+                                    SearchSongRow(song, results.songs, searchViewModel, navController = navController, onPlayed = {
                                         recordRecent(song.toRecentItem())
                                     })
                                 }
@@ -437,7 +439,7 @@ fun SumUpSearchScreen(
                                     item { SearchSectionHeader("Episodes") }
                                     items(results.episodes.size) { i ->
                                         val ep = results.episodes[i]
-                                        SearchSongRow(ep, results.episodes, searchViewModel, onPlayed = {
+                                        SearchSongRow(ep, results.episodes, searchViewModel, navController = navController, onPlayed = {
                                             recordRecent(ep.toRecentItem())
                                         })
                                     }
@@ -566,11 +568,13 @@ fun RecentItemRow(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SearchSongRow(
     song: SongsModel,
     songList: List<SongsModel>,
     searchViewModel: SearchViewModel,
+    navController: NavController,
     onPlayed: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -580,6 +584,16 @@ fun SearchSongRow(
     val currentPlayingIndicatorColor =
         if (song.id == searchViewModel.currentSongId.value) Color(AppPalette.toArgb()) else Color.White
     val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
+    var showSongOptions by remember { mutableStateOf(false) }
+
+    if (showSongOptions) {
+        io.github.sekademi.spotufi.ui.components.SongOptionsSheet(
+            song = song,
+            navController = navController,
+            context = context,
+            onDismiss = { showSongOptions = false }
+        )
+    }
 
     SwipeToQueueBox(song = song, onAddToQueue = { playerViewModel.addToQueue(it) }) {
         Row(
@@ -588,65 +602,81 @@ fun SearchSongRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp, 8.dp)
-                .clickable(
+                .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) {
-                onPlayed()
-                // Start a radio from the tapped track (queue = this song + Spotify
-                // recommendations) rather than queuing the whole search list.
-                searchViewModel.startRadioFromSong(song)
-                SongPlayer.playSong(song.url, context)
-                searchViewModel.updateSongState(
-                    song.coverUri,
-                    song.title,
-                    song.singer,
-                    true,
-                    song.id,
-                    0,
-                    song.album,
-                )
-            },
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.Start,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    onLongClick = { showSongOptions = true },
+                    onClick = {
+                        onPlayed()
+                        // Start a radio from the tapped track (queue = this song + Spotify
+                        // recommendations) rather than queuing the whole search list.
+                        searchViewModel.startRadioFromSong(song)
+                        SongPlayer.playSong(song.url, context)
+                        searchViewModel.updateSongState(
+                            song.coverUri,
+                            song.title,
+                            song.singer,
+                            true,
+                            song.id,
+                            0,
+                            song.album,
+                        )
+                    }
+                ),
         ) {
-            AsyncImage(
-                modifier = Modifier
-                    .padding(0.dp, 0.dp, 10.dp, 0.dp)
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(6.dp)),
-                model = song.coverUri,
-                contentScale = ContentScale.Crop,
-                error = painterResource(R.drawable.placeholder),
-                placeholder = painterResource(R.drawable.placeholder),
-                contentDescription = "",
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = song.title, color = currentPlayingIndicatorColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                Text(text = "Song • ${song.singer}", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            Row(
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f).padding(end = 12.dp),
+            ) {
+                AsyncImage(
+                    modifier = Modifier
+                        .padding(0.dp, 0.dp, 10.dp, 0.dp)
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+                    model = song.coverUri,
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(R.drawable.placeholder),
+                    placeholder = painterResource(R.drawable.placeholder),
+                    contentDescription = "",
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = song.title, color = currentPlayingIndicatorColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    Text(text = "Song • ${song.singer}", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            if (isLiked) removeLikedSongId(context, song.id.toString())
+                            else addLikedSongId(context, song.id.toString())
+                            isLiked = isSongLiked(context, song.id.toString())
+                            searchViewModel.updateLikeState(!searchViewModel.likeState.value)
+                        },
+                    painter = if (isLiked) painterResource(id = R.drawable.added) else painterResource(id = R.drawable.ic_add),
+                    tint = if (isLiked) Color.White else Color.Gray,
+                    contentDescription = if (isLiked) "Remove from Liked" else "Add to Liked",
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Song options",
+                    tint = Color(0xFFB3B3B3),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { showSongOptions = true }
+                )
             }
         }
-
-        Icon(
-            modifier = Modifier
-                .size(20.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) {
-                    if (isLiked) removeLikedSongId(context, song.id.toString())
-                    else addLikedSongId(context, song.id.toString())
-                    isLiked = isSongLiked(context, song.id.toString())
-                    searchViewModel.updateLikeState(!searchViewModel.likeState.value)
-                },
-            painter = if (isLiked) painterResource(id = R.drawable.added) else painterResource(id = R.drawable.ic_add),
-            tint = if (isLiked) Color.White else Color.Gray,
-            contentDescription = "",
-        )
-    }
     }
 }
 

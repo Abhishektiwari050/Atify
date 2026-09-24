@@ -66,6 +66,7 @@ class PlaybackService : MediaLibraryService() {
     private val queueByTrackId = java.util.concurrent.ConcurrentHashMap<String, List<SongsModel>>()
     private var webPlayer: WebMediaPlayer? = null
     private var showingWeb = false
+    @Volatile private var lastReportedTrackId: String? = null
 
     private val playerListener = object : Player.Listener {
         private var lastErrorSongId: Int? = null
@@ -101,6 +102,11 @@ class PlaybackService : MediaLibraryService() {
                         .ifEmpty { completed.singer.split(",", "&", "/").map { it.trim() }.filter { it.isNotBlank() } }
                     if (artistList.isNotEmpty()) {
                         io.github.sekademi.spotufi.data.recommendation.TasteProfileEngine.recordCompletion(applicationContext, artistList)
+                    }
+                    // Report completed track to Spotify session for Spotify Wrapped & stats
+                    if (completed.spotifyTrackId.isNotBlank() && lastReportedTrackId != completed.spotifyTrackId) {
+                        lastReportedTrackId = completed.spotifyTrackId
+                        SpotifySync.reportPlayback(applicationContext, completed.spotifyTrackId, durationMs = completed.durationMs.toLong())
                     }
                 }
                 when (currentSongState.repeat.value) {
@@ -207,6 +213,7 @@ class PlaybackService : MediaLibraryService() {
 
         lifecycleScope.launch {
             snapshotFlow { currentSongState.songId.value }.collect {
+                lastReportedTrackId = null
                 mediaSession?.let { session -> updateSessionCustomLayout(session) }
                 io.github.sekademi.spotufi.ui.widget.NowPlayingWidgetProvider.updateAllWidgets(
                     this@PlaybackService,
@@ -227,6 +234,28 @@ class PlaybackService : MediaLibraryService() {
                     isPlaying,
                     currentSongState.coverUri.value,
                 )
+            }
+        }
+
+        // Periodic check: once playback passes 30s (Spotify's official Wrapped threshold),
+        // report the stream to the Spotify session so it logs to the user's Spotify account.
+        lifecycleScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(3000L)
+                val p = SongPlayer.exoPlayer
+                if (p != null && p.isPlaying) {
+                    val pos = p.currentPosition
+                    if (pos >= 30_000L) {
+                        val queue = currentSongState.queue.value
+                        val curId = currentSongState.songId.value
+                        val track = queue.firstOrNull { it.id == curId }
+                        val spotId = track?.spotifyTrackId.orEmpty()
+                        if (spotId.isNotBlank() && lastReportedTrackId != spotId) {
+                            lastReportedTrackId = spotId
+                            SpotifySync.reportPlayback(applicationContext, spotId, durationMs = p.duration)
+                        }
+                    }
+                }
             }
         }
 

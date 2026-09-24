@@ -214,6 +214,11 @@ fun HistoryScreen(navController: NavController) {
                                     value = "${history.size}",
                                     accent = Color(0xFFE8622C),
                                 )
+                                StatPill(
+                                    label = "Minutes",
+                                    value = "${(history.size * 3.5).toInt()}",
+                                    accent = Color(0xFF3D91F4),
+                                )
                             }
                         }
                     }
