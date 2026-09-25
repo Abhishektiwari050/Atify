@@ -16,9 +16,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -188,7 +192,7 @@ fun MiniPlayer(navController: NavHostController) {
             .background(darkVibrantColor)
             .graphicsLayer {
                 translationY = swipeOffsetY
-                alpha = (1f + swipeOffsetY / 150f).coerceIn(0f, 1f)
+                alpha = (1f - (kotlin.math.abs(swipeOffsetY) / 250f)).coerceIn(0f, 1f)
             }
     ) {
         Row(
@@ -198,103 +202,118 @@ fun MiniPlayer(navController: NavHostController) {
                 .height(56.dp)
                 .padding(start = 8.dp, end = 8.dp)
         ) {
-            // Draggable Track Info (Artwork + Title + Artist)
+            // Interactive Track Info (Artwork + Title + Artist)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .pointerInput(Unit) {
-                        var dragAxis = MiniPlayerDragAxis.NONE
-                        var totalDx = 0f
-                        var totalDy = 0f
-                        val distThresholdY = 25.dp.toPx()
-                        val thresholdX = 50.dp.toPx()
-                        detectDragGestures(
-                            onDragStart = {
-                                dragAxis = MiniPlayerDragAxis.NONE
-                                totalDx = 0f
-                                totalDy = 0f
-                            },
-                            onDragEnd = {
-                                when (dragAxis) {
-                                    MiniPlayerDragAxis.VERTICAL -> {
-                                        if (swipeOffsetY < -distThresholdY) {
-                                            coroutineScope.launch {
-                                                Animatable(swipeOffsetY).animateTo(-250f, tween(180)) { swipeOffsetY = value }
-                                                swipeOffsetY = 0f
+                        val touchSlop = viewConfiguration.touchSlop
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var totalDx = 0f
+                            var totalDy = 0f
+                            var hasPassedSlop = false
+                            var dragAxis = MiniPlayerDragAxis.NONE
+                            val distThresholdY = 30.dp.toPx()
+                            val thresholdX = 40.dp.toPx()
+
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+
+                                if (change.changedToUp()) {
+                                    if (!hasPassedSlop) {
+                                        // Quick tap anywhere on track info row -> open player immediately
+                                        navController.navigate(Routes.Player.route)
+                                    } else {
+                                        when (dragAxis) {
+                                            MiniPlayerDragAxis.VERTICAL -> {
+                                                if (swipeOffsetY < -distThresholdY) {
+                                                    // Swipe up -> open player
+                                                    coroutineScope.launch {
+                                                        Animatable(swipeOffsetY).animateTo(-250f, tween(180)) { swipeOffsetY = value }
+                                                        swipeOffsetY = 0f
+                                                        navController.navigate(Routes.Player.route)
+                                                    }
+                                                } else if (swipeOffsetY > distThresholdY) {
+                                                    // Swipe down -> dismiss/close mini player & pause
+                                                    coroutineScope.launch {
+                                                        Animatable(swipeOffsetY).animateTo(250f, tween(180)) { swipeOffsetY = value }
+                                                        swipeOffsetY = 0f
+                                                        miniPlayerViewModel.clearSong()
+                                                    }
+                                                } else {
+                                                    coroutineScope.launch {
+                                                        Animatable(swipeOffsetY).animateTo(0f, spring(0.75f, 400f)) { swipeOffsetY = value }
+                                                    }
+                                                }
+                                            }
+                                            MiniPlayerDragAxis.HORIZONTAL -> {
+                                                val activeQueue = miniPlayerViewModel.queue.value
+                                                if (swipeOffsetX > thresholdX) {
+                                                    // Swiped right -> play next track (forward skip)
+                                                    coroutineScope.launch {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        val startX = swipeOffsetX
+                                                        Animatable(startX).animateTo(350f, tween(140, easing = FastOutSlowInEasing)) { swipeOffsetX = value }
+                                                        miniPlayerViewModel.playNextSongs(activeQueue, context)
+                                                        swipeOffsetX = -350f
+                                                        Animatable(-350f).animateTo(0f, spring(0.8f, 400f)) { swipeOffsetX = value }
+                                                    }
+                                                } else if (swipeOffsetX < -thresholdX) {
+                                                    // Swiped left -> play previous track
+                                                    coroutineScope.launch {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        val startX = swipeOffsetX
+                                                        Animatable(startX).animateTo(-350f, tween(140, easing = FastOutSlowInEasing)) { swipeOffsetX = value }
+                                                        miniPlayerViewModel.playPreviousSong(activeQueue, context)
+                                                        swipeOffsetX = 350f
+                                                        Animatable(350f).animateTo(0f, spring(0.8f, 400f)) { swipeOffsetX = value }
+                                                    }
+                                                } else {
+                                                    coroutineScope.launch {
+                                                        Animatable(swipeOffsetX).animateTo(0f, spring(0.75f, 500f)) { swipeOffsetX = value }
+                                                    }
+                                                }
+                                            }
+                                            MiniPlayerDragAxis.NONE -> {
                                                 navController.navigate(Routes.Player.route)
                                             }
+                                        }
+                                    }
+                                    break
+                                }
+
+                                val dragAmount = change.positionChange()
+                                totalDx += dragAmount.x
+                                totalDy += dragAmount.y
+
+                                if (!hasPassedSlop) {
+                                    val distance = kotlin.math.hypot(totalDx, totalDy)
+                                    if (distance > touchSlop) {
+                                        hasPassedSlop = true
+                                        dragAxis = if (kotlin.math.abs(totalDx) >= kotlin.math.abs(totalDy)) {
+                                            MiniPlayerDragAxis.HORIZONTAL
                                         } else {
-                                            coroutineScope.launch {
-                                                Animatable(swipeOffsetY).animateTo(0f, spring(0.75f, 400f)) { swipeOffsetY = value }
-                                            }
-                                        }
-                                    }
-                                    MiniPlayerDragAxis.HORIZONTAL -> {
-                                        val activeQueue = miniPlayerViewModel.queue.value
-                                        if (swipeOffsetX > thresholdX) {
-                                            // Swiped right -> play next track (forward skip)
-                                            coroutineScope.launch {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                val startX = swipeOffsetX
-                                                Animatable(startX).animateTo(350f, tween(140, easing = FastOutSlowInEasing)) { swipeOffsetX = value }
-                                                miniPlayerViewModel.playNextSongs(activeQueue, context)
-                                                swipeOffsetX = -350f
-                                                Animatable(-350f).animateTo(0f, spring(0.8f, 400f)) { swipeOffsetX = value }
-                                            }
-                                        } else if (swipeOffsetX < -thresholdX) {
-                                            // Swiped left -> play previous track
-                                            coroutineScope.launch {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                val startX = swipeOffsetX
-                                                Animatable(startX).animateTo(-350f, tween(140, easing = FastOutSlowInEasing)) { swipeOffsetX = value }
-                                                miniPlayerViewModel.playPreviousSong(activeQueue, context)
-                                                swipeOffsetX = 350f
-                                                Animatable(350f).animateTo(0f, spring(0.8f, 400f)) { swipeOffsetX = value }
-                                            }
-                                        } else {
-                                            coroutineScope.launch {
-                                                Animatable(swipeOffsetX).animateTo(0f, spring(0.75f, 500f)) { swipeOffsetX = value }
-                                            }
-                                        }
-                                    }
-                                    MiniPlayerDragAxis.NONE -> {
-                                        if (kotlin.math.abs(totalDx) < 12f && kotlin.math.abs(totalDy) < 12f) {
-                                            navController.navigate(Routes.Player.route)
+                                            MiniPlayerDragAxis.VERTICAL
                                         }
                                     }
                                 }
-                                dragAxis = MiniPlayerDragAxis.NONE
-                            },
-                            onDragCancel = {
-                                coroutineScope.launch {
-                                    launch { Animatable(swipeOffsetY).animateTo(0f, spring(0.75f, 400f)) { swipeOffsetY = value } }
-                                    launch { Animatable(swipeOffsetX).animateTo(0f, spring(0.75f, 400f)) { swipeOffsetX = value } }
-                                }
-                                dragAxis = MiniPlayerDragAxis.NONE
-                            }
-                        ) { change, dragAmount ->
-                            change.consume()
-                            totalDx += dragAmount.x
-                            totalDy += dragAmount.y
-                            if (dragAxis == MiniPlayerDragAxis.NONE) {
-                                if (kotlin.math.abs(totalDx) > 10f || kotlin.math.abs(totalDy) > 10f) {
-                                    dragAxis = if (kotlin.math.abs(totalDx) >= kotlin.math.abs(totalDy)) {
-                                        MiniPlayerDragAxis.HORIZONTAL
-                                    } else {
-                                        MiniPlayerDragAxis.VERTICAL
+
+                                if (hasPassedSlop) {
+                                    change.consume()
+                                    when (dragAxis) {
+                                        MiniPlayerDragAxis.VERTICAL -> {
+                                            swipeOffsetY += dragAmount.y
+                                        }
+                                        MiniPlayerDragAxis.HORIZONTAL -> {
+                                            swipeOffsetX += dragAmount.x
+                                        }
+                                        MiniPlayerDragAxis.NONE -> {}
                                     }
                                 }
-                            }
-                            when (dragAxis) {
-                                MiniPlayerDragAxis.VERTICAL -> {
-                                    swipeOffsetY = (swipeOffsetY + dragAmount.y).coerceAtMost(0f)
-                                }
-                                MiniPlayerDragAxis.HORIZONTAL -> {
-                                    swipeOffsetX += dragAmount.x
-                                }
-                                MiniPlayerDragAxis.NONE -> {}
                             }
                         }
                     }

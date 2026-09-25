@@ -73,26 +73,32 @@ fun PlayerFull(
         horizontalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(20.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Icon(
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(25.dp)
+                .size(44.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
                     haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     playerViewModel.updateShuffleState(!shuffle)
-                },
-            tint = if (shuffle) Color(AppPalette.toArgb()) else Color.White,
-            painter = painterResource(id = R.drawable.ic_player_shuffle),
-            contentDescription = "Shuffle"
-        )
+                }
+        ) {
+            Icon(
+                modifier = Modifier.size(28.dp),
+                tint = if (shuffle) Color(AppPalette.toArgb()) else Color.White,
+                painter = painterResource(id = R.drawable.ic_player_shuffle),
+                contentDescription = "Shuffle"
+            )
+        }
 
-        Icon(
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(35.dp)
+                .size(48.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -100,11 +106,15 @@ fun PlayerFull(
                     haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     playerViewModel.playPreviousSong(queueSongs, context)
                     isLiked.value = isSongLiked(context, playerViewModel.currentSongId.value.toString())
-                },
-            tint = Color.White,
-            painter = painterResource(id = R.drawable.ic_player_back),
-            contentDescription = "Previous"
-        )
+                }
+        ) {
+            Icon(
+                modifier = Modifier.size(42.dp),
+                tint = Color.White,
+                painter = painterResource(id = R.drawable.ic_player_back),
+                contentDescription = "Previous"
+            )
+        }
 
         val isLocatingOrBuffering = playerViewModel.isResolving.value || playerViewModel.isBuffering.value
         if (isLocatingOrBuffering) {
@@ -134,9 +144,10 @@ fun PlayerFull(
             )
         }
 
-        Icon(
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(35.dp)
+                .size(48.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -144,17 +155,20 @@ fun PlayerFull(
                     haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     playerViewModel.playNextSongs(queueSongs, context)
                     isLiked.value = isSongLiked(context, playerViewModel.currentSongId.value.toString())
-                },
-            tint = Color.White,
-            painter = painterResource(id = R.drawable.ic_player_skip),
-            contentDescription = "Next"
-        )
+                }
+        ) {
+            Icon(
+                modifier = Modifier.size(42.dp),
+                tint = Color.White,
+                painter = painterResource(id = R.drawable.ic_player_skip),
+                contentDescription = "Next"
+            )
+        }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(width = 32.dp, height = 40.dp)
+                .size(44.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -168,35 +182,40 @@ fun PlayerFull(
                     playerViewModel.updateRepeatState(nextRepeat)
                 }
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(24.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Icon(
-                    modifier = Modifier.size(20.dp),
-                    tint = if (repeat != RepeatMode.OFF) Color(0xFF1ED760) else Color.White,
-                    painter = painterResource(id = R.drawable.ic_repeat),
-                    contentDescription = "Repeat"
-                )
-                if (repeat == RepeatMode.ONE) {
-                    Text(
-                        text = "1",
-                        color = Color(0xFF1ED760),
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.offset(y = (-1).dp)
-                    )
-                }
-            }
-            if (repeat != RepeatMode.OFF) {
-                Spacer(modifier = Modifier.height(2.dp))
                 Box(
-                    modifier = Modifier
-                        .size(4.dp)
-                        .background(Color(0xFF1ED760), shape = CircleShape)
-                )
-            } else {
-                Spacer(modifier = Modifier.height(6.dp))
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        modifier = Modifier.size(28.dp),
+                        tint = if (repeat != RepeatMode.OFF) Color(0xFF1ED760) else Color.White,
+                        painter = painterResource(id = R.drawable.ic_repeat),
+                        contentDescription = "Repeat"
+                    )
+                    if (repeat == RepeatMode.ONE) {
+                        Text(
+                            text = "1",
+                            color = Color(0xFF1ED760),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.offset(y = (-1).dp)
+                        )
+                    }
+                }
+                if (repeat != RepeatMode.OFF) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .background(Color(0xFF1ED760), shape = CircleShape)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
             }
         }
     }

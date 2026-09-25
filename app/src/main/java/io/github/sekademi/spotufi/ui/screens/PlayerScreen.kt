@@ -275,23 +275,25 @@ fun PlayerScreen(navController: NavController) {
         dismissPlayer()
     }
 
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+
     // Create nested scroll connection to handle drag gestures
-    val nestedScrollConnection = remember(screenHeight) {
+    val nestedScrollConnection = remember(screenHeight, lazyListState) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
                 // Only cancel ongoing slide animations when the USER is physically
-                // dragging.  Fling-driven scroll events must not interfere.
+                // dragging. Fling-driven scroll events must not interfere.
                 if (source == NestedScrollSource.UserInput) {
                     cancelRunningAnimation()
                 }
-                // If the player is currently offset (offsetY > 0) and the user
-                // drags up (delta < 0), consume the drag to slide the player back
-                // up towards 0.
-                if (offsetY > 0f && delta < 0f) {
+                val isAtTop = lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset == 0
+                // If dragging down (delta > 0) while at the top of content, or if screen is already offset
+                if ((isAtTop && delta > 0f) || (offsetY > 0f)) {
+                    val prevOffset = offsetY
                     val newOffset = (offsetY + delta).coerceIn(0f, screenHeight)
                     offsetY = newOffset
-                    return Offset(0f, delta)
+                    return Offset(0f, newOffset - prevOffset)
                 }
                 return Offset.Zero
             }
@@ -305,11 +307,12 @@ fun PlayerScreen(navController: NavController) {
                 if (source == NestedScrollSource.UserInput) {
                     cancelRunningAnimation()
                 }
-                // Unconsumed downward scroll (delta > 0) because the list is at
-                // the top — translate the player screen down.
+                // Unconsumed downward scroll (delta > 0)
                 if (delta > 0f) {
-                    offsetY = (offsetY + delta).coerceIn(0f, screenHeight)
-                    return Offset(0f, delta)
+                    val prevOffset = offsetY
+                    val newOffset = (offsetY + delta).coerceIn(0f, screenHeight)
+                    offsetY = newOffset
+                    return Offset(0f, newOffset - prevOffset)
                 }
                 return Offset.Zero
             }
@@ -319,9 +322,9 @@ fun PlayerScreen(navController: NavController) {
                 // to either 0f (open) or screenHeight (dismiss).
                 if (offsetY > 0f) {
                     val targetValue = when {
-                        available.y < -500f -> 0f
-                        available.y > 500f -> screenHeight
-                        else -> if (offsetY > screenHeight * 0.25f) screenHeight else 0f
+                        available.y < -300f -> 0f
+                        available.y > 300f -> screenHeight
+                        else -> if (offsetY > screenHeight * 0.15f) screenHeight else 0f
                     }
                     val job = coroutineScope.launch {
                         slideTo(targetValue, available.y)
@@ -579,6 +582,7 @@ fun PlayerScreen(navController: NavController) {
             )
         }
         androidx.compose.foundation.lazy.LazyColumn(
+            state = lazyListState,
             modifier = Modifier
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -605,14 +609,14 @@ fun PlayerScreen(navController: NavController) {
                             offsetY = (offsetY + dragAmount).coerceIn(0f, screenHeight)
                         },
                         onDragEnd = {
-                            if (offsetY > screenHeight * 0.20f) {
+                            if (offsetY > screenHeight * 0.15f) {
                                 dismissPlayer()
                             } else {
                                 launchAnimation(0f)
                             }
                         },
                         onDragCancel = {
-                            if (offsetY > screenHeight * 0.20f) {
+                            if (offsetY > screenHeight * 0.15f) {
                                 dismissPlayer()
                             } else {
                                 launchAnimation(0f)

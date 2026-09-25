@@ -241,4 +241,21 @@ class CurrentSongState @Inject constructor() {
             )
         }
     }
+
+    fun clearSong() {
+        SongPlayer.pause()
+        _title.value = ""
+        _album.value = ""
+        _singer.value = ""
+        _coverUri.value = ""
+        _playingState.value = false
+        _songIndex.value = 0
+        _songId.value = 0
+        _songUrl.value = ""
+        _artistIds.value = ""
+        _resolveError.value = null
+        _isResolving.value = false
+        _isBuffering.value = false
+        SongPlayer.setNowPlayingMeta("", "", "")
+    }
 }

@@ -359,6 +359,10 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
     fun updateLikeState(likeState : Boolean){
         currentSongState.updateLikeState(likeState)
     }
+
+    fun clearSong() {
+        currentSongState.clearSong()
+    }
 }
 
 /**
