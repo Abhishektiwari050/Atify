@@ -11,6 +11,9 @@ on:
 jobs:
   build-and-upload-apk:
     runs-on: ubuntu-latest
+    env:
+      GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
 
     steps:
       - name: Checkout repository
@@ -19,7 +22,7 @@ jobs:
           fetch-depth: 1
 
       - name: Import GPG key
-        if: "${{ secrets.GPG_PRIVATE_KEY != '' }}"
+        if: env.GPG_KEY != ''
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -40,12 +43,12 @@ jobs:
         run: chmod +x gradlew
 
       - name: Decode keystore
-        if: "${{ secrets.KEYSTORE_BASE64 != '' }}"
+        if: env.KEYSTORE_B64 != ''
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.jks
 
       - name: Verify keystore credentials
-        if: "${{ secrets.KEYSTORE_BASE64 != '' }}"
+        if: env.KEYSTORE_B64 != ''
         uses: Appegy/verify-keystore-action@v1.1.0
         with:
           keystore-path: app/release.jks
@@ -81,7 +84,7 @@ jobs:
           cd app/build/outputs/apk/release
           for apk in *.apk; do
             sha256sum "$apk" | cut -d " " -f 1 > "$apk.sha256"
-            if command -v gpg >/dev/null 2>&1 && [ "${{ secrets.GPG_PRIVATE_KEY != '' }}" = "true" ]; then
+            if command -v gpg >/dev/null 2>&1 && [ -n "$GPG_KEY" ]; then
               gpg --batch --yes --detach-sig "$apk.sha256" || true
             fi
           done
