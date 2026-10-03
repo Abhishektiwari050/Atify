@@ -43,8 +43,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.SpotifySync
+import io.github.sekademi.spotufi.data.entity.SongsModel
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import kotlinx.coroutines.delay
@@ -65,6 +68,7 @@ fun PlayerInfo(
     spotifyTrackId: String = "",
     onShowSavedIn: (() -> Unit)? = null,
     onQualityClick: (() -> Unit)? = null,
+    currentSong: SongsModel? = null,
 ) {
     var snackbarMessage by remember { mutableStateOf("") }
     var snackbarVisible by remember { mutableStateOf(false) }
@@ -194,10 +198,22 @@ fun PlayerInfo(
                             return@clickable
                         }
                         if (isLiked.value) {
-                            removeLikedSongId(context, songId.toString())
+                            removeLikedSong(context, songId.toString())
                             snackbarMessage = "Removed from Liked Songs"
                         } else {
-                            addLikedSongId(context, songId.toString())
+                            val trackToLike = currentSong ?: SongsModel(
+                                id = songId,
+                                title = songTitle,
+                                singer = songSinger,
+                                coverUri = "",
+                                album = "",
+                                url = "",
+                                spotifyTrackId = spotifyTrackId,
+                                explicit = false,
+                                durationMs = 0,
+                                artistIds = "",
+                            )
+                            addLikedSong(context, trackToLike)
                             snackbarMessage = "Added to Liked Songs"
                         }
                         snackbarVisible = true

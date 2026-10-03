@@ -55,8 +55,10 @@ import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import io.github.sekademi.spotufi.data.entity.SongsModel
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.navigation.albumRoute
@@ -144,7 +146,7 @@ fun SongOptionsSheet(
             }
             SongMenuRow(
                 Icons.Default.Add, "Add to playlist",
-                enabled = song.spotifyTrackId.isNotBlank(), trailingArrow = true,
+                enabled = true, trailingArrow = true,
             ) {
                 showSavedIn = true
             }
@@ -153,11 +155,13 @@ fun SongOptionsSheet(
                 label = if (liked) "Remove from Liked Songs" else "Add to Liked Songs",
                 iconTint = if (liked) Color(AppPalette.toArgb()) else Color.White,
             ) {
-                if (liked) removeLikedSongId(context, song.id.toString())
-                else addLikedSongId(context, song.id.toString())
+                if (liked) removeLikedSong(context, song.id.toString())
+                else addLikedSong(context, song)
                 liked = !liked
-                // Mirror the like to the real Spotify account.
-                io.github.sekademi.spotufi.data.api.SpotifySync.setTrackSaved(context, song.spotifyTrackId, liked)
+                // Mirror the like to the real Spotify account if available.
+                if (song.spotifyTrackId.isNotBlank()) {
+                    io.github.sekademi.spotufi.data.api.SpotifySync.setTrackSaved(context, song.spotifyTrackId, liked)
+                }
             }
             SongMenuRow(
                 icon = if (downloaded) Icons.Default.CheckCircle else ImageVector.vectorResource(R.drawable.ic_download),

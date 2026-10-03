@@ -161,7 +161,49 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
         val seeds = queueSongs.takeLast(5)
             .mapNotNull { it.spotifyTrackId.ifBlank { null } }
             .distinct()
-        if (seeds.isEmpty()) return
+        if (seeds.isEmpty()) {
+            val lastTrack = queueSongs.lastOrNull() ?: return
+            val query = listOf(lastTrack.singer, lastTrack.title).filter { it.isNotBlank() }.joinToString(" ")
+            if (query.isBlank()) return
+            radioLoading = true
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val ytRes = com.metrolist.innertube.YouTube.search(query, com.metrolist.innertube.YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    val existing = currentSongState.queue.value
+                    val existingIds = existing.map { it.id }.toSet()
+                    val freshYt = ytRes?.items.orEmpty().mapNotNull { item ->
+                        when (item) {
+                            is com.metrolist.innertube.models.SongItem -> {
+                                val artistName = item.artists.joinToString(", ") { it.name }.ifBlank { "YouTube" }
+                                val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                                val id = ("yt:${item.id}").hashCode() and 0x7fffffff
+                                if (id in existingIds) return@mapNotNull null
+                                SongsModel(
+                                    id = id,
+                                    title = item.title,
+                                    album = item.album?.name ?: "Single",
+                                    singer = artistName,
+                                    coverUri = item.thumbnail,
+                                    url = "youtube:${item.id}|$cleanTitle $artistName",
+                                    spotifyTrackId = "",
+                                    explicit = item.explicit,
+                                    durationMs = (item.duration ?: 0) * 1000,
+                                )
+                            }
+                            else -> null
+                        }
+                    }
+                    if (freshYt.isNotEmpty()) {
+                        currentSongState.updateQueue(existing + freshYt)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("PlayerViewModel", "YouTube radio extension failed: ${e.message}")
+                } finally {
+                    radioLoading = false
+                }
+            }
+            return
+        }
         radioLoading = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -195,25 +237,34 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
         // A crossfade is already advancing the queue itself — don't double-skip.
         if (SongPlayer.isCrossfadeActive()) return
         val cur = currentPositionIn(queueSongs)
-        // Top up the queue with Spotify recommendations as we approach the end.
+        // Top up the queue with recommendations as we approach the end.
         maybeExtendRadio(queueSongs, cur)
-        if (cur >= queueSongs.size - 1 && autoplayRadioEnabled) {
-            // End of the queue (e.g. a single). Don't loop back to the start —
-            // wait for the radio fetch kicked off above to append tracks and
-            // continue into them, like Spotify's autoplay.
-            continueIntoRadio(queueSongs, context)
-            return
-        }
-        val nextIdx = if (cur < queueSongs.size - 1) {
-            cur + 1
-        } else {
-            if (currentSongState.repeat.value == RepeatMode.ALL) {
-                0
+        if (cur >= queueSongs.size - 1) {
+            if (autoplayRadioEnabled) {
+                // Wait for the radio fetch kicked off above to append tracks and
+                // continue into them, like Spotify's autoplay.
+                continueIntoRadio(queueSongs, context)
+                return
+            } else if (currentSongState.repeat.value == RepeatMode.ALL && queueSongs.size > 1) {
+                val nextSong = queueSongs.firstOrNull() ?: return
+                updateSongState(
+                    nextSong.coverUri,
+                    nextSong.title,
+                    nextSong.singer,
+                    true,
+                    nextSong.id,
+                    0,
+                    nextSong.album
+                )
+                SongPlayer.playSong(nextSong.url, context)
+                return
             } else {
+                // At end of queue and repeat is OFF or single track — do not restart from 0:00!
                 return
             }
         }
-        val nextSong = queueSongs[nextIdx]
+        val nextIdx = cur + 1
+        val nextSong = queueSongs.getOrNull(nextIdx) ?: return
         updateSongState(
             nextSong.coverUri,
             nextSong.title,
@@ -258,40 +309,52 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
 
     @Volatile private var awaitingRadioContinue = false
 
-    /** Waits (max ~10s) for the autoplay radio to extend the queue past
-     *  [queueSongs] and plays the first appended track; falls back to looping
-     *  the queue if no radio tracks arrive. */
+    /** Waits (max ~6s) for the autoplay radio to extend the queue past
+     *  [queueSongs] and plays the first appended track; never replays the current song from start! */
     private fun continueIntoRadio(queueSongs: List<SongsModel>, context: Context) {
         if (awaitingRadioContinue) return
         awaitingRadioContinue = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                repeat(40) {
+                repeat(25) {
                     val q = currentSongState.queue.value
                     if (q.size > queueSongs.size) {
-                        val next = q[queueSongs.size]
-                        withContext(Dispatchers.Main) {
-                            updateSongState(next.coverUri, next.title, next.singer, true, next.id, queueSongs.size, next.album)
-                            SongPlayer.playSong(next.url, context)
+                        val next = q.getOrNull(queueSongs.size)
+                        if (next != null) {
+                            withContext(Dispatchers.Main) {
+                                updateSongState(next.coverUri, next.title, next.singer, true, next.id, queueSongs.size, next.album)
+                                SongPlayer.playSong(next.url, context)
+                            }
+                            return@launch
+                        }
+                    }
+                    if (!radioLoading) {
+                        // Radio finished loading. Only loop if repeat == ALL on multiple tracks.
+                        if (currentSongState.repeat.value == RepeatMode.ALL && queueSongs.size > 1) {
+                            val first = queueSongs.firstOrNull() ?: return@launch
+                            if (first.id != currentSongId.value) {
+                                withContext(Dispatchers.Main) {
+                                    updateSongState(first.coverUri, first.title, first.singer, true, first.id, 0, first.album)
+                                    SongPlayer.playSong(first.url, context)
+                                }
+                            }
                         }
                         return@launch
                     }
-                    if (!radioLoading) {
-                        val first = queueSongs.first()
+                    delay(200L)
+                }
+                // Timed out:
+                if (currentSongState.repeat.value == RepeatMode.ALL && queueSongs.size > 1) {
+                    val first = queueSongs.firstOrNull() ?: return@launch
+                    if (first.id != currentSongId.value) {
                         withContext(Dispatchers.Main) {
                             updateSongState(first.coverUri, first.title, first.singer, true, first.id, 0, first.album)
                             SongPlayer.playSong(first.url, context)
                         }
-                        return@launch
                     }
-                    delay(250L)
                 }
-                // Radio never arrived (offline / no seed id) — loop like before.
-                val first = queueSongs.first()
-                withContext(Dispatchers.Main) {
-                    updateSongState(first.coverUri, first.title, first.singer, true, first.id, 0, first.album)
-                    SongPlayer.playSong(first.url, context)
-                }
+            } catch (e: Exception) {
+                android.util.Log.e("PlayerViewModel", "continueIntoRadio error: ${e.message}")
             } finally {
                 awaitingRadioContinue = false
             }
@@ -320,13 +383,13 @@ class PlayerViewModel @Inject constructor(private val currentSongState: CurrentS
         val prevIdx = if (cur > 0) {
             cur - 1
         } else {
-            if (currentSongState.repeat.value == RepeatMode.ALL) {
+            if (currentSongState.repeat.value == RepeatMode.ALL && queueSongs.size > 1) {
                 queueSongs.size - 1
             } else {
                 return
             }
         }
-        val previousSong = queueSongs[prevIdx]
+        val previousSong = queueSongs.getOrNull(prevIdx) ?: return
         updateSongState(previousSong.coverUri, previousSong.title, previousSong.singer, true, previousSong.id, prevIdx, previousSong.album)
         SongPlayer.playSong(previousSong.url, context)
     }

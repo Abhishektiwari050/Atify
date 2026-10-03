@@ -64,6 +64,7 @@ import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.SpotifySync
 import io.github.sekademi.spotufi.data.preferences.AlternativeStream
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.alternativeStreamKey
 import io.github.sekademi.spotufi.data.preferences.clearAlternativeStream
@@ -71,6 +72,7 @@ import io.github.sekademi.spotufi.data.preferences.getAlternativeStream
 import io.github.sekademi.spotufi.data.preferences.isDownloaded
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.data.preferences.removeDownload
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.data.preferences.setLocalAlternativeStream
 import io.github.sekademi.spotufi.data.preferences.setYouTubeAlternativeStream
@@ -250,9 +252,21 @@ fun PlayerOptionsSheet(
                     label = if (isLiked.value) "Remove from Liked Songs" else "Add to Liked Songs"
                 ) {
                     if (isLiked.value) {
-                        removeLikedSongId(context, songId.toString())
+                        removeLikedSong(context, songId.toString())
                     } else {
-                        addLikedSongId(context, songId.toString())
+                        val track = currentSong ?: io.github.sekademi.spotufi.data.entity.SongsModel(
+                            id = songId,
+                            title = title,
+                            album = album,
+                            singer = singer,
+                            coverUri = cover,
+                            url = "",
+                            spotifyTrackId = "",
+                            explicit = false,
+                            durationMs = 0,
+                            artistIds = "",
+                        )
+                        addLikedSong(context, track)
                     }
                     isLiked.value = isSongLiked(context, songId.toString())
                     SpotifySync.setTrackSaved(

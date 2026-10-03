@@ -133,6 +133,10 @@ fun LikedSongsScreen(navController: NavController) {
 
     val songs = (songsResp as? Response.Success)?.data.orEmpty()
 
+    LaunchedEffect(Unit) {
+        likedSongsViewModel.refresh()
+    }
+
     LaunchedEffect(songs) {
         if (songs.isNotEmpty()) {
             SongPlayer.prefetchList(songs.map { it.url }, context)

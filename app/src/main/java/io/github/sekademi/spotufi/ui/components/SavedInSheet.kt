@@ -56,8 +56,10 @@ import com.metrolist.spotify.models.SpotifyPlaylist
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.SpotifySync
 import io.github.sekademi.spotufi.data.entity.SongsModel
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -196,9 +198,11 @@ fun SavedInSheet(
                 },
             ) {
                 liked = !liked
-                if (liked) addLikedSongId(context, song.id.toString())
-                else removeLikedSongId(context, song.id.toString())
-                SpotifySync.setTrackSaved(context, song.spotifyTrackId, liked)
+                if (liked) addLikedSong(context, song)
+                else removeLikedSong(context, song.id.toString())
+                if (song.spotifyTrackId.isNotBlank()) {
+                    SpotifySync.setTrackSaved(context, song.spotifyTrackId, liked)
+                }
                 onLikedChanged(liked)
             }
 

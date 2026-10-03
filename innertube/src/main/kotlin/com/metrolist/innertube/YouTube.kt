@@ -67,14 +67,20 @@ object YouTube {
 
     suspend fun search(query: String, filter: SearchFilter): Result<SearchResult> = runCatching {
         val response = innerTube.search(WEB_REMIX, query, filter.value).body<SearchResponse>()
-        val shelves = response.contents?.tabbedSearchResultsRenderer?.tabs?.firstOrNull()
+        val sectionContents = response.contents?.tabbedSearchResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer?.contents
-            ?.mapNotNull { it.musicShelfRenderer }
             .orEmpty()
+        val shelves = sectionContents.mapNotNull { it.musicShelfRenderer }
+        val cardShelfItems = sectionContents.mapNotNull { it.musicCardShelfRenderer }
+            .flatMap { card ->
+                card.contents?.mapNotNull { it.musicResponsiveListItemRenderer }?.mapNotNull { SearchPage.toYTItem(it) } ?: emptyList()
+            }
+        val shelfItems = shelves.flatMap { shelf ->
+            shelf.contents?.getItems()?.mapNotNull { SearchPage.toYTItem(it) } ?: emptyList()
+        }
+        val allItems = (cardShelfItems + shelfItems).distinctBy { it.id }
         SearchResult(
-            items = shelves.flatMap { shelf ->
-                shelf.contents?.getItems()?.mapNotNull { SearchPage.toYTItem(it) } ?: emptyList()
-            }.distinctBy { it.id },
+            items = allItems,
             continuation = shelves.firstOrNull { it.continuations != null }
                 ?.continuations?.getContinuation()
         )

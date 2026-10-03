@@ -43,7 +43,7 @@ class LikedSongsViewModel @Inject constructor(
         currentSongState.updateSongState(coverUri, title, singer, playingState, songId, songIndex, album)
     }
 
-    init {
+    fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {
             repository.provideLikedSongs().collect { response ->
                 _songs.value = if (response is Response.Success) {
@@ -53,6 +53,10 @@ class LikedSongsViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    init {
+        refresh()
     }
 
     /** Drops an unliked song from the displayed list without a refetch. */

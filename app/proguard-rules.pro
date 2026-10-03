@@ -107,3 +107,17 @@
 -dontwarn java.lang.management.ManagementFactory
 -dontwarn java.lang.management.RuntimeMXBean
 -dontwarn javax.script.ScriptEngineFactory
+
+# NewPipeExtractor reflection and parsers (crucial for YouTube extraction)
+-keep class org.schabi.newpipe.extractor.** { *; }
+-dontwarn org.schabi.newpipe.extractor.**
+
+# Jsoup HTML parsing
+-keep class org.jsoup.** { *; }
+-dontwarn org.jsoup.**
+
+# InnerTube and music utilities
+-keep class com.metrolist.music.** { *; }
+-keep class com.metrolist.innertube.** { *; }
+-dontwarn com.metrolist.innertube.**
+

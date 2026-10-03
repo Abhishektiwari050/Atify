@@ -54,8 +54,10 @@ import io.github.sekademi.spotufi.data.entity.AlbumsModel
 import io.github.sekademi.spotufi.data.entity.ArtistOverviewModel
 import io.github.sekademi.spotufi.data.entity.ArtistTrackUi
 import io.github.sekademi.spotufi.data.entity.ArtistsModel
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.data.entity.SongsModel
 import io.github.sekademi.spotufi.di.SongPlayer
@@ -496,8 +498,8 @@ private fun PopularTrackRow(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ) {
-                        if (isLiked) removeLikedSongId(context, song.id.toString())
-                        else addLikedSongId(context, song.id.toString())
+                        if (isLiked) removeLikedSong(context, song.id.toString())
+                        else addLikedSong(context, song)
                         isLiked = isSongLiked(context, song.id.toString())
                         artistViewModel.updateLikeState(!artistViewModel.likeState.value)
                     },

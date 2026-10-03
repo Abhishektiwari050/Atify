@@ -673,6 +673,7 @@ fun PlayerScreen(navController: NavController) {
                     spotifyTrackId = queueSongs.firstOrNull { it.id == songId }?.spotifyTrackId.orEmpty(),
                     onShowSavedIn = { showSavedIn = true },
                     onQualityClick = { showAudioDetails = true },
+                    currentSong = queueSongs.firstOrNull { it.id == songId },
                 )
 
                 PlayerProgress(

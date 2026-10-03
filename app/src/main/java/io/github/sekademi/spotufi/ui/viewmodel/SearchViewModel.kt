@@ -47,17 +47,72 @@ class SearchViewModel @Inject constructor(private val repository: AppRepository,
 
     fun addAllToQueue(songs: List<SongsModel>) = currentSongState.addAllToQueue(songs)
 
+    fun playSongFromList(song: SongsModel, list: List<SongsModel>, context: android.content.Context) {
+        val effectiveList = if (list.isNotEmpty() && list.any { it.id == song.id }) list else listOf(song)
+        val index = effectiveList.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+        currentSongState.updateQueue(effectiveList)
+        updateSongState(
+            song.coverUri,
+            song.title,
+            song.singer,
+            true,
+            song.id,
+            index,
+            song.album
+        )
+        io.github.sekademi.spotufi.di.SongPlayer.playSong(song.url, context)
+
+        if (effectiveList.size <= 1) {
+            startRadioFromSong(song)
+        }
+    }
+
     /**
      * Start playback of a single search result as a *radio*, the way Spotify does:
-     * the queue becomes just this track, then Spotify-recommended tracks (seeded from
-     * it) are appended as they load — instead of queuing the rest of the search list
-     * (which made playback "just go down the search results"). The append is skipped
-     * if the user has since started something else.
+     * the queue becomes just this track, then recommended tracks (Spotify or YouTube)
+     * are appended as they load.
      */
     fun startRadioFromSong(song: SongsModel) {
         currentSongState.updateQueue(listOf(song))
         val seed = song.spotifyTrackId
-        if (seed.isBlank()) return
+        if (seed.isBlank()) {
+            val query = listOf(song.singer, song.title).filter { it.isNotBlank() }.joinToString(" ")
+            if (query.isBlank()) return
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val ytRes = com.metrolist.innertube.YouTube.search(query, com.metrolist.innertube.YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    val current = currentSongState.queue.value
+                    if (current.size == 1 && current.first().id == song.id) {
+                        val fresh = ytRes?.items.orEmpty().mapNotNull { item ->
+                            when (item) {
+                                is com.metrolist.innertube.models.SongItem -> {
+                                    val artistName = item.artists.joinToString(", ") { it.name }.ifBlank { "YouTube" }
+                                    val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                                    val id = ("yt:${item.id}").hashCode() and 0x7fffffff
+                                    if (id == song.id) return@mapNotNull null
+                                    SongsModel(
+                                        id = id,
+                                        title = item.title,
+                                        album = item.album?.name ?: "Single",
+                                        singer = artistName,
+                                        coverUri = item.thumbnail,
+                                        url = "youtube:${item.id}|$cleanTitle $artistName",
+                                        spotifyTrackId = "",
+                                        explicit = item.explicit,
+                                        durationMs = (item.duration ?: 0) * 1000,
+                                    )
+                                }
+                                else -> null
+                            }
+                        }
+                        if (fresh.isNotEmpty()) currentSongState.updateQueue(current + fresh)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("SearchViewModel", "YouTube radio lookup failed: ${e.message}")
+                }
+            }
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             val recs = repository.provideRecommendations(listOf(seed))
             val current = currentSongState.queue.value

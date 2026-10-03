@@ -277,8 +277,8 @@ class Api @Inject constructor(
             val albums = spRes?.albums?.items.orEmpty().map { it.toAlbumModel() }
             val artists = spRes?.artists?.items.orEmpty().map { it.toArtistModel() }
 
-            // 2. Process YouTube songs
-            val ytSongs = ytSongRes?.items.orEmpty().mapNotNull { item ->
+            // 2. Process YouTube songs (both song shelf items and video search items)
+            val ytSongsFromMusic = ytSongRes?.items.orEmpty().mapNotNull { item ->
                 when (item) {
                     is SongItem -> {
                         val artistName = item.artists.joinToString(", ") { it.name }.ifBlank { "YouTube" }
@@ -298,6 +298,31 @@ class Api @Inject constructor(
                     else -> null
                 }
             }
+
+            val ytSongsFromVideos = ytVideoRes?.items.orEmpty().mapNotNull { item ->
+                when (item) {
+                    is SongItem -> {
+                        if (!item.isEpisode) {
+                            val artistName = item.artists.joinToString(", ") { it.name }.ifBlank { "YouTube" }
+                            val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                            SongsModel(
+                                id = stableId("yt:${item.id}"),
+                                title = item.title,
+                                album = item.album?.name ?: "YouTube",
+                                singer = artistName,
+                                coverUri = item.thumbnail,
+                                url = "youtube:${item.id}|$cleanTitle $artistName",
+                                spotifyTrackId = "",
+                                explicit = item.explicit,
+                                durationMs = (item.duration ?: 0) * 1000,
+                            )
+                        } else null
+                    }
+                    else -> null
+                }
+            }
+
+            val ytSongs = (ytSongsFromMusic + ytSongsFromVideos).distinctBy { it.id }
 
             // Deduplicate: start with Spotify songs, then append unique YouTube songs
             val spSongKeys = spSongs.map {
@@ -909,20 +934,37 @@ class Api @Inject constructor(
         val map = java.util.concurrent.ConcurrentHashMap<String, Entry>()
     }
 
-    /** The user's Spotify "Liked Songs" (saved tracks) as playable songs. */
+    /** The user's Liked Songs (local/YouTube + Spotify saved tracks) as playable songs. */
     suspend fun getLikedSongs(): Flow<Response<List<SongsModel>>> = flow {
-        emit(Response.Loading())
-        if (!SpotifyTokenProvider.ensureToken(context)) {
-            emit(Response.Error("Spotify not authenticated")); return@flow
+        val localLiked = io.github.sekademi.spotufi.data.preferences.getLocalLikedSongs(context)
+        if (localLiked.isNotEmpty()) {
+            emit(Response.Success(localLiked))
+        } else {
+            emit(Response.Loading())
         }
+
+        if (!SpotifyTokenProvider.ensureToken(context)) {
+            if (localLiked.isNotEmpty()) {
+                emit(Response.Success(localLiked))
+            } else {
+                emit(Response.Error("Spotify not authenticated"))
+            }
+            return@flow
+        }
+
         Spotify.likedSongs(limit = 50).fold(
             onSuccess = { first ->
                 val models = first.items.map { it.track.toSongModel() }.toMutableList()
-                // Seed the local like registry so hearts/menus show these as liked
-                // and unliking them can be mirrored back to Spotify.
                 models.forEach { io.github.sekademi.spotufi.data.preferences.addLikedSongId(context, it.id.toString()) }
-                // First page immediately, then page through the whole library.
-                emit(Response.Success(models.toList()))
+
+                fun buildMerged(): List<SongsModel> {
+                    val freshLocal = io.github.sekademi.spotufi.data.preferences.getLocalLikedSongs(context)
+                    val localKeys = freshLocal.map { it.id }.toSet()
+                    val filteredSp = models.filterNot { it.id in localKeys }
+                    return freshLocal + filteredSp
+                }
+
+                emit(Response.Success(buildMerged()))
                 var offset = first.items.size
                 while (offset < first.total && first.items.isNotEmpty()) {
                     val page = Spotify.likedSongs(limit = 50, offset = offset).getOrNull() ?: break
@@ -931,10 +973,18 @@ class Api @Inject constructor(
                     pageModels.forEach { io.github.sekademi.spotufi.data.preferences.addLikedSongId(context, it.id.toString()) }
                     models += pageModels
                     offset += page.items.size
-                    emit(Response.Success(models.toList()))
+                    emit(Response.Success(buildMerged()))
                 }
             },
-            onFailure = { Log.e("Api", "getLikedSongs failed", it); emit(Response.Error(it.message ?: "error")) },
+            onFailure = {
+                Log.e("Api", "getLikedSongs failed", it)
+                val currentLocal = io.github.sekademi.spotufi.data.preferences.getLocalLikedSongs(context)
+                if (currentLocal.isNotEmpty()) {
+                    emit(Response.Success(currentLocal))
+                } else {
+                    emit(Response.Error(it.message ?: "error"))
+                }
+            },
         )
     }
 

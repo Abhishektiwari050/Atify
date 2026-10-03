@@ -507,19 +507,23 @@ object SongPlayer {
                         return@withContext
                     }
                     ensurePlayer(appContext)
+                    val p = player ?: run {
+                        updateResolveStatus(false)
+                        return@withContext
+                    }
                     val currentSongModel = boundState?.queue?.value?.firstOrNull { it.url == song }
                     val initialItem = if (currentSongModel != null) {
                         buildMediaItemWithSong(streamUrl, currentSongModel)
                     } else {
                         buildMediaItem(streamUrl, mediaId = song)
                     }
-                    player!!.setMediaItem(initialItem)
-                    player!!.prepare()
+                    p.setMediaItem(initialItem)
+                    p.prepare()
                     if (song == restoreQuery && restorePositionMs > 0) {
-                        player!!.seekTo(restorePositionMs)
+                        p.seekTo(restorePositionMs)
                     }
                     restoreQuery = null
-                    player!!.playWhenReady = playWhenResolved
+                    p.playWhenReady = playWhenResolved
                     loadedQuery = song
                     updateResolveStatus(false)
                 }

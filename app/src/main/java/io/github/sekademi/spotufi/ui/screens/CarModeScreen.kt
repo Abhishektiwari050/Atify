@@ -52,8 +52,11 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
+import io.github.sekademi.spotufi.data.entity.SongsModel
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel
@@ -261,10 +264,22 @@ fun CarModeScreen(navController: NavController) {
                                 indication = null,
                             ) {
                                 if (isLiked) {
-                                    removeLikedSongId(context, currentId.toString())
+                                    removeLikedSong(context, currentId.toString())
                                     isLiked = false
                                 } else {
-                                    addLikedSongId(context, currentId.toString())
+                                    val currentTrack = playerViewModel.queue.value.firstOrNull { it.id == currentId } ?: SongsModel(
+                                        id = currentId,
+                                        title = currentTitle,
+                                        singer = currentSinger,
+                                        coverUri = currentCover,
+                                        album = "",
+                                        url = "",
+                                        spotifyTrackId = "",
+                                        explicit = false,
+                                        durationMs = 0,
+                                        artistIds = "",
+                                    )
+                                    addLikedSong(context, currentTrack)
                                     isLiked = true
                                 }
                             }

@@ -61,10 +61,12 @@ import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.data.entity.AlbumsModel
 import io.github.sekademi.spotufi.data.entity.SongsModel
 import io.github.sekademi.spotufi.data.preferences.addLikedAlbumId
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isAlbumLiked
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.data.preferences.removeLikedAlbumId
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
@@ -537,9 +539,9 @@ fun SumUpAlbumScreen(
                                     indication = null
                                 ) {
                                     if (isLiked) {
-                                        removeLikedSongId(context, songId.toString())
+                                        removeLikedSong(context, songId.toString())
                                     } else {
-                                        addLikedSongId(context, songId.toString())
+                                        addLikedSong(context, albumSongs[song])
                                     }
                                     isLiked = isSongLiked(context, songId.toString())
                                     albumViewModel.updateLikeState(!albumViewModel.likeState.value)

@@ -68,8 +68,10 @@ import androidx.compose.material.icons.filled.Info
 import io.github.sekademi.spotufi.ui.components.EmptyStateView
 import io.github.sekademi.spotufi.ui.components.ErrorRetryView
 import io.github.sekademi.spotufi.ui.components.TrackListShimmer
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.components.Loader
@@ -87,6 +89,7 @@ import io.github.sekademi.spotufi.ui.viewmodel.SearchViewModel
 enum class SearchFilter(val label: String) {
     ALL("All"),
     SONGS("Songs"),
+    YOUTUBE("YouTube"),
     ARTISTS("Artists"),
     ALBUMS("Albums"),
     SHOWS("Podcasts"),
@@ -322,6 +325,7 @@ fun SumUpSearchScreen(
                     val isEmpty = when (selectedFilter) {
                         SearchFilter.ALL -> mixed.isEmpty() && results.shows.isEmpty() && results.episodes.isEmpty()
                         SearchFilter.SONGS -> results.songs.isEmpty()
+                        SearchFilter.YOUTUBE -> results.songs.none { it.spotifyTrackId.isBlank() || it.url.startsWith("youtube:") }
                         SearchFilter.ARTISTS -> results.artists.isEmpty()
                         SearchFilter.ALBUMS -> results.albums.isEmpty()
                         SearchFilter.SHOWS -> results.shows.isEmpty() && results.episodes.isEmpty()
@@ -395,6 +399,15 @@ fun SumUpSearchScreen(
                                 items(results.songs.size) { i ->
                                     val song = results.songs[i]
                                     SearchSongRow(song, results.songs, searchViewModel, navController = navController, onPlayed = {
+                                        recordRecent(song.toRecentItem())
+                                    })
+                                }
+                            }
+                            SearchFilter.YOUTUBE -> {
+                                val ytSongs = results.songs.filter { it.spotifyTrackId.isBlank() || it.url.startsWith("youtube:") }
+                                items(ytSongs.size) { i ->
+                                    val song = ytSongs[i]
+                                    SearchSongRow(song, ytSongs, searchViewModel, navController = navController, onPlayed = {
                                         recordRecent(song.toRecentItem())
                                     })
                                 }
@@ -654,19 +667,7 @@ fun SearchSongRow(
                     onLongClick = { showSongOptions = true },
                     onClick = {
                         onPlayed()
-                        // Start a radio from the tapped track (queue = this song + Spotify
-                        // recommendations) rather than queuing the whole search list.
-                        searchViewModel.startRadioFromSong(song)
-                        SongPlayer.playSong(song.url, context)
-                        searchViewModel.updateSongState(
-                            song.coverUri,
-                            song.title,
-                            song.singer,
-                            true,
-                            song.id,
-                            0,
-                            song.album,
-                        )
+                        searchViewModel.playSongFromList(song, songList, context)
                     }
                 ),
         ) {
@@ -688,7 +689,32 @@ fun SearchSongRow(
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = song.title, color = currentPlayingIndicatorColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                    Text(text = "Song • ${song.singer}", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    val isYouTube = song.spotifyTrackId.isBlank() || song.url.startsWith("youtube:")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isYouTube) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = 6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(Color(0xFFE50914).copy(alpha = 0.85f))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    text = "YouTube",
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Text(
+                            text = if (isYouTube) song.singer else "Song • ${song.singer}",
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
 
@@ -700,9 +726,15 @@ fun SearchSongRow(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                         ) {
-                            if (isLiked) removeLikedSongId(context, song.id.toString())
-                            else addLikedSongId(context, song.id.toString())
-                            isLiked = isSongLiked(context, song.id.toString())
+                            if (isLiked) {
+                                removeLikedSong(context, song.id.toString())
+                            } else {
+                                addLikedSong(context, song)
+                            }
+                            if (song.spotifyTrackId.isNotBlank()) {
+                                io.github.sekademi.spotufi.data.api.SpotifySync.setTrackSaved(context, song.spotifyTrackId, !isLiked)
+                            }
+                            isLiked = !isLiked
                             searchViewModel.updateLikeState(!searchViewModel.likeState.value)
                         },
                     painter = if (isLiked) painterResource(id = R.drawable.added) else painterResource(id = R.drawable.ic_add),

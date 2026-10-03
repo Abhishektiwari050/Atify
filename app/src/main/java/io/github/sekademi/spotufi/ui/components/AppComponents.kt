@@ -80,8 +80,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
+import io.github.sekademi.spotufi.data.preferences.addLikedSong
 import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
+import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
@@ -377,7 +379,7 @@ fun MiniPlayer(navController: NavHostController) {
                                     indication = null,
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                        removeLikedSongId(context, songId.toString())
+                                        removeLikedSong(context, songId.toString())
                                         isLiked = false
                                         miniPlayerViewModel.updateLikeState(!likeState)
                                     },
@@ -394,7 +396,19 @@ fun MiniPlayer(navController: NavHostController) {
                                     indication = null,
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                        addLikedSongId(context, songId.toString())
+                                        val trackToLike = currentTrack ?: SongsModel(
+                                            id = songId,
+                                            title = songTitle,
+                                            singer = songSinger,
+                                            coverUri = songCoverUri,
+                                            album = "",
+                                            url = "",
+                                            spotifyTrackId = "",
+                                            explicit = false,
+                                            durationMs = 0,
+                                            artistIds = "",
+                                        )
+                                        addLikedSong(context, trackToLike)
                                         isLiked = true
                                         miniPlayerViewModel.updateLikeState(!likeState)
                                         io.github.sekademi.spotufi.data.api.SpotifySync.setTrackSaved(

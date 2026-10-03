@@ -621,9 +621,9 @@ class PlaybackService : MediaLibraryService() {
                 if (curSong != null) {
                     val wasLiked = io.github.sekademi.spotufi.data.preferences.isSongLiked(this@PlaybackService, curId.toString())
                     if (wasLiked) {
-                        io.github.sekademi.spotufi.data.preferences.removeLikedSongId(this@PlaybackService, curId.toString())
+                        io.github.sekademi.spotufi.data.preferences.removeLikedSong(this@PlaybackService, curId.toString())
                     } else {
-                        io.github.sekademi.spotufi.data.preferences.addLikedSongId(this@PlaybackService, curId.toString())
+                        io.github.sekademi.spotufi.data.preferences.addLikedSong(this@PlaybackService, curSong)
                         val artistList = curSong.artistIds.split(",").map { it.trim() }.filter { it.isNotBlank() }
                             .ifEmpty { curSong.singer.split(",", "&", "/").map { it.trim() }.filter { it.isNotBlank() } }
                         if (artistList.isNotEmpty()) {
