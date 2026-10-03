@@ -14,6 +14,8 @@ import io.github.sekademi.spotufi.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -35,6 +37,15 @@ object DownloadManager {
         java.util.concurrent.ConcurrentHashMap<String, Boolean>()
     )
     @Volatile var onDownloadsChanged: (() -> Unit)? = null
+    private val _downloadVersion = MutableStateFlow(0)
+    val downloadVersion: StateFlow<Int> = _downloadVersion
+
+    @Volatile var spotiFlacCooldownUntil = 0L
+
+    fun notifyChanged() {
+        _downloadVersion.value += 1
+        onDownloadsChanged?.invoke()
+    }
 
     private val downloadProgress = java.util.concurrent.ConcurrentHashMap<String, Int>()
     private val downloadingSongs =
@@ -47,6 +58,17 @@ object DownloadManager {
     fun activeCount(): Int = downloading.size
 
     fun downloadProgress(query: String): Int = downloadProgress[query] ?: -1
+
+    fun isAlbumDownloading(songs: List<io.github.sekademi.spotufi.data.entity.SongsModel>): Boolean {
+        if (songs.isEmpty()) return false
+        return songs.any { isDownloading(it.url) }
+    }
+
+    fun downloadedCount(songs: List<io.github.sekademi.spotufi.data.entity.SongsModel>, context: Context): Int {
+        if (songs.isEmpty()) return 0
+        val appContext = context.applicationContext
+        return songs.count { io.github.sekademi.spotufi.data.preferences.isDownloaded(appContext, it.id.toString()) }
+    }
 
     fun downloadingSnapshot(): List<Pair<io.github.sekademi.spotufi.data.entity.SongsModel, Int>> =
         downloadingSongs.entries.map { (q, song) -> song to (downloadProgress[q] ?: 0) }
@@ -105,7 +127,7 @@ object DownloadManager {
                                         val pct = ((position * 100) / total).toInt().coerceIn(0, 100)
                                         if (downloadProgress[query] != pct) {
                                             downloadProgress[query] = pct
-                                            onDownloadsChanged?.invoke()
+                                            notifyChanged()
                                         }
                                     }
                                 }
@@ -144,8 +166,12 @@ object DownloadManager {
         appContext: Context,
     ): Boolean {
         val dlQuality = io.github.sekademi.spotufi.data.preferences.getDownloadQuality(appContext)
-        if (dlQuality.lossless && song.spotifyTrackId.isNotBlank()) {
-            val flacOk = kotlinx.coroutines.withTimeoutOrNull(30_000) {
+        val allowFlac = dlQuality.lossless &&
+            song.spotifyTrackId.isNotBlank() &&
+            System.currentTimeMillis() >= spotiFlacCooldownUntil
+
+        if (allowFlac) {
+            val flacOk = kotlinx.coroutines.withTimeoutOrNull(12_000) {
                 runCatching { downloadFlacToFile(song, appContext) }.getOrDefault(false)
             } ?: false
             if (flacOk) return true
@@ -163,7 +189,6 @@ object DownloadManager {
 
         val dir = java.io.File(appContext.filesDir, "downloads").apply { mkdirs() }
         val tmpFile = java.io.File(dir, "${song.id}.part")
-        val outName = "${song.id}.m4a"
 
         if (!httpDownloadRanged(playback.streamUrl, tmpFile, song.url)) {
             runCatching { tmpFile.delete() }
@@ -171,20 +196,21 @@ object DownloadManager {
         }
 
         val uri = saveToPublicMusic(appContext, song, tmpFile, "m4a", "audio/mp4")
-        tmpFile.delete()
         if (uri != null) {
+            tmpFile.delete()
             io.github.sekademi.spotufi.data.preferences.addDownload(appContext, song, uri)
             return true
         }
         // Fallback: private storage (no WRITE_EXTERNAL_STORAGE on API < 29, or MediaStore failure)
         val fallbackDir = java.io.File(appContext.filesDir, "downloads").apply { mkdirs() }
         val fallbackFile = java.io.File(fallbackDir, "${song.id}.m4a")
-        if (!tmpFile.renameTo(fallbackFile)) {
-            lastDownloadError = "Couldn't save file"
-            return false
+        if (tmpFile.renameTo(fallbackFile) || (tmpFile.copyTo(fallbackFile, overwrite = true).also { tmpFile.delete() }.exists())) {
+            io.github.sekademi.spotufi.data.preferences.addDownload(appContext, song, fallbackFile.absolutePath)
+            return true
         }
-        io.github.sekademi.spotufi.data.preferences.addDownload(appContext, song, fallbackFile.absolutePath)
-        return true
+        lastDownloadError = "Couldn't save file"
+        tmpFile.delete()
+        return false
     }
 
     /**
@@ -203,6 +229,7 @@ object DownloadManager {
             is com.metrolist.spotify.SpotiFlac.Result.Success -> r.track
             is com.metrolist.spotify.SpotiFlac.Result.Cooldown -> {
                 Log.w(TAG, "FLAC download on cooldown for ${song.title}: ${r.message}")
+                spotiFlacCooldownUntil = System.currentTimeMillis() + 60_000L
                 return false
             }
             else -> return false
@@ -217,8 +244,8 @@ object DownloadManager {
         }
 
         val uri = saveToPublicMusic(appContext, song, tmpFile, "flac", "audio/flac")
-        tmpFile.delete()
         if (uri != null) {
+            tmpFile.delete()
             io.github.sekademi.spotufi.data.preferences.addDownload(appContext, song, uri)
             Log.d(TAG, "FLAC downloaded (${flac.provider} ${flac.quality}-bit): ${song.title}")
             return true
@@ -226,13 +253,14 @@ object DownloadManager {
         // Fallback: private storage
         val fallbackDir = java.io.File(appContext.filesDir, "downloads").apply { mkdirs() }
         val fallbackFile = java.io.File(fallbackDir, "${song.id}.flac")
-        if (!tmpFile.renameTo(fallbackFile)) {
-            lastDownloadError = "Couldn't save file"
-            return false
+        if (tmpFile.renameTo(fallbackFile) || (tmpFile.copyTo(fallbackFile, overwrite = true).also { tmpFile.delete() }.exists())) {
+            io.github.sekademi.spotufi.data.preferences.addDownload(appContext, song, fallbackFile.absolutePath)
+            Log.d(TAG, "FLAC downloaded (private fallback): ${song.title}")
+            return true
         }
-        io.github.sekademi.spotufi.data.preferences.addDownload(appContext, song, fallbackFile.absolutePath)
-        Log.d(TAG, "FLAC downloaded (private fallback): ${song.title}")
-        return true
+        lastDownloadError = "Couldn't save file"
+        tmpFile.delete()
+        return false
     }
 
     /**
@@ -270,9 +298,15 @@ object DownloadManager {
                 put(MediaStore.Audio.Media.IS_MUSIC, 1)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
-            val uri = appContext.contentResolver.insert(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values
-            ) ?: return null
+            val uri = runCatching {
+                val existingUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                val selection = "${MediaStore.Audio.Media.DISPLAY_NAME} = ? AND ${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
+                val selectionArgs = arrayOf(displayName, "%${folderName}%")
+                runCatching {
+                    appContext.contentResolver.delete(existingUri, selection, selectionArgs)
+                }
+                appContext.contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+            }.getOrNull() ?: return null
 
             try {
                 appContext.contentResolver.openOutputStream(uri)?.use { out ->
@@ -295,14 +329,19 @@ object DownloadManager {
                 folderName,
             ).apply { mkdirs() }
             val outFile = java.io.File(dir, "$fileName.$ext")
-            if (!tmpFile.renameTo(outFile)) return null
-            MediaScannerConnection.scanFile(
-                appContext,
-                arrayOf(outFile.absolutePath),
-                arrayOf(mime),
+            return try {
+                tmpFile.copyTo(outFile, overwrite = true)
+                tmpFile.delete()
+                MediaScannerConnection.scanFile(
+                    appContext,
+                    arrayOf(outFile.absolutePath),
+                    arrayOf(mime),
+                    null
+                )
+                outFile.absolutePath
+            } catch (e: Exception) {
                 null
-            )
-            return outFile.absolutePath
+            }
         }
     }
 
@@ -393,7 +432,7 @@ object DownloadManager {
         ) return
         downloadingSongs[query] = song
         downloadProgress[query] = 0
-        onDownloadsChanged?.invoke()
+        notifyChanged()
         DownloadService.start(appContext)
         updateNotification(appContext)
         lastDownloadError = null
@@ -414,7 +453,7 @@ object DownloadManager {
                         "Download failed: ${lastDownloadError ?: "unknown reason"}",
                         android.widget.Toast.LENGTH_LONG,
                     ).show()
-                } else {
+                } else if (downloading.isEmpty()) {
                     val folder = io.github.sekademi.spotufi.data.preferences.getDownloadFolderName(appContext)
                     android.widget.Toast.makeText(
                         appContext,
@@ -422,7 +461,7 @@ object DownloadManager {
                         android.widget.Toast.LENGTH_SHORT,
                     ).show()
                 }
-                onDownloadsChanged?.invoke()
+                notifyChanged()
                 onComplete(ok)
             }
         }

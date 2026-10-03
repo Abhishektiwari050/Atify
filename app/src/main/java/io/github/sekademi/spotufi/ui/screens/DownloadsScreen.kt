@@ -43,6 +43,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,8 +104,9 @@ fun DownloadsScreen(navController: NavController) {
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var currentSort by remember { mutableStateOf(getDownloadsSortOption(context)) }
     var isDescending by remember { mutableStateOf(isDownloadsSortDescending(context)) }
+    val dlVersion by io.github.sekademi.spotufi.di.SongPlayer.downloadVersion.collectAsState()
 
-    androidx.compose.runtime.LaunchedEffect(currentSort, isDescending) {
+    androidx.compose.runtime.LaunchedEffect(currentSort, isDescending, dlVersion) {
         songs = getDownloadedSongs(context)
     }
 

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -146,6 +147,14 @@ fun LikedSongsScreen(navController: NavController) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSort by remember { mutableStateOf(getLikedSortOption(context)) }
     var isDescending by remember { mutableStateOf(isLikedSortDescending(context)) }
+    val dlVersion by SongPlayer.downloadVersion.collectAsState()
+    val isDownloadingLiked = remember(songs, dlVersion) {
+        SongPlayer.isAlbumDownloading(songs)
+    }
+    val likedDownloaded = remember(songs, dlVersion) {
+        songs.isNotEmpty() && SongPlayer.allDownloaded(songs, context)
+    }
+
     var showSortSheet by remember { mutableStateOf(false) }
     var harmonicSortedSongs by remember { mutableStateOf<List<io.github.sekademi.spotufi.data.entity.SongsModel>>(emptyList()) }
 
@@ -307,31 +316,36 @@ fun LikedSongsScreen(navController: NavController) {
                                 .padding(20.dp, 0.dp)
                         ) {
                             // Download all liked songs for offline playback.
-                            var likedDownloaded by remember(songs) {
-                                mutableStateOf(songs.isNotEmpty() && SongPlayer.allDownloaded(songs, context))
-                            }
                             if (songs.isNotEmpty()) {
-                                Icon(
-                                    imageVector = if (likedDownloaded)
-                                        Icons.Default.CheckCircle else ImageVector.vectorResource(R.drawable.ic_download),
-                                    tint = if (likedDownloaded) Color(AppPalette.toArgb()) else Color.White,
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                        ) {
-                                            if (!likedDownloaded) {
-                                                SongPlayer.downloadAll(songs, context)
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    "Downloading ${songs.size} tracks…",
-                                                    android.widget.Toast.LENGTH_SHORT,
-                                                ).show()
-                                            }
-                                        },
-                                    contentDescription = "Download liked songs",
-                                )
+                                if (isDownloadingLiked) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(22.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Color(AppPalette.toArgb()),
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (likedDownloaded)
+                                            Icons.Default.CheckCircle else ImageVector.vectorResource(R.drawable.ic_download),
+                                        tint = if (likedDownloaded) Color(AppPalette.toArgb()) else Color.White,
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                            ) {
+                                                if (!likedDownloaded) {
+                                                    SongPlayer.downloadAll(songs, context)
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "Downloading ${songs.size} tracks…",
+                                                        android.widget.Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                }
+                                            },
+                                        contentDescription = if (likedDownloaded) "Liked songs downloaded" else "Download liked songs",
+                                    )
+                                }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 // Shuffle-play: start liked songs in random order.
                                 Icon(
@@ -561,6 +575,30 @@ fun LikedSongsScreen(navController: NavController) {
                                 fontWeight = FontWeight.Medium,
                                 maxLines = 1
                             )
+                        }
+
+                        val isTrackDownloaded = remember<Boolean>(song.id, dlVersion) {
+                            SongPlayer.isDownloaded(song, context)
+                        }
+                        val isTrackDownloading = remember<Boolean>(song.id, dlVersion) {
+                            SongPlayer.isDownloading(song)
+                        }
+
+                        if (isTrackDownloading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(AppPalette.toArgb()),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        } else if (isTrackDownloaded) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                tint = Color(AppPalette.toArgb()),
+                                modifier = Modifier.size(18.dp),
+                                contentDescription = "Downloaded",
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
                     }
                     }

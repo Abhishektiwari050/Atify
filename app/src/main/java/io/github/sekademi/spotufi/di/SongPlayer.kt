@@ -127,8 +127,14 @@ object SongPlayer {
         get() = DownloadManager.lastDownloadError
 
     fun isDownloading(query: String): Boolean = DownloadManager.isDownloading(query)
+    fun isDownloading(song: io.github.sekademi.spotufi.data.entity.SongsModel): Boolean = DownloadManager.isDownloading(song.url)
+    fun isDownloaded(song: io.github.sekademi.spotufi.data.entity.SongsModel, context: Context): Boolean =
+        io.github.sekademi.spotufi.data.preferences.isDownloaded(context, song.id.toString())
     fun downloadProgress(query: String): Int = DownloadManager.downloadProgress(query)
     fun downloadingSnapshot(): List<Pair<io.github.sekademi.spotufi.data.entity.SongsModel, Int>> = DownloadManager.downloadingSnapshot()
+    val downloadVersion: StateFlow<Int> get() = DownloadManager.downloadVersion
+    fun isAlbumDownloading(songs: List<io.github.sekademi.spotufi.data.entity.SongsModel>): Boolean = DownloadManager.isAlbumDownloading(songs)
+    fun downloadedCount(songs: List<io.github.sekademi.spotufi.data.entity.SongsModel>, context: Context): Int = DownloadManager.downloadedCount(songs, context)
     fun downloadAll(songs: List<io.github.sekademi.spotufi.data.entity.SongsModel>, context: Context) = DownloadManager.downloadAll(songs, context, scope)
     fun allDownloaded(songs: List<io.github.sekademi.spotufi.data.entity.SongsModel>, context: Context): Boolean = DownloadManager.allDownloaded(songs, context)
     fun downloadSong(song: io.github.sekademi.spotufi.data.entity.SongsModel, context: Context, onComplete: (Boolean) -> Unit = {}) = DownloadManager.downloadSong(song, context, scope, onComplete)

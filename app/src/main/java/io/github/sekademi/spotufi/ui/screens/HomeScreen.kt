@@ -27,18 +27,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.style.TextOverflow
+import io.github.sekademi.spotufi.ui.components.WhatsNewSheet
 import io.github.sekademi.spotufi.data.entity.SongsModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -109,7 +114,7 @@ fun HomeScreen(navController: NavController){
         when {
             // Preferred: the real personalized Spotify home feed.
             feed != null && feed.sections.isNotEmpty() -> {
-                HomeFeedContent(navController, feed, homeViewModel)
+                HomeFeedContent(navController, feed, homeViewModel, albumsList)
             }
 
             // Still resolving the real personalized home feed. Show the loader even
@@ -168,8 +173,16 @@ private fun onHomeItemClick(navController: NavController, item: HomeItem) {
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun HomeFeedContent(navController: NavController, feed: HomeFeedModel, homeViewModel: HomeViewModel) {
+fun HomeFeedContent(
+    navController: NavController,
+    feed: HomeFeedModel,
+    homeViewModel: HomeViewModel,
+    newReleases: List<AlbumsModel> = emptyList(),
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    var showWhatsNewSheet by remember { mutableStateOf(false) }
+    var selectedFilter by remember { mutableStateOf("All") }
+
     // Mirror open.spotify.com exactly: sections render in the order the feed
     // returns them. The 2-column "shortcuts" grid is only used for the UNTITLED
     // section the web home starts with — if the feed leads with a titled section
@@ -186,7 +199,13 @@ fun HomeFeedContent(navController: NavController, feed: HomeFeedModel, homeViewM
             .background(Color(AppBackground.toArgb()))
     ) {
         item {
-            HomeHeaderRow(navController)
+            HomeHeaderRow(
+                navController = navController,
+                onWhatsNewClick = { showWhatsNewSheet = true },
+                hasNewReleases = newReleases.isNotEmpty(),
+                selectedFilter = selectedFilter,
+                onFilterChange = { selectedFilter = it },
+            )
         }
         item {
             HomeMoodRadiosRow(navController)
@@ -208,6 +227,15 @@ fun HomeFeedContent(navController: NavController, feed: HomeFeedModel, homeViewM
                 }
             }
         }
+        if (newReleases.isNotEmpty()) {
+            item {
+                HomeNewReleasesSection(
+                    albums = newReleases,
+                    navController = navController,
+                    onViewAllClick = { showWhatsNewSheet = true },
+                )
+            }
+        }
         gridSection?.let { section ->
             item {
                 HomeShortcutGrid(navController, section.items.take(8))
@@ -218,12 +246,27 @@ fun HomeFeedContent(navController: NavController, feed: HomeFeedModel, homeViewM
         }
         item { Spacer(modifier = Modifier.height(120.dp)) }
     }
+
+    if (showWhatsNewSheet) {
+        WhatsNewSheet(
+            albums = newReleases,
+            navController = navController,
+            onDismiss = { showWhatsNewSheet = false },
+        )
+    }
 }
 
 /** Spotify-style top row: profile avatar on the left (opens Settings, like the
- *  official app's profile drawer), then the filter pills — one single row. */
+ *  official app's profile drawer), filter pills in the middle, and the What's New
+ *  notification bell on the right. */
 @Composable
-private fun HomeHeaderRow(navController: NavController) {
+private fun HomeHeaderRow(
+    navController: NavController,
+    onWhatsNewClick: () -> Unit = {},
+    hasNewReleases: Boolean = false,
+    selectedFilter: String = "All",
+    onFilterChange: (String) -> Unit = {},
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     androidx.compose.runtime.LaunchedEffect(Unit) {
         io.github.sekademi.spotufi.data.api.ProfileCache.ensure(context)
@@ -266,23 +309,24 @@ private fun HomeHeaderRow(navController: NavController) {
             }
         }
         // Filter pills — Podcasts/Audiobooks jump to Search (where they're indexed).
-        val filters = listOf("All", "Music", "Podcasts", "Audiobooks")
-        var selected by remember { androidx.compose.runtime.mutableStateOf("All") }
+        val filters = listOf("All", "Music", "New Releases", "Podcasts", "Audiobooks")
         LazyRow(
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f),
         ) {
             items(filters.size) { i ->
                 val label = filters[i]
-                val isSel = label == selected
+                val isSel = label == selectedFilter
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .background(if (isSel) Color(0xFF1ED760) else Color(0xFF2A2A2A))
                         .clickable {
-                            selected = label
-                            if (label == "Podcasts" || label == "Audiobooks") {
+                            onFilterChange(label)
+                            if (label == "New Releases") {
+                                onWhatsNewClick()
+                            } else if (label == "Podcasts" || label == "Audiobooks") {
                                 navController.navigate(Routes.Search.route)
                             }
                         }
@@ -293,6 +337,31 @@ private fun HomeHeaderRow(navController: NavController) {
                         color = if (isSel) Color.Black else Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        }
+
+        // Spotify "What's New" bell icon with indicator dot
+        IconButton(
+            onClick = onWhatsNewClick,
+            modifier = Modifier
+                .padding(end = 12.dp)
+                .size(36.dp),
+        ) {
+            Box(contentAlignment = Alignment.TopEnd) {
+                Icon(
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = "What's New",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp),
+                )
+                if (hasNewReleases) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1ED760))
                     )
                 }
             }
@@ -457,6 +526,7 @@ fun SumUpHomeScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val quickPicks by homeViewModel.quickPicks.collectAsState()
     val history = remember { io.github.sekademi.spotufi.data.preferences.getListeningHistory(context) }
+    var showWhatsNewSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -478,6 +548,11 @@ fun SumUpHomeScreen(
             }
         }
         if (albums.isNotEmpty()) {
+            HomeNewReleasesSection(
+                albums = albums,
+                navController = navController,
+                onViewAllClick = { showWhatsNewSheet = true },
+            )
             HomePlaylistGrid(navController, albums)
             HomeAlbums(album = albums, navController)
         }
@@ -487,6 +562,14 @@ fun SumUpHomeScreen(
         if (albums.isNotEmpty()) {
             ImageCard(navController, albums)
         }
+    }
+
+    if (showWhatsNewSheet) {
+        WhatsNewSheet(
+            albums = albums,
+            navController = navController,
+            onDismiss = { showWhatsNewSheet = false },
+        )
     }
 }
 
@@ -965,6 +1048,135 @@ private fun QuickPickCard(
             color = Color(0xFFB3B3B3),
             fontSize = 11.sp,
             fontWeight = FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+fun HomeNewReleasesSection(
+    albums: List<AlbumsModel>,
+    navController: NavController,
+    onViewAllClick: () -> Unit = {},
+) {
+    if (albums.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(
+                    text = "FROM ARTISTS YOU FOLLOW",
+                    color = Color(0xFF1ED760),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "New Releases",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Text(
+                text = "View all",
+                color = Color(0xFFB3B3B3),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clickable { onViewAllClick() }
+                    .padding(4.dp),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(albums.size) { index ->
+                val album = albums[index]
+                NewReleaseCard(
+                    album = album,
+                    onClick = {
+                        navController.navigate(albumRoute(album.name, album.artists))
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun NewReleaseCard(
+    album: AlbumsModel,
+    onClick: () -> Unit,
+) {
+    val isSingle = album.type.equals("single", ignoreCase = true)
+    Column(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .clip(RoundedCornerShape(8.dp))
+        ) {
+            AsyncImage(
+                model = album.coverUri,
+                contentDescription = album.name,
+                placeholder = painterResource(R.drawable.placeholder),
+                error = painterResource(R.drawable.placeholder),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = if (isSingle) "Single" else "Album",
+                    color = if (isSingle) Color(0xFF1ED760) else Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = album.name,
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = album.artists,
+            color = Color(0xFFB3B3B3),
+            fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

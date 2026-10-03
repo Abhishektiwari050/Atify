@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -148,6 +149,14 @@ fun SumUpAlbumScreen(
 ) {
     // `songs` is already this album's track list (loaded by AlbumViewModel).
     val albumSongs: List<SongsModel> = songs
+
+    val dlVersion by SongPlayer.downloadVersion.collectAsState()
+    val isDownloadingAlbum = remember(albumSongs, dlVersion) {
+        SongPlayer.isAlbumDownloading(albumSongs)
+    }
+    val albumDownloaded = remember(albumSongs, dlVersion) {
+        SongPlayer.allDownloaded(albumSongs, context)
+    }
 
     // Warm the stream cache for the first few tracks so the first tap plays
     // (near-)instantly instead of resolving YouTube on the tap.
@@ -288,31 +297,29 @@ fun SumUpAlbumScreen(
                     fontWeight = FontWeight.Medium
                 )
 
-                Row(horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
                         .padding(20.dp, 0.dp)
-                ){
-
-                    if (snackbarVisible){
-                            Snackbar(showMessage = snackbarMessage)
-                        }
-                    else{
-                        // Let the action icons take their natural width — a fixed
-                        // 75dp squeezed the add + download buttons together.
-                        Row(horizontalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        // Action buttons row
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(18.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-
                             AsyncImage(
                                 modifier = Modifier
                                     .height(60.dp)
                                     .width(32.dp)
                                     .padding(0.dp, 5.dp)
-                                    .clip(RoundedCornerShape(5.dp))
-                                ,
+                                    .clip(RoundedCornerShape(5.dp)),
                                 model = album[0].coverUri,
                                 error = painterResource(R.drawable.placeholder),
                                 contentScale = ContentScale.Crop,
@@ -334,45 +341,46 @@ fun SumUpAlbumScreen(
                                         }
                                         isAlbumLiked = isAlbumLiked(context, album[0].id.toString())
                                         snackbarVisible = true
-
                                     },
-                                painter = if (isAlbumLiked){
+                                painter = if (isAlbumLiked) {
                                     painterResource(id = R.drawable.added)
-                                }
-                                else{
+                                } else {
                                     painterResource(id = R.drawable.ic_add)
-                                }
-                                ,
-                                tint = if (isAlbumLiked){
+                                },
+                                tint = if (isAlbumLiked) {
                                     Color(AppPalette.toArgb())
-                                }
-                                else{
+                                } else {
                                     Color.White
                                 },
                                 contentDescription = ""
                             )
                             // Download the whole album (all tracks) for offline playback.
-                            var albumDownloaded by remember(albumSongs) {
-                                mutableStateOf(SongPlayer.allDownloaded(albumSongs, context))
+                            if (isDownloadingAlbum) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color(AppPalette.toArgb()),
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = if (albumDownloaded)
+                                        Icons.Default.CheckCircle else ImageVector.vectorResource(R.drawable.ic_download),
+                                    tint = if (albumDownloaded) Color(AppPalette.toArgb()) else Color.White,
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                        ) {
+                                            if (!albumDownloaded && albumSongs.isNotEmpty()) {
+                                                SongPlayer.downloadAll(albumSongs, context)
+                                                snackbarMessage = "Downloading ${albumSongs.size} tracks…"
+                                                snackbarVisible = true
+                                            }
+                                        },
+                                    contentDescription = if (albumDownloaded) "Album downloaded" else "Download album",
+                                )
                             }
-                            Icon(
-                                imageVector = if (albumDownloaded)
-                                    Icons.Default.CheckCircle else ImageVector.vectorResource(R.drawable.ic_download),
-                                tint = if (albumDownloaded) Color(AppPalette.toArgb()) else Color.White,
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                    ) {
-                                        if (!albumDownloaded && albumSongs.isNotEmpty()) {
-                                            SongPlayer.downloadAll(albumSongs, context)
-                                            snackbarMessage = "Downloading ${albumSongs.size} tracks…"
-                                            snackbarVisible = true
-                                        }
-                                    },
-                                contentDescription = "Download album",
-                            )
                             Spacer(modifier = Modifier.width(16.dp))
                             // Shuffle-play: start the album in random order.
                             Icon(
@@ -400,7 +408,6 @@ fun SumUpAlbumScreen(
                                 contentDescription = "Shuffle play",
                             )
                         }
-
 
                         // Always visible: pause when playing, resume when this
                         // album's track is paused, otherwise start from the top.
@@ -437,20 +444,27 @@ fun SumUpAlbumScreen(
                                     }
                             ) {
                                 Icon(
-                                    modifier = Modifier
-                                        .size(25.dp),
+                                    modifier = Modifier.size(25.dp),
                                     tint = Color.Black,
                                     painter = painterResource(
                                         id = if (playing) R.drawable.ic_playing else R.drawable.play_svgrepo_com,
                                     ),
-                                    contentDescription = if (playing) "Pause" else "Play")
+                                    contentDescription = if (playing) "Pause" else "Play"
+                                )
                             }
                         }
                     }
 
-
-
-
+                    if (snackbarVisible) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Snackbar(showMessage = snackbarMessage)
+                        }
+                    }
                 }
 
             }
@@ -529,6 +543,31 @@ fun SumUpAlbumScreen(
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
                             }
+                        }
+
+                        val trackSong = albumSongs[song]
+                        val isTrackDownloaded = remember<Boolean>(songId, dlVersion) {
+                            SongPlayer.isDownloaded(trackSong, context)
+                        }
+                        val isTrackDownloading = remember<Boolean>(songId, dlVersion) {
+                            SongPlayer.isDownloading(trackSong)
+                        }
+
+                        if (isTrackDownloading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(AppPalette.toArgb()),
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                        } else if (isTrackDownloaded) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                tint = Color(AppPalette.toArgb()),
+                                modifier = Modifier.size(18.dp),
+                                contentDescription = "Downloaded",
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
                         }
 
                         Icon(

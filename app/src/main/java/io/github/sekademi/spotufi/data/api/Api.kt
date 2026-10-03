@@ -105,7 +105,7 @@ class Api @Inject constructor(
             if (HomeCache.albums == null) emit(Response.Error("Spotify not authenticated — set sp_dc cookie"))
             return@flow
         }
-        Spotify.newReleases(limit = 20).fold(
+        Spotify.newReleases(limit = 40).fold(
             onSuccess = { resp ->
                 val list = resp.albums?.items.orEmpty().map { it.toAlbumModel() }
                 HomeCache.albums = list
