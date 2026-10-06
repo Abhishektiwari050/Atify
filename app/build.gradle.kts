@@ -25,9 +25,10 @@ fun getGitVersionCode(): Int {
         val result = providers.exec {
             commandLine("git", "rev-list", "--count", "HEAD")
         }
-        result.standardOutput.asText.get().trim().toIntOrNull() ?: 5
+        val count = result.standardOutput.asText.get().trim().toIntOrNull() ?: 5
+        100 + count
     } catch (e: Exception) {
-        5
+        100
     }
 }
 
@@ -56,6 +57,13 @@ android {
                 keyAlias = project.property("releaseKeyAlias").toString()
                 keyPassword = project.property("releaseKeyPassword").toString()
             }
+        } else if (file("signing.keystore").exists()) {
+            create("release") {
+                storeFile = file("signing.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
@@ -67,15 +75,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = if (project.hasProperty("releaseStoreFile")) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            if (file("signing.keystore").exists()) {
+                signingConfig = signingConfigs.findByName("release")
+            }
         }
     }
 
