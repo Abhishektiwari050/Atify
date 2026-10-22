@@ -72,14 +72,15 @@
 
 ## 📲 Download
 
-Grab the latest APK directly from GitHub Releases:
+Grab the latest APK or iOS IPA directly from GitHub Releases:
 
 <div align="center">
 
-| Architecture | Package | Direct Download |
+| Platform / Architecture | Package | Direct Download |
 |---|---|---|
-| **ARM64 (Recommended)** | `Atify-arm64-v8a.apk` | [**Download ARM64**](https://github.com/Abhishektiwari050/Atify/releases/download/v1.0.0/Atify-arm64-v8a.apk) |
-| **Universal (All Phones)** | `Atify-universal.apk` | [**Download Universal**](https://github.com/Abhishektiwari050/Atify/releases/download/v1.0.0/Atify-universal.apk) |
+| **Android ARM64 (Recommended)** | `Atify-arm64-v8a.apk` | [**Download ARM64**](https://github.com/Abhishektiwari050/Atify/releases/latest) |
+| **Android Universal (All Phones)** | `Atify-universal.apk` | [**Download Universal**](https://github.com/Abhishektiwari050/Atify/releases/latest) |
+| **iOS Sideload IPA (AltStore / SideStore / TrollStore)** | `Atify.ipa` | [**Download IPA**](https://github.com/Abhishektiwari050/Atify/releases/latest) |
 
 </div>
 
@@ -116,19 +117,32 @@ Atify features an organic, atmospheric color scheme designed for easy viewing du
 * **Android SDK 37**
 
 ### Clone & Build
+### Android Build
 ```bash
-# Clone the repository
-git clone https://github.com/Abhishektiwari050/Atify.git
-cd Atify
-
 # Build Debug APK
 ./gradlew assembleDebug
 
 # Build Release APK
 ./gradlew :app:assembleRelease --no-daemon
 ```
+Output APKs will be located at `app/build/outputs/apk/release/`.
 
-Output APKs will be located at `app/build/outputs/apk/debug/`.
+### iOS Build (macOS / Xcode)
+```bash
+# Build & Archive iOS App
+xcodebuild -project iosApp/Atify.xcodeproj \
+  -scheme Atify \
+  -configuration Release \
+  -archivePath build/Atify.xcarchive \
+  -destination 'generic/platform=iOS' \
+  CODE_SIGNING_ALLOWED=NO archive
+
+# Package unsigned IPA
+mkdir -p build/Payload
+cp -R build/Atify.xcarchive/Products/Applications/Atify.app build/Payload/
+cd build && zip -r -9 Atify.ipa Payload
+```
+*Note: GitHub Actions automatically compiles and packages `Atify.ipa` on every release and commit to `main`.*
 
 ---
 

@@ -1,0 +1,428 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000201 /* AtifyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000101 /* AtifyApp.swift */; };
+		A10000000000000000000202 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000102 /* Track.swift */; };
+		A10000000000000000000203 /* PreferencesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000103 /* PreferencesService.swift */; };
+		A10000000000000000000204 /* InnerTubeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000104 /* InnerTubeService.swift */; };
+		A10000000000000000000205 /* SpotifyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000105 /* SpotifyService.swift */; };
+		A10000000000000000000206 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000106 /* AudioPlayer.swift */; };
+		A10000000000000000000207 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000107 /* Theme.swift */; };
+		A10000000000000000000208 /* TrackRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000108 /* TrackRowView.swift */; };
+		A10000000000000000000209 /* AirPlayButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000109 /* AirPlayButtonView.swift */; };
+		A10000000000000000000210 /* HeartButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000110 /* HeartButtonView.swift */; };
+		A10000000000000000000211 /* PlayerControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000111 /* PlayerControlsView.swift */; };
+		A10000000000000000000212 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000112 /* NowPlayingView.swift */; };
+		A10000000000000000000213 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000113 /* MiniPlayerView.swift */; };
+		A10000000000000000000214 /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000114 /* HomeScreen.swift */; };
+		A10000000000000000000215 /* SearchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000115 /* SearchScreen.swift */; };
+		A10000000000000000000216 /* LibraryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000116 /* LibraryScreen.swift */; };
+		A10000000000000000000217 /* LikedSongsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000117 /* LikedSongsView.swift */; };
+		A10000000000000000000218 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000118 /* SettingsView.swift */; };
+		A10000000000000000000219 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000119 /* MainTabView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000003 /* Atify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atify.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000040 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000101 /* AtifyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtifyApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000102 /* Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Track.swift; sourceTree = "<group>"; };
+		A10000000000000000000103 /* PreferencesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesService.swift; sourceTree = "<group>"; };
+		A10000000000000000000104 /* InnerTubeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InnerTubeService.swift; sourceTree = "<group>"; };
+		A10000000000000000000105 /* SpotifyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyService.swift; sourceTree = "<group>"; };
+		A10000000000000000000106 /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
+		A10000000000000000000107 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		A10000000000000000000108 /* TrackRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackRowView.swift; sourceTree = "<group>"; };
+		A10000000000000000000109 /* AirPlayButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayButtonView.swift; sourceTree = "<group>"; };
+		A10000000000000000000110 /* HeartButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartButtonView.swift; sourceTree = "<group>"; };
+		A10000000000000000000111 /* PlayerControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControlsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000112 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
+		A10000000000000000000113 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
+		A10000000000000000000114 /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
+		A10000000000000000000115 /* SearchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchScreen.swift; sourceTree = "<group>"; };
+		A10000000000000000000116 /* LibraryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryScreen.swift; sourceTree = "<group>"; };
+		A10000000000000000000117 /* LikedSongsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikedSongsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000118 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000119 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A10000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A10000000000000000000010 = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000011 /* Atify */,
+				A10000000000000000000012 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A10000000000000000000011 /* Atify */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000101 /* AtifyApp.swift */,
+				A10000000000000000000013 /* Models */,
+				A10000000000000000000014 /* Services */,
+				A10000000000000000000015 /* Views */,
+				A10000000000000000000040 /* Info.plist */,
+			);
+			path = Atify;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000012 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000003 /* Atify.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000013 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000102 /* Track.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000014 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000103 /* PreferencesService.swift */,
+				A10000000000000000000104 /* InnerTubeService.swift */,
+				A10000000000000000000105 /* SpotifyService.swift */,
+				A10000000000000000000106 /* AudioPlayer.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000015 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000016 /* Components */,
+				A10000000000000000000017 /* Player */,
+				A10000000000000000000114 /* HomeScreen.swift */,
+				A10000000000000000000115 /* SearchScreen.swift */,
+				A10000000000000000000116 /* LibraryScreen.swift */,
+				A10000000000000000000117 /* LikedSongsView.swift */,
+				A10000000000000000000118 /* SettingsView.swift */,
+				A10000000000000000000119 /* MainTabView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000016 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000107 /* Theme.swift */,
+				A10000000000000000000108 /* TrackRowView.swift */,
+				A10000000000000000000109 /* AirPlayButtonView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000017 /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000110 /* HeartButtonView.swift */,
+				A10000000000000000000111 /* PlayerControlsView.swift */,
+				A10000000000000000000112 /* NowPlayingView.swift */,
+				A10000000000000000000113 /* MiniPlayerView.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10000000000000000000002 /* Atify */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000030 /* Build configuration list for PBXNativeTarget "Atify" */;
+			buildPhases = (
+				A10000000000000000000004 /* Sources */,
+				A10000000000000000000005 /* Frameworks */,
+				A10000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Atify;
+			productName = Atify;
+			productReference = A10000000000000000000003 /* Atify.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					A10000000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = A10000000000000000000020 /* Build configuration list for PBXProject "Atify" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A10000000000000000000010;
+			productRefGroup = A10000000000000000000012 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A10000000000000000000002 /* Atify */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A10000000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A10000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000201 /* AtifyApp.swift in Sources */,
+				A10000000000000000000202 /* Track.swift in Sources */,
+				A10000000000000000000203 /* PreferencesService.swift in Sources */,
+				A10000000000000000000204 /* InnerTubeService.swift in Sources */,
+				A10000000000000000000205 /* SpotifyService.swift in Sources */,
+				A10000000000000000000206 /* AudioPlayer.swift in Sources */,
+				A10000000000000000000207 /* Theme.swift in Sources */,
+				A10000000000000000000208 /* TrackRowView.swift in Sources */,
+				A10000000000000000000209 /* AirPlayButtonView.swift in Sources */,
+				A10000000000000000000210 /* HeartButtonView.swift in Sources */,
+				A10000000000000000000211 /* PlayerControlsView.swift in Sources */,
+				A10000000000000000000212 /* NowPlayingView.swift in Sources */,
+				A10000000000000000000213 /* MiniPlayerView.swift in Sources */,
+				A10000000000000000000214 /* HomeScreen.swift in Sources */,
+				A10000000000000000000215 /* SearchScreen.swift in Sources */,
+				A10000000000000000000216 /* LibraryScreen.swift in Sources */,
+				A10000000000000000000217 /* LikedSongsView.swift in Sources */,
+				A10000000000000000000218 /* SettingsView.swift in Sources */,
+				A10000000000000000000219 /* MainTabView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A10000000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDEFINED_VARIABLES = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A10000000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDEFINED_VARIABLES = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A10000000000000000000031 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGNING_ALLOWED = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Atify/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.4.11;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.sekademi.atify;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A10000000000000000000032 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGNING_ALLOWED = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Atify/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.4.11;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.sekademi.atify;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A10000000000000000000020 /* Build configuration list for PBXProject "Atify" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000021 /* Debug */,
+				A10000000000000000000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000000030 /* Build configuration list for PBXNativeTarget "Atify" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000031 /* Debug */,
+				A10000000000000000000032 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A10000000000000000000001 /* Project object */;
+}
