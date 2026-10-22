@@ -1,5 +1,6 @@
 package io.github.sekademi.spotufi.ui.components
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -336,24 +337,31 @@ fun MiniPlayer(navController: NavHostController) {
                     placeholder = painterResource(R.drawable.placeholder),
                     contentDescription = ""
                 )
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = songTitle,
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1500),
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = songSinger,
-                        color = Color.White.copy(alpha = 0.72f),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
-                        maxLines = 1,
-                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2000),
-                    )
+                Crossfade(
+                    targetState = songTitle to songSinger,
+                    animationSpec = tween(220),
+                    modifier = Modifier.weight(1f),
+                    label = "miniPlayerTextCrossfade"
+                ) { (title, singer) ->
+                    Column {
+                        Text(
+                            text = title,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1500),
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = singer,
+                            color = Color.White.copy(alpha = 0.72f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2000),
+                        )
+                    }
                 }
             }
 
@@ -363,70 +371,79 @@ fun MiniPlayer(navController: NavHostController) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(start = 4.dp)
             ) {
-                // Plus / Check icon with touch target
+                // Plus / Check icon with animated spring bounce
                 Box(
                     modifier = Modifier.size(36.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isLiked) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            tint = Color(0xFF1ED760),
-                            modifier = Modifier
-                                .size(24.dp)
-                                .combinedClickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                        removeLikedSong(context, songId.toString())
-                                        isLiked = false
-                                        miniPlayerViewModel.updateLikeState(!likeState)
-                                    },
-                                    onLongClick = { showSavedIn = true },
-                                ),
-                            contentDescription = "Saved",
-                        )
-                    } else {
-                        Icon(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .combinedClickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                        val trackToLike = currentTrack ?: SongsModel(
-                                            id = songId,
-                                            title = songTitle,
-                                            singer = songSinger,
-                                            coverUri = songCoverUri,
-                                            album = "",
-                                            url = "",
-                                            spotifyTrackId = "",
-                                            explicit = false,
-                                            durationMs = 0,
-                                            artistIds = "",
-                                        )
-                                        addLikedSong(context, trackToLike)
-                                        isLiked = true
-                                        miniPlayerViewModel.updateLikeState(!likeState)
-                                        io.github.sekademi.spotufi.data.api.SpotifySync.setTrackSaved(
-                                            context, currentTrack?.spotifyTrackId.orEmpty(), true)
-                                    },
-                                    onLongClick = { showSavedIn = true },
-                                ),
-                            painter = painterResource(id = R.drawable.ic_add),
-                            tint = Color.White,
-                            contentDescription = "Add",
-                        )
-                    }
+                    AnimatedHeartButton(
+                        isLiked = isLiked,
+                        size = 24.dp,
+                        likedColor = Color(0xFF1ED760),
+                        unlikedColor = Color.White,
+                        onLongClick = { showSavedIn = true },
+                        onClick = {
+                            if (isLiked) {
+                                removeLikedSong(context, songId.toString())
+                                isLiked = false
+                                miniPlayerViewModel.updateLikeState(!likeState)
+                            } else {
+                                val trackToLike = currentTrack ?: SongsModel(
+                                    id = songId,
+                                    title = songTitle,
+                                    singer = songSinger,
+                                    coverUri = songCoverUri,
+                                    album = "",
+                                    url = "",
+                                    spotifyTrackId = "",
+                                    explicit = false,
+                                    durationMs = 0,
+                                    artistIds = "",
+                                )
+                                addLikedSong(context, trackToLike)
+                                isLiked = true
+                                miniPlayerViewModel.updateLikeState(!likeState)
+                                io.github.sekademi.spotufi.data.api.SpotifySync.setTrackSaved(
+                                    context, currentTrack?.spotifyTrackId.orEmpty(), true
+                                )
+                            }
+                        }
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(6.dp))
 
                 val isLocatingOrBuffering = miniPlayerViewModel.isResolving.value || miniPlayerViewModel.isBuffering.value
-                Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                BouncyScaleBox(
+                    onClick = {
+                        if (songPlayingState) {
+                            SongPlayer.pause()
+                            miniPlayerViewModel.updateSongState(
+                                songCoverUri,
+                                songTitle,
+                                songSinger,
+                                false,
+                                songId,
+                                songIndex,
+                                songAlbum
+                            )
+                        } else {
+                            SongPlayer.play()
+                            miniPlayerViewModel.updateSongState(
+                                songCoverUri,
+                                songTitle,
+                                songSinger,
+                                true,
+                                songId,
+                                songIndex,
+                                songAlbum
+                            )
+                        }
+                    },
+                    enabled = !isLocatingOrBuffering,
+                    pressedScale = 0.88f,
+                    modifier = Modifier.size(40.dp)
+                ) {
                     if (isLocatingOrBuffering) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(26.dp),
@@ -441,37 +458,7 @@ fun MiniPlayer(navController: NavHostController) {
                                 painterResource(id = R.drawable.play_svgrepo_com),
                             contentDescription = if (songPlayingState) "Pause" else "Play",
                             tint = Color.White,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    if (songPlayingState) {
-                                        SongPlayer.pause()
-                                        miniPlayerViewModel.updateSongState(
-                                            songCoverUri,
-                                            songTitle,
-                                            songSinger,
-                                            false,
-                                            songId,
-                                            songIndex,
-                                            songAlbum
-                                        )
-                                    } else {
-                                        SongPlayer.play()
-                                        miniPlayerViewModel.updateSongState(
-                                            songCoverUri,
-                                            songTitle,
-                                            songSinger,
-                                            true,
-                                            songId,
-                                            songIndex,
-                                            songAlbum
-                                        )
-                                    }
-                                }
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }

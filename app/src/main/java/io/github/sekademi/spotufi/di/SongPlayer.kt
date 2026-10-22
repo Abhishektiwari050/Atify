@@ -455,7 +455,6 @@ object SongPlayer {
         cancelCrossfade()
         runCatching {
             player?.pause()
-            player?.clearMediaItems()
         }
 
         if (song.startsWith("episode:") && webPlayerEnabled && SpotifyWebPlayer.canPlay &&
@@ -488,6 +487,55 @@ object SongPlayer {
             Log.w(TAG, "web playback on but no Spotify id for query: $song — using fallback engine")
         }
 
+        // Fast synchronous playback path: if stream is already in memory or disk cache, start immediately (<5ms)
+        val sid = StreamResolver.spotifyTrackIdForPlayback(song)
+        val syncCached = streamCache[song]
+            ?: sid?.let { streamCache[it] }
+            ?: downloadedPath?.let { path ->
+                currentSource = "Downloaded"
+                currentQuality = if (path.startsWith("content://")) "AUDIO" else path.substringAfterLast('.', "").uppercase()
+                if (path.startsWith("content://") || path.startsWith("file://")) path
+                else android.net.Uri.fromFile(java.io.File(path)).toString()
+            }
+            ?: io.github.sekademi.spotufi.data.preferences.getCachedStreamForQueryOrSpotifyId(appContext, song, sid)?.let {
+                currentSource = it.second
+                currentQuality = it.third
+                it.first
+            }
+
+        if (syncCached != null) {
+            ensurePlayer(appContext)
+            val p = player
+            if (p != null) {
+                val currentSongModel = boundState?.queue?.value?.firstOrNull { it.url == song }
+                val initialItem = if (currentSongModel != null) {
+                    buildMediaItemWithSong(syncCached, currentSongModel)
+                } else {
+                    buildMediaItem(syncCached, mediaId = song)
+                }
+                p.setMediaItem(initialItem)
+                p.prepare()
+                if (song == restoreQuery && restorePositionMs > 0) {
+                    p.seekTo(restorePositionMs)
+                }
+                restoreQuery = null
+                p.playWhenReady = playWhenResolved
+                loadedQuery = song
+                updateResolveStatus(false)
+                startPositionWatch()
+
+                val currentQueue = boundState?.queue?.value.orEmpty()
+                val currentIndex = currentQueue.indexOfFirst { it.url == song }
+                if (currentIndex in 0 until currentQueue.lastIndex) {
+                    val nextSong = currentQueue[currentIndex + 1]
+                    prefetch(nextSong.url, appContext)
+                    queueNextMediaItem(nextSong, appContext)
+                }
+                return
+            }
+        }
+
+        updateResolveStatus(true, "Finding best stream...")
         scope.launch {
             try {
                 val streamUrl = resolveStreamUrl(song, appContext, forPlayback = true) ?: run {
@@ -561,7 +609,8 @@ object SongPlayer {
             val url = runCatching { resolveStreamUrl(nextSong.url, context, forPlayback = false) }.getOrNull()
             if (url.isNullOrBlank()) return@launch
             withContext(Dispatchers.Main) {
-                if (player === p && p.mediaItemCount == 1) {
+                // If player is still valid and the currently playing item is the last one in the timeline
+                if (player === p && p.currentMediaItemIndex == p.mediaItemCount - 1) {
                     val nextItem = buildMediaItemWithSong(url, nextSong)
                     p.addMediaItem(nextItem)
                     Log.d(TAG, "Gapless: Pre-queued next MediaItem: ${nextSong.title}")
@@ -608,13 +657,15 @@ object SongPlayer {
         }
     }
 
-    fun prefetchList(songs: List<String>, context: Context, count: Int = 2) {
+    fun prefetchList(songs: List<String>, context: Context, count: Int = 3) {
         if (songs.isEmpty() || webPlaybackActive()) return
         val appContext = context.applicationContext
         val targets = songs.filter { it.isNotBlank() }.take(count)
         scope.launch(Dispatchers.IO) {
             targets.forEach { song ->
-                if (streamCache[song] == null && io.github.sekademi.spotufi.data.preferences.getCachedStream(appContext, song) == null) {
+                val sid = StreamResolver.spotifyTrackIdForPlayback(song)
+                val inMem = streamCache[song] ?: sid?.let { streamCache[it] }
+                if (inMem == null && io.github.sekademi.spotufi.data.preferences.getCachedStreamForQueryOrSpotifyId(appContext, song, sid) == null) {
                     val url = runCatching { StreamResolver.resolveStreamUrl(song, appContext, forPlayback = false) }.getOrNull()
                     if (url != null) {
                         StreamResolver.cacheIntro(url, appContext)

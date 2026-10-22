@@ -50,6 +50,9 @@ import io.github.sekademi.spotufi.data.entity.SongsModel
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.di.RepeatMode
 import io.github.sekademi.spotufi.di.SongPlayer
+import io.github.sekademi.spotufi.ui.components.AnimatedRepeatButton
+import io.github.sekademi.spotufi.ui.components.AnimatedShuffleButton
+import io.github.sekademi.spotufi.ui.components.BouncyScaleBox
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
@@ -75,38 +78,18 @@ fun PlayerFull(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(44.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    playerViewModel.updateShuffleState(!shuffle)
-                }
-        ) {
-            Icon(
-                modifier = Modifier.size(28.dp),
-                tint = if (shuffle) Color(AppPalette.toArgb()) else Color.White,
-                painter = painterResource(id = R.drawable.ic_player_shuffle),
-                contentDescription = "Shuffle"
-            )
-        }
+        AnimatedShuffleButton(
+            shuffle = shuffle,
+            onToggle = { playerViewModel.updateShuffleState(!shuffle) },
+            modifier = Modifier.size(44.dp)
+        )
 
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(48.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    playerViewModel.playPreviousSong(queueSongs, context)
-                    isLiked.value = isSongLiked(context, playerViewModel.currentSongId.value.toString())
-                }
+        BouncyScaleBox(
+            onClick = {
+                playerViewModel.playPreviousSong(queueSongs, context)
+                isLiked.value = isSongLiked(context, playerViewModel.currentSongId.value.toString())
+            },
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 modifier = Modifier.size(42.dp),
@@ -117,45 +100,50 @@ fun PlayerFull(
         }
 
         val isLocatingOrBuffering = playerViewModel.isResolving.value || playerViewModel.isBuffering.value
-        if (isLocatingOrBuffering) {
-            Box(
-                modifier = Modifier
-                    .requiredSize(64.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(30.dp),
-                    color = Color.Black,
-                    strokeWidth = 3.dp,
+        BouncyScaleBox(
+            onClick = {
+                val p = SongPlayer.exoPlayer
+                if (p != null) {
+                    if (p.isPlaying) p.pause() else p.play()
+                }
+            },
+            enabled = !isLocatingOrBuffering,
+            pressedScale = 0.94f
+        ) {
+            if (isLocatingOrBuffering) {
+                Box(
+                    modifier = Modifier
+                        .requiredSize(64.dp)
+                        .clip(CircleShape)
+                        .background(Color.White),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(30.dp),
+                        color = Color.Black,
+                        strokeWidth = 3.dp,
+                    )
+                }
+            } else {
+                PlayPauseButton(
+                    player = SongPlayer.exoPlayer,
+                    modifier = Modifier
+                        .requiredSize(64.dp)
+                        .clip(CircleShape)
+                        .background(Color.White),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = Color.Black,
+                    ),
                 )
             }
-        } else {
-            PlayPauseButton(
-                player = SongPlayer.exoPlayer,
-                modifier = Modifier
-                    .requiredSize(64.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
-                colors = IconButtonDefaults.iconButtonColors(
-                    contentColor = Color.Black,
-                ),
-            )
         }
 
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(48.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    playerViewModel.playNextSongs(queueSongs, context)
-                    isLiked.value = isSongLiked(context, playerViewModel.currentSongId.value.toString())
-                }
+        BouncyScaleBox(
+            onClick = {
+                playerViewModel.playNextSongs(queueSongs, context)
+                isLiked.value = isSongLiked(context, playerViewModel.currentSongId.value.toString())
+            },
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 modifier = Modifier.size(42.dp),
@@ -165,59 +153,18 @@ fun PlayerFull(
             )
         }
 
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(44.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    val nextRepeat = when (repeat) {
-                        RepeatMode.OFF -> RepeatMode.ALL
-                        RepeatMode.ALL -> RepeatMode.ONE
-                        RepeatMode.ONE -> RepeatMode.OFF
-                    }
-                    playerViewModel.updateRepeatState(nextRepeat)
+        AnimatedRepeatButton(
+            repeat = repeat,
+            onToggle = {
+                val nextRepeat = when (repeat) {
+                    RepeatMode.OFF -> RepeatMode.ALL
+                    RepeatMode.ALL -> RepeatMode.ONE
+                    RepeatMode.ONE -> RepeatMode.OFF
                 }
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        modifier = Modifier.size(28.dp),
-                        tint = if (repeat != RepeatMode.OFF) Color(0xFF1ED760) else Color.White,
-                        painter = painterResource(id = R.drawable.ic_repeat),
-                        contentDescription = "Repeat"
-                    )
-                    if (repeat == RepeatMode.ONE) {
-                        Text(
-                            text = "1",
-                            color = Color(0xFF1ED760),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.offset(y = (-1).dp)
-                        )
-                    }
-                }
-                if (repeat != RepeatMode.OFF) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(4.dp)
-                            .background(Color(0xFF1ED760), shape = CircleShape)
-                    )
-                } else {
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-            }
-        }
+                playerViewModel.updateRepeatState(nextRepeat)
+            },
+            modifier = Modifier.size(44.dp)
+        )
     }
 }
 

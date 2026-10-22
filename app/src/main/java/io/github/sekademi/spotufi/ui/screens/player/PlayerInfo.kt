@@ -49,6 +49,7 @@ import io.github.sekademi.spotufi.data.preferences.addLikedSongId
 import io.github.sekademi.spotufi.data.preferences.isSongLiked
 import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
+import io.github.sekademi.spotufi.ui.components.AnimatedHeartButton
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import kotlinx.coroutines.delay
 
@@ -185,52 +186,40 @@ fun PlayerInfo(
                 }
             }
 
-            Icon(
-                modifier = Modifier
-                    .size(26.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                        if (isLiked.value && onShowSavedIn != null) {
-                            onShowSavedIn()
-                            return@clickable
-                        }
-                        if (isLiked.value) {
-                            removeLikedSong(context, songId.toString())
-                            snackbarMessage = "Removed from Liked Songs"
-                        } else {
-                            val trackToLike = currentSong ?: SongsModel(
-                                id = songId,
-                                title = songTitle,
-                                singer = songSinger,
-                                coverUri = "",
-                                album = "",
-                                url = "",
-                                spotifyTrackId = spotifyTrackId,
-                                explicit = false,
-                                durationMs = 0,
-                                artistIds = "",
-                            )
-                            addLikedSong(context, trackToLike)
-                            snackbarMessage = "Added to Liked Songs"
-                        }
-                        snackbarVisible = true
-                        isLiked.value = isSongLiked(context, songId.toString())
-                        SpotifySync.setTrackSaved(context, spotifyTrackId, isLiked.value)
-                    },
-                painter = if (isLiked.value) {
-                    painterResource(id = R.drawable.added)
-                } else {
-                    painterResource(id = R.drawable.ic_add)
-                },
-                tint = if (isLiked.value) {
-                    Color(AppPalette.toArgb())
-                } else {
-                    Color.White
-                },
-                contentDescription = if (isLiked.value) "Liked" else "Like"
+            AnimatedHeartButton(
+                isLiked = isLiked.value,
+                size = 26.dp,
+                likedColor = Color(AppPalette.toArgb()),
+                unlikedColor = Color.White,
+                onLongClick = onShowSavedIn,
+                onClick = {
+                    if (isLiked.value && onShowSavedIn != null) {
+                        onShowSavedIn()
+                        return@AnimatedHeartButton
+                    }
+                    if (isLiked.value) {
+                        removeLikedSong(context, songId.toString())
+                        snackbarMessage = "Removed from Liked Songs"
+                    } else {
+                        val trackToLike = currentSong ?: SongsModel(
+                            id = songId,
+                            title = songTitle,
+                            singer = songSinger,
+                            coverUri = "",
+                            album = "",
+                            url = "",
+                            spotifyTrackId = spotifyTrackId,
+                            explicit = false,
+                            durationMs = 0,
+                            artistIds = "",
+                        )
+                        addLikedSong(context, trackToLike)
+                        snackbarMessage = "Added to Liked Songs"
+                    }
+                    snackbarVisible = true
+                    isLiked.value = isSongLiked(context, songId.toString())
+                    SpotifySync.setTrackSaved(context, spotifyTrackId, isLiked.value)
+                }
             )
         }
 

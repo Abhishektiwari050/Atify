@@ -15,6 +15,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import io.github.sekademi.spotufi.data.recommendation.SmartMusicRanker
 import javax.inject.Inject
 
 @HiltViewModel
@@ -47,6 +49,114 @@ class SearchViewModel @Inject constructor(private val repository: AppRepository,
 
     fun addAllToQueue(songs: List<SongsModel>) = currentSongState.addAllToQueue(songs)
 
+    /**
+     * Plays a track from search immediately (<10ms for cached) and populates the upcoming queue
+     * with mood-matched similar songs (Spotify ML radio / track recommendations / YouTube artist mix),
+     * rather than dumping the raw search query results into the queue.
+     */
+    fun playSongAndStartRadio(song: SongsModel, context: android.content.Context) {
+        // 1. Immediately play the tapped song and set initial single-item queue
+        currentSongState.updateQueue(listOf(song))
+        updateSongState(
+            song.coverUri,
+            song.title,
+            song.singer,
+            true,
+            song.id,
+            0,
+            song.album
+        )
+        io.github.sekademi.spotufi.di.SongPlayer.playSong(song.url, context)
+
+        // 2. Resolve mood-similar tracks in the background
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val seed = song.spotifyTrackId
+                val candidates = mutableListOf<SongsModel>()
+
+                // A. Primary: Spotify ML track radio / inspired-by mix
+                if (seed.isNotBlank()) {
+                    val recs = runCatching { repository.provideRecommendations(listOf(seed)) }.getOrNull()
+                    if (!recs.isNullOrEmpty()) {
+                        candidates.addAll(recs)
+                    }
+                }
+
+                // B. If no Spotify track ID or recommendations were empty, look up track on Spotify
+                if (candidates.size < 5) {
+                    val fallbackSeed = if (seed.isBlank()) {
+                        runCatching {
+                            com.metrolist.spotify.Spotify.search(
+                                "${song.singer} ${song.title}",
+                                types = listOf("track"),
+                                limit = 1
+                            ).getOrNull()?.tracks?.items?.firstOrNull()?.id
+                        }.getOrNull()
+                    } else null
+
+                    if (!fallbackSeed.isNullOrBlank()) {
+                        val moreRecs = runCatching { repository.provideRecommendations(listOf(fallbackSeed)) }.getOrNull()
+                        if (!moreRecs.isNullOrEmpty()) {
+                            candidates.addAll(moreRecs)
+                        }
+                    }
+                }
+
+                // C. Fallback: YouTube Music mix / related songs by the artist
+                if (candidates.size < 5) {
+                    val mixQuery = "${song.singer} radio mix"
+                    val ytRes = runCatching {
+                        com.metrolist.innertube.YouTube.search(mixQuery, com.metrolist.innertube.YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    }.getOrNull()
+                    val ytItems = ytRes?.items.orEmpty().filterIsInstance<com.metrolist.innertube.models.SongItem>()
+                    for (item in ytItems) {
+                        val cleanTitle = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(item.title)
+                        val artistName = item.artists.joinToString(", ") { it.name }.ifBlank { song.singer }
+                        val id = ("yt:${item.id}").hashCode() and 0x7fffffff
+                        if (id != song.id) {
+                            candidates.add(
+                                SongsModel(
+                                    id = id,
+                                    title = item.title,
+                                    album = item.album?.name ?: "Radio",
+                                    singer = artistName,
+                                    coverUri = item.thumbnail,
+                                    url = "youtube:${item.id}|$cleanTitle $artistName",
+                                    spotifyTrackId = "",
+                                    explicit = item.explicit,
+                                    durationMs = (item.duration ?: 0) * 1000,
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Filter out playing track and duplicates
+                val distinctCandidates = candidates.filter { it.id != song.id && it.title.isNotBlank() }.distinctBy { it.id }
+
+                // Sort with SmartMusicRanker to create cohesive acoustic flow and mood trajectory
+                val flow = if (distinctCandidates.size > 1) {
+                    SmartMusicRanker.sortSmartFlow(context, distinctCandidates)
+                } else distinctCandidates
+
+                withContext(Dispatchers.Main) {
+                    // Only update if this song is still playing / queue has not been replaced
+                    val activeQueue = currentSongState.queue.value
+                    if (activeQueue.size == 1 && activeQueue.first().id == song.id) {
+                        currentSongState.updateQueue(listOf(song) + flow)
+                        io.github.sekademi.spotufi.di.SongPlayer.prefetchList(
+                            flow.take(3).map { it.url },
+                            context,
+                            count = 3
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SearchViewModel", "Mood radio generation failed: ${e.message}")
+            }
+        }
+    }
+
     fun playSongFromList(song: SongsModel, list: List<SongsModel>, context: android.content.Context) {
         val effectiveList = if (list.isNotEmpty() && list.any { it.id == song.id }) list else listOf(song)
         val index = effectiveList.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
@@ -63,7 +173,7 @@ class SearchViewModel @Inject constructor(private val repository: AppRepository,
         io.github.sekademi.spotufi.di.SongPlayer.playSong(song.url, context)
 
         if (effectiveList.size <= 1) {
-            startRadioFromSong(song)
+            playSongAndStartRadio(song, context)
         }
     }
 
@@ -72,7 +182,11 @@ class SearchViewModel @Inject constructor(private val repository: AppRepository,
      * the queue becomes just this track, then recommended tracks (Spotify or YouTube)
      * are appended as they load.
      */
-    fun startRadioFromSong(song: SongsModel) {
+    fun startRadioFromSong(song: SongsModel, context: android.content.Context? = null) {
+        if (context != null) {
+            playSongAndStartRadio(song, context)
+            return
+        }
         currentSongState.updateQueue(listOf(song))
         val seed = song.spotifyTrackId
         if (seed.isBlank()) {

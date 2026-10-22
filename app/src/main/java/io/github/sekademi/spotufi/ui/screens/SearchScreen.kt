@@ -64,6 +64,13 @@ import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.data.entity.SearchResults
 import io.github.sekademi.spotufi.data.entity.SongsModel
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import io.github.sekademi.spotufi.ui.components.AnimatedHeartButton
+import io.github.sekademi.spotufi.ui.components.BouncyScaleBox
 import androidx.compose.material.icons.filled.Info
 import io.github.sekademi.spotufi.ui.components.EmptyStateView
 import io.github.sekademi.spotufi.ui.components.ErrorRetryView
@@ -654,6 +661,17 @@ fun SearchSongRow(
         )
     }
 
+    val rowInteractionSource = remember { MutableInteractionSource() }
+    val isRowPressed by rowInteractionSource.collectIsPressedAsState()
+    val rowScale by animateFloatAsState(
+        targetValue = if (isRowPressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "searchRowScale"
+    )
+
     SwipeToQueueBox(song = song, onAddToQueue = { playerViewModel.addToQueue(it) }) {
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -661,13 +679,17 @@ fun SearchSongRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp, 8.dp)
+                .graphicsLayer {
+                    scaleX = rowScale
+                    scaleY = rowScale
+                }
                 .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
+                    interactionSource = rowInteractionSource,
                     indication = null,
                     onLongClick = { showSongOptions = true },
                     onClick = {
                         onPlayed()
-                        searchViewModel.playSongFromList(song, songList, context)
+                        searchViewModel.playSongAndStartRadio(song, context)
                     }
                 ),
         ) {
@@ -719,40 +741,36 @@ fun SearchSongRow(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) {
-                            if (isLiked) {
-                                removeLikedSong(context, song.id.toString())
-                            } else {
-                                addLikedSong(context, song)
-                            }
-                            if (song.spotifyTrackId.isNotBlank()) {
-                                io.github.sekademi.spotufi.data.api.SpotifySync.setTrackSaved(context, song.spotifyTrackId, !isLiked)
-                            }
-                            isLiked = !isLiked
-                            searchViewModel.updateLikeState(!searchViewModel.likeState.value)
-                        },
-                    painter = if (isLiked) painterResource(id = R.drawable.added) else painterResource(id = R.drawable.ic_add),
-                    tint = if (isLiked) Color.White else Color.Gray,
-                    contentDescription = if (isLiked) "Remove from Liked" else "Add to Liked",
+                AnimatedHeartButton(
+                    isLiked = isLiked,
+                    size = 20.dp,
+                    likedColor = Color(0xFF1ED760),
+                    unlikedColor = Color.Gray,
+                    onClick = {
+                        if (isLiked) {
+                            removeLikedSong(context, song.id.toString())
+                        } else {
+                            addLikedSong(context, song)
+                        }
+                        if (song.spotifyTrackId.isNotBlank()) {
+                            io.github.sekademi.spotufi.data.api.SpotifySync.setTrackSaved(context, song.spotifyTrackId, !isLiked)
+                        }
+                        isLiked = !isLiked
+                        searchViewModel.updateLikeState(!searchViewModel.likeState.value)
+                    }
                 )
                 Spacer(modifier = Modifier.width(16.dp))
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Song options",
-                    tint = Color(0xFFB3B3B3),
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { showSongOptions = true }
-                )
+                BouncyScaleBox(
+                    onClick = { showSongOptions = true },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Song options",
+                        tint = Color(0xFFB3B3B3),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

@@ -82,10 +82,18 @@ object StreamResolver {
         streamCache.remove(song)
         sourceCache.remove(song)
         qualityCache.remove(song)
+        val sid = trackIdRegistry[song] ?: spotifyTrackIdForPlayback(song)
+        if (sid != null) {
+            streamCache.remove(sid)
+            sourceCache.remove(sid)
+            qualityCache.remove(sid)
+        }
         context?.let {
             io.github.sekademi.spotufi.data.preferences.clearCachedStream(it, song)
+            if (sid != null) io.github.sekademi.spotufi.data.preferences.clearCachedStream(it, "spotify_id:$sid")
             io.github.sekademi.spotufi.data.preferences.clearCachedVideoId(it, song)
             io.github.sekademi.spotufi.data.preferences.clearTrackQualityProfile(it, song)
+            if (sid != null) io.github.sekademi.spotufi.data.preferences.clearPermanentVideoIdForSpotifyId(it, sid)
         }
     }
 
@@ -175,17 +183,24 @@ object StreamResolver {
             return if (path.startsWith("content://") || path.startsWith("file://")) path
             else android.net.Uri.fromFile(java.io.File(path)).toString()
         }
-        streamCache[song]?.let {
+        val sid = (trackIdRegistry[song] ?: spotifyTrackIdForPlayback(song))
+        val inMemory = streamCache[song] ?: sid?.let { streamCache[it] }
+        if (inMemory != null) {
             if (forPlayback) {
-                currentSource = sourceCache[song] ?: "YouTube"
-                currentQuality = qualityCache[song] ?: ""
+                currentSource = sourceCache[song] ?: sid?.let { sourceCache[it] } ?: "YouTube"
+                currentQuality = qualityCache[song] ?: sid?.let { qualityCache[it] } ?: ""
             }
-            return it
+            return inMemory
         }
-        io.github.sekademi.spotufi.data.preferences.getCachedStream(appContext, song)?.let { (url, src, q) ->
+        io.github.sekademi.spotufi.data.preferences.getCachedStreamForQueryOrSpotifyId(appContext, song, sid)?.let { (url, src, q) ->
             streamCache[song] = url
             sourceCache[song] = src
             qualityCache[song] = q
+            if (sid != null) {
+                streamCache[sid] = url
+                sourceCache[sid] = src
+                qualityCache[sid] = q
+            }
             if (forPlayback) {
                 currentSource = src
                 currentQuality = q
@@ -196,7 +211,6 @@ object StreamResolver {
         val isLosslessKnownUnavailable = qualityProfile?.losslessAvailability == io.github.sekademi.spotufi.data.preferences.LosslessAvailability.UNAVAILABLE
 
         val quality = io.github.sekademi.spotufi.data.preferences.currentStreamingQuality(appContext)
-        val sid = (trackIdRegistry[song] ?: spotifyTrackIdForPlayback(song))
         val shouldTryLossless = losslessStreaming && quality.lossless && !isLosslessKnownUnavailable && sid != null
 
         return coroutineScope {
@@ -227,9 +241,13 @@ object StreamResolver {
                     streamCache[song] = flacResult.track.url
                     sourceCache[song] = "Lossless • ${flacResult.track.provider}"
                     qualityCache[song] = flacQuality
-                    io.github.sekademi.spotufi.data.preferences.setCachedStream(
+                    streamCache[sid] = flacResult.track.url
+                    sourceCache[sid] = "Lossless • ${flacResult.track.provider}"
+                    qualityCache[sid] = flacQuality
+                    io.github.sekademi.spotufi.data.preferences.setCachedStreamWithSpotifyId(
                         appContext,
                         song,
+                        sid,
                         flacResult.track.url,
                         "Lossless • ${flacResult.track.provider}",
                         flacQuality,
@@ -273,9 +291,15 @@ object StreamResolver {
             streamCache[song] = playback.streamUrl
             sourceCache[song] = "YouTube"
             qualityCache[song] = ytQuality
-            io.github.sekademi.spotufi.data.preferences.setCachedStream(
+            if (sid != null) {
+                streamCache[sid] = playback.streamUrl
+                sourceCache[sid] = "YouTube"
+                qualityCache[sid] = ytQuality
+            }
+            io.github.sekademi.spotufi.data.preferences.setCachedStreamWithSpotifyId(
                 appContext,
                 song,
+                sid,
                 playback.streamUrl,
                 "YouTube",
                 ytQuality,
@@ -323,6 +347,15 @@ object StreamResolver {
         }
         val searchText = searchTextForPlayback(query)
         if (searchText.length == 11 && !searchText.contains(' ')) return listOf(searchText)
+
+        val sid = trackIdRegistry[query] ?: spotifyTrackIdForPlayback(query)
+        if (sid != null) {
+            val permanentVideoId = io.github.sekademi.spotufi.data.preferences.getPermanentVideoIdForSpotifyId(appContext, sid)
+            if (!permanentVideoId.isNullOrBlank()) {
+                Log.d(TAG, "resolveVideoCandidates: Found permanent videoId match for Spotify ID $sid -> $permanentVideoId")
+                return listOf(permanentVideoId)
+            }
+        }
 
         val cacheKey = "$query|$filter"
         io.github.sekademi.spotufi.data.preferences.getCachedVideoIds(appContext, cacheKey)?.let { cachedIds ->
@@ -484,6 +517,10 @@ object StreamResolver {
                             videoId,
                             ytQuality,
                         )
+                        val sid = trackIdRegistry[query] ?: spotifyTrackIdForPlayback(query)
+                        if (sid != null) {
+                            io.github.sekademi.spotufi.data.preferences.setPermanentVideoIdForSpotifyId(appContext, sid, videoId)
+                        }
                         return playback
                     },
                     onFailure = { Log.w(TAG, "stream failed for $videoId (${it.message}) — trying next candidate for: ${searchTextForPlayback(query)}") },
@@ -492,12 +529,17 @@ object StreamResolver {
             return null
         }
         val qualityProfile = io.github.sekademi.spotufi.data.preferences.getTrackQualityProfile(appContext, query)
+        val sid = trackIdRegistry[query] ?: spotifyTrackIdForPlayback(query)
         val bestKnownVideoId = qualityProfile?.bestVideoId
+            ?: sid?.let { io.github.sekademi.spotufi.data.preferences.getPermanentVideoIdForSpotifyId(appContext, it) }
         if (!bestKnownVideoId.isNullOrBlank()) {
             val playback = tryIds(listOf(bestKnownVideoId))
             if (playback != null) return playback
             Log.w(TAG, "Cached bestVideoId $bestKnownVideoId failed for: $query — purging")
             io.github.sekademi.spotufi.data.preferences.clearBestVideoMatch(appContext, query)
+            if (sid != null) {
+                io.github.sekademi.spotufi.data.preferences.clearPermanentVideoIdForSpotifyId(appContext, sid)
+            }
         }
         tryIds(resolveVideoCandidates(query, appContext).take(3))?.let { return it }
         if (!io.github.sekademi.spotufi.data.preferences.isVideoFallbackEnabled(appContext)) {

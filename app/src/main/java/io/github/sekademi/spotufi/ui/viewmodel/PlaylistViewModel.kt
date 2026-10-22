@@ -79,6 +79,7 @@ class PlaylistViewModel @Inject constructor(
                         )
                     )
                     _songs.value = Response.Success(local.songs)
+                    io.github.sekademi.spotufi.di.SongPlayer.prefetchList(local.songs.map { it.url }, context, count = 3)
                 } else {
                     _playlist.value = Response.Error("Local playlist not found")
                     _songs.value = Response.Error("Local playlist not found")
@@ -93,7 +94,9 @@ class PlaylistViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             repository.providePlaylistSongs(playlistId).collect { response ->
                 _songs.value = if (response is Response.Success) {
-                    Response.Success(response.data.distinctBy { it.id })
+                    val distinct = response.data.distinctBy { it.id }
+                    io.github.sekademi.spotufi.di.SongPlayer.prefetchList(distinct.map { it.url }, context, count = 3)
+                    Response.Success(distinct)
                 } else {
                     response
                 }

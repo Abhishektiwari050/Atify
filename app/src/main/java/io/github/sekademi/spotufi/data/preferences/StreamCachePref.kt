@@ -7,6 +7,7 @@ private const val SUFFIX_URL = "_url"
 private const val SUFFIX_SOURCE = "_src"
 private const val SUFFIX_QUALITY = "_q"
 private const val SUFFIX_EXPIRES = "_exp"
+private const val PREFIX_SPOTIFY_ID = "spotify_id:"
 
 /**
  * Returns a cached (url, source, quality) triple if the entry exists and has not
@@ -37,6 +38,22 @@ fun getCachedStream(
 }
 
 /**
+ * Returns a cached stream by query, falling back to looking up by Spotify ID if present.
+ */
+fun getCachedStreamForQueryOrSpotifyId(
+    context: Context,
+    query: String,
+    spotifyId: String? = null,
+): Triple<String, String, String>? {
+    val cached = getCachedStream(context, query)
+    if (cached != null) return cached
+    if (!spotifyId.isNullOrBlank()) {
+        return getCachedStream(context, "$PREFIX_SPOTIFY_ID$spotifyId")
+    }
+    return null
+}
+
+/**
  * Persist a resolved stream URL so the next play of the same query can skip the
  * full resolution pipeline. [expiresInSeconds] is the value from the YouTube
  * player response (typically ~21600 = 6h).
@@ -60,10 +77,28 @@ fun setCachedStream(
         .apply()
 }
 
+/**
+ * Persist a resolved stream under both the full query and the Spotify track ID for fast retrieval.
+ */
+fun setCachedStreamWithSpotifyId(
+    context: Context,
+    query: String,
+    spotifyId: String?,
+    url: String,
+    source: String,
+    quality: String,
+    expiresInSeconds: Int,
+) {
+    setCachedStream(context, query, url, source, quality, expiresInSeconds)
+    if (!spotifyId.isNullOrBlank()) {
+        setCachedStream(context, "$PREFIX_SPOTIFY_ID$spotifyId", url, source, quality, expiresInSeconds)
+    }
+}
+
 /** Remove a cached stream entry (used when the user invalidates / refreshes). */
 fun clearCachedStream(context: Context, query: String) {
-    context.getSharedPreferences(PREF_STREAM_CACHE, Context.MODE_PRIVATE)
-        .edit()
+    val prefs = context.getSharedPreferences(PREF_STREAM_CACHE, Context.MODE_PRIVATE)
+    prefs.edit()
         .remove(query + SUFFIX_URL)
         .remove(query + SUFFIX_SOURCE)
         .remove(query + SUFFIX_QUALITY)

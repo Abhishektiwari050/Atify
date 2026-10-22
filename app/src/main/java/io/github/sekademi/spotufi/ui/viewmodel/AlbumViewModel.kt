@@ -1,5 +1,6 @@
 package io.github.sekademi.spotufi.ui.viewmodel
 
+import android.content.Context
 import androidx.compose.runtime.State
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,7 @@ import io.github.sekademi.spotufi.data.entity.SongsModel
 import io.github.sekademi.spotufi.di.CurrentSongState
 import io.github.sekademi.spotufi.ui.repository.AppRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +19,11 @@ import javax.inject.Inject
 
 
 @HiltViewModel
-class AlbumViewModel @Inject constructor(private val repository: AppRepository, private val currentSongState: CurrentSongState) :  ViewModel() {
+class AlbumViewModel @Inject constructor(
+    private val repository: AppRepository,
+    private val currentSongState: CurrentSongState,
+    @ApplicationContext private val context: Context,
+) :  ViewModel() {
 
     val currentSongPlayingState: State<Boolean> get() = currentSongState.playingState
 
@@ -66,7 +72,9 @@ class AlbumViewModel @Inject constructor(private val repository: AppRepository, 
         viewModelScope.launch(Dispatchers.IO) {
             repository.provideAlbumSongs(name, artist).collect { response ->
                 _songs.value = if (response is Response.Success) {
-                    Response.Success(response.data.distinctBy { it.id })
+                    val distinct = response.data.distinctBy { it.id }
+                    io.github.sekademi.spotufi.di.SongPlayer.prefetchList(distinct.map { it.url }, context, count = 3)
+                    Response.Success(distinct)
                 } else {
                     response
                 }

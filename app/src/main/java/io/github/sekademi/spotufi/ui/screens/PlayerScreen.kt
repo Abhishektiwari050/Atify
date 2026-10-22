@@ -643,6 +643,7 @@ fun PlayerScreen(navController: NavController) {
                 pagerState = artworkPagerState,
                 canvasUrl = canvasUrl,
                 showStaticCover = showStaticCover,
+                isPlaying = songPlayingState,
                 onToggleCover = { if (playerViewModel.canvasUrl.value != null) showStaticCover = !showStaticCover },
                 modifier = Modifier
                     .weight(1f)

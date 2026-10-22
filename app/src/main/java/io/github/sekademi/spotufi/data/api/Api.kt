@@ -223,7 +223,7 @@ class Api @Inject constructor(
         if (!SpotifyTokenProvider.ensureToken(context)) {
             emit(Response.Error("Spotify not authenticated — set sp_dc cookie")); return@flow
         }
-        Spotify.search(query, types = listOf("track"), limit = 30).fold(
+        Spotify.search(query, types = listOf("track"), limit = 50).fold(
             onSuccess = { res -> emit(Response.Success(res.tracks?.items.orEmpty().map { it.toSongModel() })) },
             onFailure = { Log.e("Api", "searchTracks failed", it); emit(Response.Error(it.message ?: "error")) },
         )
@@ -248,7 +248,7 @@ class Api @Inject constructor(
         coroutineScope {
             val spDeferred = async(Dispatchers.IO) {
                 if (hasSpotify) {
-                    Spotify.search(trimmed, types = listOf("track", "album", "artist"), limit = 20).getOrNull()
+                    Spotify.search(trimmed, types = listOf("track", "album", "artist"), limit = 50).getOrNull()
                 } else null
             }
             val spPodcastsDeferred = async(Dispatchers.IO) {

@@ -189,6 +189,15 @@ class PlaybackService : MediaLibraryService() {
                         nextSong.coverUri, nextSong.title, nextSong.singer,
                         true, nextSong.id, nextIdx, nextSong.album
                     )
+
+                    // Prune finished media items from the beginning of ExoPlayer's playlist to keep current index at 0
+                    val p = SongPlayer.exoPlayer
+                    if (p != null && p.currentMediaItemIndex > 0) {
+                        for (i in 0 until p.currentMediaItemIndex) {
+                            p.removeMediaItem(0)
+                        }
+                    }
+
                     // Proactively queue the subsequent track for uninterrupted gapless playback
                     if (nextIdx in 0 until queue.lastIndex) {
                         val subsequent = queue[nextIdx + 1]
@@ -348,9 +357,7 @@ class PlaybackService : MediaLibraryService() {
                     intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_ARTIST),
                     intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_ALBUM),
                 ).joinToString(" ").takeIf { it.isNotBlank() }
-            if (!query.isNullOrBlank()) {
-                handleVoiceQuery(query)
-            }
+            handleVoiceQuery(query.orEmpty())
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -770,16 +777,58 @@ class PlaybackService : MediaLibraryService() {
                 )
                 SongPlayer.playSong(song.url, applicationContext)
             } else if (requested != null) {
-                extractSearchQuery(requested)?.let { handleVoiceQuery(it) }
+                val query = extractSearchQuery(requested)
+                handleVoiceQuery(query.orEmpty())
             }
+            val resolvedIndex = if (startIndex in mediaItems.indices) startIndex else 0
             return Futures.immediateFuture(
-                MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET),
+                MediaSession.MediaItemsWithStartPosition(mediaItems, resolvedIndex, startPositionMs.coerceAtLeast(0L)),
             )
         }
     }
 
+    /**
+     * Sanitizes voice queries from Google Assistant / Gemini / Android Auto.
+     * Often, speech recognition hears "Atify" phonetically as "85" ("eighty-five"),
+     * or includes voice command preambles ("play [song] using Atify" / "play [song] on 85").
+     */
+    private fun sanitizeVoiceQuery(rawQuery: String): String {
+        var q = rawQuery.trim()
+        if (q.isBlank()) return ""
+
+        // 1. Remove leading play commands ("play ", "listen to ", "start ", "stream ", "put on ")
+        q = q.replace(Regex("""^(?i)(play|listen\s+to|start|stream|put\s+on)\s+"""), "").trim()
+
+        // 2. Remove app suffixes: "on atify", "using atify", "on 85", "using 85", "in 85", "with 85", "on eighty-five", etc.
+        q = q.replace(Regex("""(?i)\s+(on|using|with|in|via|from|by)\s+(atify|spotufi|85|eighty[\s-]?five)\b.*$"""), "").trim()
+
+        // 3. Remove trailing app name or phonetic "85" ("starboy 85", "starboy atify")
+        q = q.replace(Regex("""(?i)\s+\b(atify|spotufi|85|eighty[\s-]?five)\b.*$"""), "").trim()
+
+        // 4. Remove leading app name ("atify play starboy" or "85 play starboy")
+        q = q.replace(Regex("""^(?i)(atify|spotufi|85|eighty[\s-]?five)\s+"""), "").trim()
+
+        // 5. If speech-to-text transcribed "play a song using atify" or "play on song using atify",
+        // the remaining text may be "a song", "on song", "some music", "music", "songs", or simply empty/85.
+        val genericFallbacks = setOf(
+            "85", "eighty five", "eighty-five", "atify", "spotufi",
+            "a song", "on song", "one song", "song", "songs",
+            "some music", "music", "something", "my music", "my songs"
+        )
+        if (q.lowercase() in genericFallbacks) {
+            return ""
+        }
+
+        return q.trim()
+    }
+
     private fun extractSearchQuery(item: MediaItem): String? {
         val req = item.requestMetadata
+        val titleArtist = listOfNotNull(
+            item.mediaMetadata.title?.toString()?.takeIf { it.isNotBlank() },
+            item.mediaMetadata.artist?.toString()?.takeIf { it.isNotBlank() },
+        ).joinToString(" ").takeIf { it.isNotBlank() }
+
         val query = req.searchQuery?.takeIf { it.isNotBlank() }
             ?: req.extras?.getString(android.app.SearchManager.QUERY)?.takeIf { it.isNotBlank() }
             ?: req.extras?.getString(android.provider.MediaStore.EXTRA_MEDIA_TITLE)?.takeIf { it.isNotBlank() }
@@ -787,17 +836,33 @@ class PlaybackService : MediaLibraryService() {
                 req.extras?.getString(android.provider.MediaStore.EXTRA_MEDIA_ARTIST),
                 req.extras?.getString(android.provider.MediaStore.EXTRA_MEDIA_ALBUM),
             ).joinToString(" ").takeIf { it.isNotBlank() }
+            ?: titleArtist
             ?: item.mediaId.takeIf {
                 it.isNotBlank() && !it.startsWith("folder/") &&
                     it !in setOf(ROOT, NODE_LIKED, NODE_DOWNLOADS, NODE_PLAYLISTS, NODE_ALBUMS)
             }
-        return query?.trim()
+        return query?.let { sanitizeVoiceQuery(it) }
     }
 
     private fun handleVoiceQuery(query: String) {
         lifecycleScope.launch(Dispatchers.IO) {
-            val cleanQuery = query.trim()
-            if (cleanQuery.isBlank()) return@launch
+            val cleanQuery = sanitizeVoiceQuery(query)
+            if (cleanQuery.isBlank()) {
+                withContext(Dispatchers.Main) {
+                    if (currentSongState.queue.value.isNotEmpty()) {
+                        SongPlayer.play()
+                    } else {
+                        val liked = io.github.sekademi.spotufi.data.preferences.getLocalLikedSongs(this@PlaybackService)
+                        if (liked.isNotEmpty()) {
+                            currentSongState.updateQueue(liked)
+                            val first = liked.first()
+                            currentSongState.updateSongState(first.coverUri, first.title, first.singer, true, first.id, 0, first.album)
+                            SongPlayer.playSong(first.url, applicationContext)
+                        }
+                    }
+                }
+                return@launch
+            }
 
             // 1. Unified catalog search (songs, episodes, shows)
             val searchResults = runCatching {
@@ -823,12 +888,13 @@ class PlaybackService : MediaLibraryService() {
             if (!searchResults?.songs.isNullOrEmpty()) {
                 val topSong = searchResults.songs.first()
                 withContext(Dispatchers.Main) {
-                    currentSongState.updateQueue(searchResults.songs)
+                    currentSongState.updateQueue(listOf(topSong))
                     currentSongState.updateSongState(
                         topSong.coverUri, topSong.title, topSong.singer, true,
                         topSong.id, 0, topSong.album,
                     )
                     SongPlayer.playSong(topSong.url, applicationContext)
+                    triggerAutoplay(topSong)
                 }
                 return@launch
             }
@@ -876,6 +942,7 @@ class PlaybackService : MediaLibraryService() {
                         model.id, 0, model.album,
                     )
                     SongPlayer.playSong(model.url, applicationContext)
+                    triggerAutoplay(model)
                 }
             }
         }
