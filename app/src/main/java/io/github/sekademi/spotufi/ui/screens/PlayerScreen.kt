@@ -173,8 +173,10 @@ fun PlayerScreen(navController: NavController) {
             animatable.animateTo(
                 targetValue = targetValue,
                 initialVelocity = velocity,
-                animationSpec = if (targetValue == 0f || targetValue == screenHeight)
-                    tween(350) else spring()
+                animationSpec = spring(
+                    dampingRatio = 0.84f,
+                    stiffness = 380f,
+                )
             ) {
                 offsetY = this.value
             }
@@ -550,6 +552,14 @@ fun PlayerScreen(navController: NavController) {
             }
             .graphicsLayer {
                 translationY = offsetY
+                val dragProgress = if (screenHeight > 0f) (offsetY / screenHeight).coerceIn(0f, 1f) else 0f
+                scaleX = 1f - (dragProgress * 0.04f)
+                scaleY = 1f - (dragProgress * 0.04f)
+                clip = dragProgress > 0.01f
+                shape = RoundedCornerShape(
+                    topStart = (dragProgress * 28f).dp,
+                    topEnd = (dragProgress * 28f).dp
+                )
             }
             .background(
                 Brush.verticalGradient(

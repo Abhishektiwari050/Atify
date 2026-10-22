@@ -81,6 +81,7 @@ import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import io.github.sekademi.spotufi.ui.components.SwipeToQueueBox
+import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import io.github.sekademi.spotufi.ui.viewmodel.PlaylistViewModel
 import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 
@@ -620,9 +621,8 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(20.dp, 8.dp)
-                                .combinedClickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
+                                .tactileItemPress(
+                                    pressedScale = 0.985f,
                                     onLongClick = { menuSong = song },
                                     onClick = {
                                         playlistViewModel.updateQueue(filteredSongs)

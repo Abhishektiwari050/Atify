@@ -1,11 +1,13 @@
 package io.github.sekademi.spotufi.ui.screens.player
 
 import android.content.Context
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -100,30 +102,57 @@ fun PlayerInfo(
                     .padding(end = 12.dp)
             ) {
                 Column {
-                    Text(
-                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
-                        text = songTitle,
-                        color = Color.White,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                    Text(
-                        text = songSinger,
-                        color = Color.Gray,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2000)
-                            .then(
-                                if (onArtistClick != null) Modifier.clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) { onArtistClick() } else Modifier
-                            ),
-                    )
+                    AnimatedContent(
+                        targetState = songTitle,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = androidx.compose.animation.core.tween(220)) +
+                                slideInVertically(animationSpec = androidx.compose.animation.core.tween(220)) { it / 3 })
+                                .togetherWith(
+                                    fadeOut(animationSpec = androidx.compose.animation.core.tween(160)) +
+                                        slideOutVertically(animationSpec = androidx.compose.animation.core.tween(160)) { -it / 3 }
+                                )
+                        },
+                        label = "playerSongTitleTransition"
+                    ) { targetTitle ->
+                        Text(
+                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
+                            text = targetTitle,
+                            color = Color.White,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+
+                    AnimatedContent(
+                        targetState = songSinger,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = androidx.compose.animation.core.tween(220)) +
+                                slideInVertically(animationSpec = androidx.compose.animation.core.tween(220)) { it / 3 })
+                                .togetherWith(
+                                    fadeOut(animationSpec = androidx.compose.animation.core.tween(160)) +
+                                        slideOutVertically(animationSpec = androidx.compose.animation.core.tween(160)) { -it / 3 }
+                                )
+                        },
+                        label = "playerSongSingerTransition"
+                    ) { targetSinger ->
+                        Text(
+                            text = targetSinger,
+                            color = Color.Gray,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2000)
+                                .then(
+                                    if (onArtistClick != null) Modifier.clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) { onArtistClick() } else Modifier
+                                ),
+                        )
+                    }
                     val isResolvingState = isResolving && resolveStatus.isNotBlank()
                     val hasError = !resolveError.isNullOrBlank()
                     val displaySource = if (isResolvingState) "Resolving" else if (hasError) "Error" else source

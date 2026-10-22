@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -284,3 +285,120 @@ fun AnimatedRepeatButton(
         }
     }
 }
+
+/**
+ * Tactile touch press modifier for list items, cards, and grid tiles.
+ * Provides subtle spring compression (e.g. 0.982f) with haptic feedback,
+ * making track rows and cards feel responsive without jarring UI shifts.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun Modifier.tactileItemPress(
+    pressedScale: Float = 0.982f,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+): Modifier {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val haptic = LocalHapticFeedback.current
+
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) pressedScale else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.8f,
+            stiffness = 500f,
+        ),
+        label = "tactileItemScale",
+    )
+
+    return this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .then(
+            if (onClick != null || onLongClick != null) {
+                Modifier.combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        onClick?.invoke()
+                    },
+                    onLongClick = onLongClick?.let { action ->
+                        {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            action()
+                        }
+                    }
+                )
+            } else Modifier
+        )
+}
+
+/**
+ * High-polish Spotify-style play/pause button with elastic bounce scale physics on touch,
+ * spring-loaded icon morphing, and buffering spinner.
+ */
+@Composable
+fun AnimatedSpotifyPlayPauseButton(
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 64.dp,
+    iconSize: Dp = 32.dp,
+    backgroundColor: Color = Color.White,
+    iconColor: Color = Color.Black,
+) {
+    val iconScale = remember { Animatable(1f) }
+
+    LaunchedEffect(isPlaying) {
+        iconScale.animateTo(1.22f, tween(80, easing = FastOutSlowInEasing))
+        iconScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
+    }
+
+    BouncyScaleBox(
+        onClick = onClick,
+        enabled = !isLoading,
+        pressedScale = 0.93f,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .graphicsLayer {
+                    shape = androidx.compose.foundation.shape.CircleShape
+                    clip = true
+                }
+                .background(backgroundColor),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isLoading) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(iconSize),
+                    color = iconColor,
+                    strokeWidth = 3.dp,
+                )
+            } else {
+                Icon(
+                    painter = if (isPlaying)
+                        painterResource(id = R.drawable.ic_playing)
+                    else
+                        painterResource(id = R.drawable.play_svgrepo_com),
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = iconColor,
+                    modifier = Modifier
+                        .size(iconSize)
+                        .graphicsLayer {
+                            scaleX = iconScale.value
+                            scaleY = iconScale.value
+                            // Optical alignment: play icon needs a tiny horizontal offset to look centered
+                            translationX = if (!isPlaying) 2.dp.toPx() else 0f
+                        }
+                )
+            }
+        }
+    }
+}
+

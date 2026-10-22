@@ -77,6 +77,7 @@ import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.ui.components.LikedSongsScreen
 import io.github.sekademi.spotufi.ui.components.Loader
 import io.github.sekademi.spotufi.ui.components.Snackbar
+import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import io.github.sekademi.spotufi.ui.components.SwipeToQueueBox
@@ -494,9 +495,8 @@ fun SumUpAlbumScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(20.dp, 8.dp)
-                            .combinedClickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
+                            .tactileItemPress(
+                                pressedScale = 0.985f,
                                 onLongClick = { menuSong = albumSongs[song] },
                                 onClick = {
                                     albumViewModel.updateQueue(albumSongs)

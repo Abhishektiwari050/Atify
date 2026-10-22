@@ -78,6 +78,7 @@ import io.github.sekademi.spotufi.ui.components.Loader
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import io.github.sekademi.spotufi.ui.components.SwipeToQueueBox
+import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import io.github.sekademi.spotufi.ui.viewmodel.LikedSongsViewModel
 import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 
@@ -532,9 +533,8 @@ fun LikedSongsScreen(navController: NavController) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(20.dp, 8.dp)
-                            .combinedClickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
+                            .tactileItemPress(
+                                pressedScale = 0.985f,
                                 onLongClick = { menuSong = song },
                                 onClick = {
                                     likedSongsViewModel.updateQueue(filteredSongs)

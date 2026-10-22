@@ -48,14 +48,20 @@ fun CustomSlider(
     var isDragging by remember { mutableStateOf(false) }
 
     val trackHeight by animateDpAsState(
-        targetValue = if (isDragging) 5.dp else 3.dp,
-        animationSpec = tween(durationMillis = 150),
+        targetValue = if (isDragging) 5.5.dp else 3.5.dp,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+        ),
         label = "trackHeight"
     )
-    val thumbAlpha by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0f,
-        animationSpec = tween(durationMillis = 150),
-        label = "thumbAlpha"
+    val thumbRadius by animateDpAsState(
+        targetValue = if (isDragging) 7.5.dp else 4.5.dp,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+        ),
+        label = "thumbRadius"
     )
 
     val fraction = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start))
@@ -96,19 +102,21 @@ fun CustomSlider(
         contentAlignment = Alignment.Center
     ) {
         val trackHeightPx = with(density) { trackHeight.toPx() }
-        val thumbRadiusPx = with(density) { 6.dp.toPx() }
+        val thumbRadiusPx = with(density) { thumbRadius.toPx() }
 
-        Canvas(modifier = Modifier.fillMaxWidth().height(trackHeight)) {
+        Canvas(modifier = Modifier.fillMaxWidth().height(36.dp)) {
             val trackY = size.height / 2f
-            val thumbX = fraction * size.width
+            val thumbX = (fraction * size.width).coerceIn(thumbRadiusPx, size.width - thumbRadiusPx)
 
+            // Background inactive track
             drawLine(
-                color = Color(0xFF535353),
+                color = Color(0x38FFFFFF),
                 start = Offset(0f, trackY),
                 end = Offset(size.width, trackY),
                 strokeWidth = trackHeightPx,
                 cap = StrokeCap.Round
             )
+            // Active played track
             drawLine(
                 color = Color.White,
                 start = Offset(0f, trackY),
@@ -116,13 +124,12 @@ fun CustomSlider(
                 strokeWidth = trackHeightPx,
                 cap = StrokeCap.Round
             )
-            if (thumbAlpha > 0f) {
-                drawCircle(
-                    color = Color.White.copy(alpha = thumbAlpha),
-                    radius = thumbRadiusPx,
-                    center = Offset(thumbX, trackY)
-                )
-            }
+            // Always-visible tactile thumb indicator
+            drawCircle(
+                color = Color.White,
+                radius = thumbRadiusPx,
+                center = Offset(thumbX, trackY)
+            )
         }
     }
 }

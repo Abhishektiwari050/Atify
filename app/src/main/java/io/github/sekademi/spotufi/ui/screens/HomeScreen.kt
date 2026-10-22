@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.style.TextOverflow
 import io.github.sekademi.spotufi.ui.components.WhatsNewSheet
+import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import io.github.sekademi.spotufi.data.entity.SongsModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -423,10 +424,10 @@ private fun HomeShortcutGrid(navController: NavController, items: List<HomeItem>
                             .height(48.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(Color(GridBackground.toArgb()))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { onHomeItemClick(navController, item) },
+                            .tactileItemPress(
+                                pressedScale = 0.96f,
+                                onClick = { onHomeItemClick(navController, item) }
+                            ),
                     ) {
                         AsyncImage(
                             modifier = Modifier.size(48.dp),
@@ -481,10 +482,10 @@ private fun HomeFeedCard(item: HomeItem, onClick: () -> Unit) {
         modifier = Modifier
             .width(150.dp)
             .padding(6.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() },
+            .tactileItemPress(
+                pressedScale = 0.95f,
+                onClick = onClick,
+            ),
     ) {
         AsyncImage(
             modifier = Modifier

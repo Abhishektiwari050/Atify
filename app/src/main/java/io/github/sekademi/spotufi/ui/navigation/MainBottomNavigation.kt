@@ -25,6 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,14 +89,28 @@ fun MainBottomNavigation(navController: NavHostController, bottomBarState: Mutab
                         val navStack by navController.currentBackStackEntryAsState()
                         val currentRoute = navStack?.destination?.route
 
+                        val haptic = LocalHapticFeedback.current
+
                         navItems.forEach { item ->
+                            val isSelected = currentRoute == item.route
+                            val iconScale by androidx.compose.animation.core.animateFloatAsState(
+                                targetValue = if (isSelected) 1.08f else 0.94f,
+                                animationSpec = androidx.compose.animation.core.spring(
+                                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                    stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+                                ),
+                                label = "navIconScale"
+                            )
                             NavigationBarItem(
-                                selected = currentRoute == item.route,
+                                selected = isSelected,
                                 icon = {
                                     Icon(
-                                        painter = painterResource(
-                                            id = item.icon
-                                        ), contentDescription = "home"
+                                        painter = painterResource(id = item.icon),
+                                        contentDescription = item.label,
+                                        modifier = Modifier.graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                        }
                                     )
                                 },
                                 label = {
@@ -108,6 +125,7 @@ fun MainBottomNavigation(navController: NavHostController, bottomBarState: Mutab
                                     }
                                 },
                                 onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                     navController.navigate(item.route) {
                                         navController.graph.startDestinationRoute?.let {
                                             popUpTo(item.route)

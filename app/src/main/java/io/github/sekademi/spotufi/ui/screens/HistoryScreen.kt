@@ -49,6 +49,7 @@ import androidx.navigation.NavController
 import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
+import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import io.github.sekademi.spotufi.data.preferences.HistoryEntry
 import io.github.sekademi.spotufi.data.preferences.clearListeningHistory
 import io.github.sekademi.spotufi.data.preferences.getListeningHistory
@@ -367,10 +368,10 @@ private fun TopArtistRow(
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(CardBg)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() }
+            .tactileItemPress(
+                pressedScale = 0.98f,
+                onClick = onClick,
+            )
             .padding(12.dp),
     ) {
         Text(
@@ -441,10 +442,10 @@ private fun TopTrackRow(
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(CardBg)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() }
+            .tactileItemPress(
+                pressedScale = 0.98f,
+                onClick = onClick,
+            )
             .padding(12.dp),
     ) {
         Text(
@@ -516,10 +517,10 @@ private fun HistoryRow(entry: HistoryEntry, onRemove: () -> Unit, onClick: () ->
             .fillMaxWidth()
             .padding(16.dp, 6.dp)
             .clip(RoundedCornerShape(8.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() },
+            .tactileItemPress(
+                pressedScale = 0.98f,
+                onClick = onClick,
+            ),
     ) {
         AsyncImage(
             modifier = Modifier

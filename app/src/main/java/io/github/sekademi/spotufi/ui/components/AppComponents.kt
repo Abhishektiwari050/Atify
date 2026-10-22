@@ -414,6 +414,11 @@ fun MiniPlayer(navController: NavHostController) {
                 Spacer(modifier = Modifier.width(6.dp))
 
                 val isLocatingOrBuffering = miniPlayerViewModel.isResolving.value || miniPlayerViewModel.isBuffering.value
+                val miniIconScale = remember { Animatable(1f) }
+                LaunchedEffect(songPlayingState) {
+                    miniIconScale.animateTo(1.25f, tween(80, easing = FastOutSlowInEasing))
+                    miniIconScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
+                }
                 BouncyScaleBox(
                     onClick = {
                         if (songPlayingState) {
@@ -458,7 +463,13 @@ fun MiniPlayer(navController: NavHostController) {
                                 painterResource(id = R.drawable.play_svgrepo_com),
                             contentDescription = if (songPlayingState) "Pause" else "Play",
                             tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier
+                                .size(32.dp)
+                                .graphicsLayer {
+                                    scaleX = miniIconScale.value
+                                    scaleY = miniIconScale.value
+                                    translationX = if (!songPlayingState) 1.5.dp.toPx() else 0f
+                                }
                         )
                     }
                 }

@@ -53,10 +53,19 @@ fun PlayerArtwork(
     val animatedScale by animateFloatAsState(
         targetValue = targetScale,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow,
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
         ),
         label = "album_cover_scale",
+    )
+
+    val shadowElevation by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isPlaying) 20.dp else 10.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "album_cover_shadow",
     )
 
     Box(

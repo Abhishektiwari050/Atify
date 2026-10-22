@@ -52,6 +52,7 @@ import io.github.sekademi.spotufi.di.RepeatMode
 import io.github.sekademi.spotufi.di.SongPlayer
 import io.github.sekademi.spotufi.ui.components.AnimatedRepeatButton
 import io.github.sekademi.spotufi.ui.components.AnimatedShuffleButton
+import io.github.sekademi.spotufi.ui.components.AnimatedSpotifyPlayPauseButton
 import io.github.sekademi.spotufi.ui.components.BouncyScaleBox
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.theme.AppPalette
@@ -100,43 +101,19 @@ fun PlayerFull(
         }
 
         val isLocatingOrBuffering = playerViewModel.isResolving.value || playerViewModel.isBuffering.value
-        BouncyScaleBox(
+        AnimatedSpotifyPlayPauseButton(
+            isPlaying = songPlayingState,
+            isLoading = isLocatingOrBuffering,
             onClick = {
                 val p = SongPlayer.exoPlayer
                 if (p != null) {
                     if (p.isPlaying) p.pause() else p.play()
                 }
             },
-            enabled = !isLocatingOrBuffering,
-            pressedScale = 0.94f
-        ) {
-            if (isLocatingOrBuffering) {
-                Box(
-                    modifier = Modifier
-                        .requiredSize(64.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(30.dp),
-                        color = Color.Black,
-                        strokeWidth = 3.dp,
-                    )
-                }
-            } else {
-                PlayPauseButton(
-                    player = SongPlayer.exoPlayer,
-                    modifier = Modifier
-                        .requiredSize(64.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        contentColor = Color.Black,
-                    ),
-                )
-            }
-        }
+            size = 64.dp,
+            iconSize = 30.dp,
+            modifier = Modifier.requiredSize(64.dp)
+        )
 
         BouncyScaleBox(
             onClick = {

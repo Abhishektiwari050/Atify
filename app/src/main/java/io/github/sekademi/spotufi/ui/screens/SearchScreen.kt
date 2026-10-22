@@ -71,6 +71,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import io.github.sekademi.spotufi.ui.components.AnimatedHeartButton
 import io.github.sekademi.spotufi.ui.components.BouncyScaleBox
+import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import androidx.compose.material.icons.filled.Info
 import io.github.sekademi.spotufi.ui.components.EmptyStateView
 import io.github.sekademi.spotufi.ui.components.ErrorRetryView
@@ -794,10 +795,10 @@ fun SearchShowRow(show: io.github.sekademi.spotufi.data.entity.PodcastModel, onC
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp, 8.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() },
+            .tactileItemPress(
+                pressedScale = 0.98f,
+                onClick = onClick,
+            ),
     ) {
         AsyncImage(
             modifier = Modifier
@@ -827,10 +828,10 @@ fun SearchArtistRow(artist: io.github.sekademi.spotufi.data.entity.ArtistsModel,
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp, 8.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() },
+            .tactileItemPress(
+                pressedScale = 0.98f,
+                onClick = onClick,
+            ),
     ) {
         AsyncImage(
             modifier = Modifier
@@ -857,10 +858,10 @@ fun SearchAlbumRow(album: io.github.sekademi.spotufi.data.entity.AlbumsModel, on
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp, 8.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() },
+            .tactileItemPress(
+                pressedScale = 0.98f,
+                onClick = onClick,
+            ),
     ) {
         AsyncImage(
             modifier = Modifier
@@ -949,10 +950,10 @@ private fun BrowseCategoryTile(
             .height(96.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(color)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() },
+            .tactileItemPress(
+                pressedScale = 0.95f,
+                onClick = onClick,
+            ),
     ) {
         if (cover.isNotBlank()) {
             AsyncImage(
