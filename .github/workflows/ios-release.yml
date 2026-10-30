@@ -77,4 +77,15 @@ jobs:
           TAG_NAME="${{ github.ref_name }}"
           echo "Attaching Atify.ipa to release $TAG_NAME..."
           cd build
-          gh release upload "$TAG_NAME" Atify.ipa Atify.ipa.sha256 --clobber --repo="${GITHUB_REPOSITORY}"
+          # Wait up to 10 minutes for the Android release workflow to create the release
+          for i in $(seq 1 60); do
+            if gh release view "$TAG_NAME" --repo="${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+              echo "Release $TAG_NAME found! Uploading IPA..."
+              gh release upload "$TAG_NAME" Atify.ipa Atify.ipa.sha256 --clobber --repo="${GITHUB_REPOSITORY}"
+              exit 0
+            fi
+            echo "Waiting for release $TAG_NAME to be created by Android builder (attempt $i/60)..."
+            sleep 10
+          done
+          echo "Fallback: release upload attempt..."
+          gh release upload "$TAG_NAME" Atify.ipa Atify.ipa.sha256 --clobber --repo="${GITHUB_REPOSITORY}" || true
