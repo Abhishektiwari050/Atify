@@ -142,7 +142,7 @@ class SearchViewModel @Inject constructor(private val repository: AppRepository,
                 withContext(Dispatchers.Main) {
                     // Only update if this song is still playing / queue has not been replaced
                     val activeQueue = currentSongState.queue.value
-                    if (currentSongState.currentSongId.value == song.id) {
+                    if (currentSongState.songId.value == song.id) {
                         val playingTrack = activeQueue.firstOrNull { it.id == song.id } ?: song
                         currentSongState.updateQueue(listOf(playingTrack) + flow)
                         io.github.sekademi.spotufi.di.SongPlayer.prefetchList(
