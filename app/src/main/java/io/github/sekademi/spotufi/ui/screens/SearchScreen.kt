@@ -278,10 +278,7 @@ fun SumUpSearchScreen(
                                         explicit = item.explicit,
                                         durationMs = item.durationMs,
                                     )
-                                    searchViewModel.startRadioFromSong(song)
-                                    SongPlayer.playSong(song.url, context)
-                                    searchViewModel.updateSongState(
-                                        song.coverUri, song.title, song.singer, true, song.id, 0, song.album)
+                                    searchViewModel.playSongAndStartRadio(song, context)
                                 }
                                 "artist" -> navController.navigate(artistRoute(item.name, item.key.takeIf { it != item.name }.orEmpty()))
                                 "album" -> navController.navigate(albumRoute(item.name, item.singer))

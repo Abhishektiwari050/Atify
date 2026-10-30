@@ -1,6 +1,7 @@
 package io.github.sekademi.spotufi.ui.screens.player
 
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
@@ -33,7 +34,7 @@ import io.github.sekademi.spotufi.data.entity.SongsModel
 /**
  * Responsive artwork carousel for the now-playing screen.
  * Supports swiping through queue tracks with smooth snap-scrolling,
- * Spotify-style spring scale physics on play/pause,
+ * Spotify-style spring scale physics on play/pause, dynamic ambient glow,
  * and hides artwork behind an alpha scrim when a Spotify Canvas video is active.
  */
 @Composable
@@ -44,6 +45,7 @@ fun PlayerArtwork(
     canvasUrl: String?,
     showStaticCover: Boolean = false,
     isPlaying: Boolean = true,
+    ambientColor: Color = Color.Black,
     onToggleCover: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -59,14 +61,20 @@ fun PlayerArtwork(
         label = "album_cover_scale",
     )
 
-    val shadowElevation by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (isPlaying) 20.dp else 10.dp,
+    val shadowElevation by animateDpAsState(
+        targetValue = if (isPlaying) 24.dp else 10.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
         ),
         label = "album_cover_shadow",
     )
+
+    val dynamicSpotColor = if (ambientColor != Color.Black) {
+        ambientColor.copy(alpha = if (isPlaying) 0.55f else 0.20f)
+    } else {
+        Color.Black.copy(alpha = if (isPlaying) 0.55f else 0.25f)
+    }
 
     Box(
         contentAlignment = Alignment.Center,
@@ -87,8 +95,13 @@ fun PlayerArtwork(
                     .sizeIn(maxWidth = 385.dp, maxHeight = 385.dp)
                     .aspectRatio(1f)
                     .padding(20.dp)
-                    .shadow(elevation = 16.dp, shape = RoundedCornerShape(10.dp), spotColor = Color.Black.copy(alpha = 0.55f))
-                    .clip(RoundedCornerShape(10.dp))
+                    .shadow(
+                        elevation = shadowElevation,
+                        shape = RoundedCornerShape(14.dp),
+                        spotColor = dynamicSpotColor,
+                        ambientColor = dynamicSpotColor.copy(alpha = 0.25f)
+                    )
+                    .clip(RoundedCornerShape(14.dp))
                     .alpha(artworkAlpha),
                 model = currentCoverUri.takeIf { it.isNotBlank() } ?: R.drawable.placeholder,
                 placeholder = painterResource(R.drawable.placeholder),
@@ -110,8 +123,13 @@ fun PlayerArtwork(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp)
-                        .shadow(elevation = 16.dp, shape = RoundedCornerShape(10.dp), spotColor = Color.Black.copy(alpha = 0.55f))
-                        .clip(RoundedCornerShape(10.dp))
+                        .shadow(
+                            elevation = shadowElevation,
+                            shape = RoundedCornerShape(14.dp),
+                            spotColor = dynamicSpotColor,
+                            ambientColor = dynamicSpotColor.copy(alpha = 0.25f)
+                        )
+                        .clip(RoundedCornerShape(14.dp))
                         .alpha(artworkAlpha),
                     model = trackCover,
                     placeholder = painterResource(R.drawable.placeholder),

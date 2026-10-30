@@ -494,7 +494,7 @@ fun PlayerScreen(navController: NavController) {
             songProgressText = if (pos < 0) "0:00" else playerViewModel.formatDuration(pos)
 
             if (songPlayingState) {
-                delay(300L)
+                delay(80L)
             } else {
                 if (dur > 0) {
                     delay(2000L)
@@ -563,11 +563,36 @@ fun PlayerScreen(navController: NavController) {
             }
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(animatedDominantColor, Color.Black),
-                    startY = 100f
+                    colorStops = arrayOf(
+                        0.0f to animatedDominantColor.copy(alpha = 0.70f),
+                        0.40f to animatedDominantColor.copy(alpha = 0.35f),
+                        0.75f to Color(0xFF101010),
+                        1.0f to Color.Black
+                    ),
+                    startY = 0f
                 )
             )
     ) {
+        // Ambient diffuse bloom centered behind artwork for Spotify/Apple Music organic depth
+        val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
+        val screenHeightDp = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            animatedDominantColor.copy(alpha = 0.40f),
+                            Color.Transparent
+                        ),
+                        center = androidx.compose.ui.geometry.Offset(
+                            x = with(density) { (screenWidthDp / 2).toPx() },
+                            y = with(density) { (screenHeightDp * 0.32f).toPx() }
+                        ),
+                        radius = with(density) { (screenWidthDp * 0.90f).toPx() }
+                    )
+                )
+        )
         if (canvasUrl != null) {
             // Spotify Canvas: the looping video fills the whole now-playing screen
             // edge-to-edge behind the controls (the "immersive" treatment), with a
@@ -654,6 +679,7 @@ fun PlayerScreen(navController: NavController) {
                 canvasUrl = canvasUrl,
                 showStaticCover = showStaticCover,
                 isPlaying = songPlayingState,
+                ambientColor = animatedDominantColor,
                 onToggleCover = { if (playerViewModel.canvasUrl.value != null) showStaticCover = !showStaticCover },
                 modifier = Modifier
                     .weight(1f)

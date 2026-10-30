@@ -190,9 +190,28 @@ fun MiniPlayer(navController: NavHostController) {
         modifier = Modifier
             .padding(horizontal = 10.dp)
             .padding(bottom = 4.dp)
-            .shadow(elevation = 8.dp, shape = RoundedCornerShape(12.dp), clip = false)
+            .shadow(
+                elevation = 12.dp,
+                shape = RoundedCornerShape(12.dp),
+                spotColor = Color.Black.copy(alpha = 0.65f),
+                ambientColor = darkVibrantColor.copy(alpha = 0.25f),
+                clip = false
+            )
             .clip(RoundedCornerShape(12.dp))
-            .background(darkVibrantColor)
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        darkVibrantColor.copy(alpha = 0.55f),
+                        Color(0xFF242424),
+                        Color(0xFF1E1E1E),
+                    )
+                )
+            )
+            .border(
+                width = 0.8.dp,
+                color = Color.White.copy(alpha = 0.10f),
+                shape = RoundedCornerShape(12.dp)
+            )
             .graphicsLayer {
                 translationY = swipeOffsetY
                 alpha = (1f - (kotlin.math.abs(swipeOffsetY) / 250f)).coerceIn(0f, 1f)
@@ -493,7 +512,7 @@ fun MiniPlayer(navController: NavHostController) {
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(fraction = animatedProgress)
-                    .background(Color.White)
+                    .background(Color(0xFF1ED760))
             )
         }
     }

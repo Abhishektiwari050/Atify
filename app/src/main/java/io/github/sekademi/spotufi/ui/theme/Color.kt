@@ -11,8 +11,8 @@ val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 val AppBackground = Color(0xFF121212)
 val GridBackground = Color(0xFF2A2A2A)
-val AppPalette = Color(0xFF6F8067)
 val SpotifyGreen = Color(0xFF1ED760)
+val AppPalette = SpotifyGreen
 
 // Atify Official Earthy Palette
 val AtifyDark = Color(0xFF18251F)
