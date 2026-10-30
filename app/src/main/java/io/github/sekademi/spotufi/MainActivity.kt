@@ -71,9 +71,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleVoiceIntent(intent: android.content.Intent?) {
-        if (intent?.action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) {
+        val action = intent?.action ?: return
+        if (action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH ||
+            action == "android.intent.action.MEDIA_SEARCH" ||
+            action == "com.google.android.gms.actions.SEARCH_ACTION" ||
+            action == "com.google.android.gms.actions.MEDIA_PLAY_FROM_SEARCH"
+        ) {
             val serviceIntent = android.content.Intent(this, PlaybackService::class.java).apply {
-                action = android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH
+                this.action = action
                 intent.extras?.let { putExtras(it) }
             }
             ContextCompat.startForegroundService(this, serviceIntent)

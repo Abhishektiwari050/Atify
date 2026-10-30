@@ -3,21 +3,47 @@
     <capability android:name="actions.intent.PLAY_MUSIC">
         <intent
             android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
-            android:targetPackage="io.github.sekademi.spotufi"
             android:targetClass="io.github.sekademi.spotufi.MainActivity">
             <parameter
                 android:name="music.recording.name"
                 android:key="query" />
+            <parameter
+                android:name="music.album.name"
+                android:key="query" />
+            <parameter
+                android:name="music.musicGroup.name"
+                android:key="query" />
+            <parameter
+                android:name="music.genre"
+                android:key="query" />
+            <parameter
+                android:name="music.playlist.name"
+                android:key="query" />
         </intent>
     </capability>
+
     <capability android:name="actions.intent.PLAY_PODCAST">
         <intent
             android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
-            android:targetPackage="io.github.sekademi.spotufi"
             android:targetClass="io.github.sekademi.spotufi.MainActivity">
             <parameter
                 android:name="podcast.name"
                 android:key="query" />
+            <parameter
+                android:name="podcastEpisode.name"
+                android:key="query" />
         </intent>
+    </capability>
+
+    <capability android:name="actions.intent.RESUME_MUSIC">
+        <intent
+            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity" />
+    </capability>
+
+    <capability android:name="actions.intent.PAUSE_MUSIC">
+        <intent
+            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity" />
     </capability>
 </shortcuts>

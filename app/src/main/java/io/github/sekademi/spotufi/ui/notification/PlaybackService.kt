@@ -350,8 +350,14 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) {
+        val action = intent?.action
+        if (action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH ||
+            action == "android.intent.action.MEDIA_SEARCH" ||
+            action == "com.google.android.gms.actions.SEARCH_ACTION" ||
+            action == "com.google.android.gms.actions.MEDIA_PLAY_FROM_SEARCH"
+        ) {
             val query = intent.getStringExtra(android.app.SearchManager.QUERY)
+                ?: intent.getStringExtra("query")
                 ?: intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_TITLE)
                 ?: listOfNotNull(
                     intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_ARTIST),
@@ -659,21 +665,43 @@ class PlaybackService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             isForPlayback: Boolean,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-            val point = io.github.sekademi.spotufi.data.preferences.loadRestorePoint(this@PlaybackService) ?:
+            val point = io.github.sekademi.spotufi.data.preferences.loadRestorePoint(this@PlaybackService)
+            if (point != null) {
+                val items = point.queue.map { playable(it) }
+                val startIdx = point.queue.indexOfFirst { it.id == point.song.id }.coerceAtLeast(0)
+                if (isForPlayback && items.isNotEmpty()) {
+                    currentSongState.updateQueue(point.queue)
+                    currentSongState.updateSongState(
+                        point.song.coverUri, point.song.title, point.song.singer, true,
+                        point.song.id, startIdx, point.song.album,
+                    )
+                    point.repeatMode?.let { currentSongState.updateRepeatState(it) }
+                    SongPlayer.playSong(point.song.url, applicationContext)
+                }
                 return Futures.immediateFuture(
-                    MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET))
-            val items = point.queue.map { playable(it) }
-            val startIdx = point.queue.indexOfFirst { it.id == point.song.id }.coerceAtLeast(0)
-            if (isForPlayback && items.isNotEmpty()) {
-                currentSongState.updateQueue(point.queue)
-                currentSongState.updateSongState(
-                    point.song.coverUri, point.song.title, point.song.singer, true,
-                    point.song.id, startIdx, point.song.album,
+                    MediaSession.MediaItemsWithStartPosition(items, startIdx, point.positionMs)
                 )
-                point.repeatMode?.let { currentSongState.updateRepeatState(it) }
+            }
+            // Fallback for voice resume when no restore point exists: start from user's liked songs
+            val liked = io.github.sekademi.spotufi.data.preferences.getLocalLikedSongs(this@PlaybackService)
+            if (liked.isNotEmpty()) {
+                val items = registerTracks(NODE_LIKED, liked)
+                if (isForPlayback) {
+                    currentSongState.updateQueue(liked)
+                    val first = liked.first()
+                    currentSongState.updateSongState(
+                        first.coverUri, first.title, first.singer, true,
+                        first.id, 0, first.album,
+                    )
+                    SongPlayer.playSong(first.url, applicationContext)
+                }
+                return Futures.immediateFuture(
+                    MediaSession.MediaItemsWithStartPosition(items, 0, 0L)
+                )
             }
             return Futures.immediateFuture(
-                MediaSession.MediaItemsWithStartPosition(items, startIdx, point.positionMs))
+                MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET)
+            )
         }
 
         override fun onGetLibraryRoot(
@@ -711,8 +739,9 @@ class PlaybackService : MediaLibraryService() {
             query: String,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<Void>> = future {
-            val results = lastSuccess(repository.searchSongs(query)).orEmpty()
-            registerTracks("search/$query", results)
+            val clean = sanitizeVoiceQuery(query).ifBlank { query }
+            val results = lastSuccess(repository.searchSongs(clean)).orEmpty()
+            registerTracks("search/$clean", results)
             session.notifySearchResultChanged(browser, query, results.size, params)
             LibraryResult.ofVoid(params)
         }
@@ -725,8 +754,9 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = future {
-            val results = lastSuccess(repository.searchSongs(query)).orEmpty()
-            val items = registerTracks("search/$query", results)
+            val clean = sanitizeVoiceQuery(query).ifBlank { query }
+            val results = lastSuccess(repository.searchSongs(clean)).orEmpty()
+            val items = registerTracks("search/$clean", results)
             val paged = paginate(items, page, pageSize)
             LibraryResult.ofItemList(ImmutableList.copyOf(paged), params)
         }
@@ -800,20 +830,21 @@ class PlaybackService : MediaLibraryService() {
         q = q.replace(Regex("""^(?i)(play|listen\s+to|start|stream|put\s+on)\s+"""), "").trim()
 
         // 2. Remove app suffixes: "on atify", "using atify", "on 85", "using 85", "in 85", "with 85", "on eighty-five", etc.
-        q = q.replace(Regex("""(?i)\s+(on|using|with|in|via|from|by)\s+(atify|spotufi|85|eighty[\s-]?five)\b.*$"""), "").trim()
+        q = q.replace(Regex("""(?i)\s+(on|using|with|in|via|from|by)\s+(atify|spotufi|85|eighty[\s-]?five|at\s*if\s*i|addify|atifly|80[\s-]?5)\b.*$"""), "").trim()
 
         // 3. Remove trailing app name or phonetic "85" ("starboy 85", "starboy atify")
-        q = q.replace(Regex("""(?i)\s+\b(atify|spotufi|85|eighty[\s-]?five)\b.*$"""), "").trim()
+        q = q.replace(Regex("""(?i)\s+\b(atify|spotufi|85|eighty[\s-]?five|at\s*if\s*i|addify|atifly|80[\s-]?5)\b.*$"""), "").trim()
 
         // 4. Remove leading app name ("atify play starboy" or "85 play starboy")
-        q = q.replace(Regex("""^(?i)(atify|spotufi|85|eighty[\s-]?five)\s+"""), "").trim()
+        q = q.replace(Regex("""^(?i)(atify|spotufi|85|eighty[\s-]?five|at\s*if\s*i|addify|atifly|80[\s-]?5)\s+"""), "").trim()
 
         // 5. If speech-to-text transcribed "play a song using atify" or "play on song using atify",
         // the remaining text may be "a song", "on song", "some music", "music", "songs", or simply empty/85.
         val genericFallbacks = setOf(
-            "85", "eighty five", "eighty-five", "atify", "spotufi",
-            "a song", "on song", "one song", "song", "songs",
-            "some music", "music", "something", "my music", "my songs"
+            "85", "eighty five", "eighty-five", "atify", "spotufi", "addify", "atifly", "at if i",
+            "a song", "on song", "one song", "the song", "song", "songs",
+            "some music", "music", "something", "my music", "my songs",
+            "a track", "track", "tracks"
         )
         if (q.lowercase() in genericFallbacks) {
             return ""
@@ -849,8 +880,14 @@ class PlaybackService : MediaLibraryService() {
             val cleanQuery = sanitizeVoiceQuery(query)
             if (cleanQuery.isBlank()) {
                 withContext(Dispatchers.Main) {
-                    if (currentSongState.queue.value.isNotEmpty()) {
-                        SongPlayer.play()
+                    val currentQueue = currentSongState.queue.value
+                    if (currentQueue.isNotEmpty()) {
+                        if (SongPlayer.getCurrentPosition() > 0) {
+                            SongPlayer.play()
+                        } else {
+                            val cur = currentQueue.getOrNull(currentSongState.songIndex.value) ?: currentQueue.first()
+                            SongPlayer.playSong(cur.url, applicationContext)
+                        }
                     } else {
                         val liked = io.github.sekademi.spotufi.data.preferences.getLocalLikedSongs(this@PlaybackService)
                         if (liked.isNotEmpty()) {
@@ -858,6 +895,15 @@ class PlaybackService : MediaLibraryService() {
                             val first = liked.first()
                             currentSongState.updateSongState(first.coverUri, first.title, first.singer, true, first.id, 0, first.album)
                             SongPlayer.playSong(first.url, applicationContext)
+                        } else {
+                            // Fallback: If fresh start with no liked songs, play trending charts so driving playback never fails
+                            val fallbackHits = lastSuccess(repository.searchSongs("top hits")) ?: emptyList()
+                            if (fallbackHits.isNotEmpty()) {
+                                currentSongState.updateQueue(fallbackHits)
+                                val first = fallbackHits.first()
+                                currentSongState.updateSongState(first.coverUri, first.title, first.singer, true, first.id, 0, first.album)
+                                SongPlayer.playSong(first.url, applicationContext)
+                            }
                         }
                     }
                 }
@@ -888,7 +934,7 @@ class PlaybackService : MediaLibraryService() {
             if (!searchResults?.songs.isNullOrEmpty()) {
                 val topSong = searchResults.songs.first()
                 withContext(Dispatchers.Main) {
-                    currentSongState.updateQueue(listOf(topSong))
+                    currentSongState.updateQueue(searchResults.songs)
                     currentSongState.updateSongState(
                         topSong.coverUri, topSong.title, topSong.singer, true,
                         topSong.id, 0, topSong.album,
