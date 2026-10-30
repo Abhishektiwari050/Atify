@@ -85,6 +85,12 @@ class MediaAssistantDiscoveryTest {
         assertTrue("Must support ACTION_PLAY_FROM_URI", (actions and PlaybackStateCompat.ACTION_PLAY_FROM_URI) != 0L)
         assertTrue("Must support ACTION_SET_REPEAT_MODE", (actions and PlaybackStateCompat.ACTION_SET_REPEAT_MODE) != 0L)
         assertTrue("Must support ACTION_SET_SHUFFLE_MODE", (actions and PlaybackStateCompat.ACTION_SET_SHUFFLE_MODE) != 0L)
+        assertTrue("Must support ACTION_FAST_FORWARD", (actions and PlaybackStateCompat.ACTION_FAST_FORWARD) != 0L)
+        assertTrue("Must support ACTION_REWIND", (actions and PlaybackStateCompat.ACTION_REWIND) != 0L)
+        assertTrue("Must support ACTION_PREPARE", (actions and PlaybackStateCompat.ACTION_PREPARE) != 0L)
+        assertTrue("Must support ACTION_PREPARE_FROM_SEARCH", (actions and PlaybackStateCompat.ACTION_PREPARE_FROM_SEARCH) != 0L)
+        assertTrue("Must support ACTION_PREPARE_FROM_MEDIA_ID", (actions and PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID) != 0L)
+        assertTrue("Must support ACTION_PREPARE_FROM_URI", (actions and PlaybackStateCompat.ACTION_PREPARE_FROM_URI) != 0L)
 
         // 4. Verify metadata publication runs cleanly
         MediaSessionHolder.updateMetadata(
@@ -217,6 +223,9 @@ class MediaAssistantDiscoveryTest {
         assertTrue("Root must declare EXTRA_OFFLINE support for assistant", extras?.getBoolean(BrowserRoot.EXTRA_OFFLINE) == true)
         assertTrue("Root must declare EXTRA_SUGGESTED support for assistant", extras?.getBoolean(BrowserRoot.EXTRA_SUGGESTED) == true)
         assertEquals("Root must declare SEARCH_SUPPORTED", 1, extras?.getInt("android.media.browse.SEARCH_SUPPORTED"))
+        assertTrue("Root must declare android.service.media.extra.RECENT", extras?.getBoolean("android.service.media.extra.RECENT") == true)
+        assertTrue("Root must declare android.service.media.extra.OFFLINE", extras?.getBoolean("android.service.media.extra.OFFLINE") == true)
+        assertTrue("Root must declare android.service.media.extra.SUGGESTED", extras?.getBoolean("android.service.media.extra.SUGGESTED") == true)
 
         // 2. Query browsable root items exposed to assistant
         val rootChildren = browserService.loadChildrenForParent(MusicBrowserService.MEDIA_ROOT_ID)

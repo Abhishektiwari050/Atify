@@ -70,6 +70,9 @@ class MusicBrowserService : MediaBrowserServiceCompat() {
             putBoolean(BrowserRoot.EXTRA_RECENT, true)
             putBoolean(BrowserRoot.EXTRA_OFFLINE, true)
             putBoolean(BrowserRoot.EXTRA_SUGGESTED, true)
+            putBoolean("android.service.media.extra.RECENT", true)
+            putBoolean("android.service.media.extra.OFFLINE", true)
+            putBoolean("android.service.media.extra.SUGGESTED", true)
             putInt("android.media.browse.SEARCH_SUPPORTED", 1)
         }
         return BrowserRoot(MEDIA_ROOT_ID, extras)
@@ -292,6 +295,32 @@ class MusicBrowserService : MediaBrowserServiceCompat() {
         override fun onPlayFromUri(uri: android.net.Uri?, extras: Bundle?) {
             startPlaybackService()
             uri?.toString()?.let { handleVoiceQuery(it) }
+        }
+
+        override fun onPrepare() {
+            onPlay()
+        }
+
+        override fun onPrepareFromSearch(query: String?, extras: Bundle?) {
+            onPlayFromSearch(query, extras)
+        }
+
+        override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
+            onPlayFromMediaId(mediaId, extras)
+        }
+
+        override fun onPrepareFromUri(uri: android.net.Uri?, extras: Bundle?) {
+            onPlayFromUri(uri, extras)
+        }
+
+        override fun onFastForward() {
+            val cur = SongPlayer.getCurrentPosition()
+            SongPlayer.seekTo(cur + 10000L)
+        }
+
+        override fun onRewind() {
+            val cur = SongPlayer.getCurrentPosition()
+            SongPlayer.seekTo((cur - 10000L).coerceAtLeast(0L))
         }
 
         override fun onMediaButtonEvent(mediaButtonEvent: Intent?): Boolean {

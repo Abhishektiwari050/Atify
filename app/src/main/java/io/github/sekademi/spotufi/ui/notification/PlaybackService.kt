@@ -1288,6 +1288,22 @@ class PlaybackService : MediaLibraryService() {
             uri?.toString()?.let { handleVoiceQuery(it) }
         }
 
+        override fun onPrepare() {
+            onPlay()
+        }
+
+        override fun onPrepareFromSearch(query: String?, extras: Bundle?) {
+            onPlayFromSearch(query, extras)
+        }
+
+        override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
+            onPlayFromMediaId(mediaId, extras)
+        }
+
+        override fun onPrepareFromUri(uri: android.net.Uri?, extras: Bundle?) {
+            onPlayFromUri(uri, extras)
+        }
+
         override fun onMediaButtonEvent(mediaButtonEvent: Intent?): Boolean {
             val event = mediaButtonEvent?.let {
                 androidx.core.content.IntentCompat.getParcelableExtra(it, Intent.EXTRA_KEY_EVENT, android.view.KeyEvent::class.java)

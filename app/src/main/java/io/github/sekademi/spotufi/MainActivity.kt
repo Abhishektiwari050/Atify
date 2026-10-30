@@ -45,6 +45,8 @@ class MainActivity : ComponentActivity() {
         controllerFuture = MediaController.Builder(this, token).buildAsync()
 
 
+        // Ensure MediaSessionCompat is explicitly active and ready for assistant / media controls
+        io.github.sekademi.spotufi.ui.notification.MediaSessionHolder.getOrCreateSession(this)
         enableEdgeToEdge()
         setContent {
 

@@ -44,6 +44,8 @@ class MyApplication : Application(), SingletonImageLoader.Factory {
             Timber.plant(Timber.DebugTree())
         }
         CrashLogger.install(this)
+        // Ensure MediaSessionCompat is initialized and active on process startup
+        io.github.sekademi.spotufi.ui.notification.MediaSessionHolder.getOrCreateSession(this)
 
         // Surface Spotify REST/GQL logs to logcat for diagnosis.
         com.metrolist.spotify.Spotify.logger = { level, msg ->

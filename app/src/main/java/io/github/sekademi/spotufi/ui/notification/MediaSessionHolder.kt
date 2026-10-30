@@ -28,6 +28,7 @@ object MediaSessionHolder {
     ): MediaSessionCompat {
         val existing = mediaSessionCompat
         if (existing != null) {
+            existing.isActive = true
             callback?.let { existing.setCallback(it) }
             return existing
         }
@@ -53,6 +54,13 @@ object MediaSessionHolder {
             isActive = true
         }
         mediaSessionCompat = session
+
+        // Immediately publish an active initial PlaybackStateCompat so the session is
+        // ready and discoverable by assistants from the moment of initialization.
+        updatePlaybackState(
+            state = PlaybackStateCompat.STATE_NONE,
+            position = 0L
+        )
         return session
     }
 
@@ -71,6 +79,10 @@ object MediaSessionHolder {
                 PlaybackStateCompat.ACTION_REWIND or
                 PlaybackStateCompat.ACTION_SEEK_TO or
                 PlaybackStateCompat.ACTION_STOP or
+                PlaybackStateCompat.ACTION_PREPARE or
+                PlaybackStateCompat.ACTION_PREPARE_FROM_SEARCH or
+                PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID or
+                PlaybackStateCompat.ACTION_PREPARE_FROM_URI or
                 PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
                 PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
                 PlaybackStateCompat.ACTION_PLAY_FROM_URI or
@@ -83,6 +95,7 @@ object MediaSessionHolder {
             .setState(state, position.coerceAtLeast(0L), playbackSpeed, android.os.SystemClock.elapsedRealtime())
 
         mediaSessionCompat?.let { session ->
+            session.isActive = true
             session.setPlaybackState(stateBuilder.build())
             session.setRepeatMode(
                 when (repeatMode) {
@@ -113,7 +126,10 @@ object MediaSessionHolder {
             .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, coverUri)
             .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMs)
 
-        mediaSessionCompat?.setMetadata(metaBuilder.build())
+        mediaSessionCompat?.let { session ->
+            session.isActive = true
+            session.setMetadata(metaBuilder.build())
+        }
     }
 
     fun release() {
