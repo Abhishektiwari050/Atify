@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Atify</string>
+    <string name="shortcut_play_music">Play Music</string>
+    <string name="shortcut_play_music_desc">Play music on Atify</string>
+    <string name="shortcut_search_music">Search Music</string>
+    <string name="shortcut_search_music_desc">Search and play songs on Atify</string>
+    <string name="shortcut_liked_songs">Liked Songs</string>
+    <string name="shortcut_liked_songs_desc">Play your saved liked songs</string>
 </resources>

@@ -48,19 +48,6 @@
         </intent>
     </capability>
 
-    <capability android:name="actions.intent.PLAY_PODCAST">
-        <intent
-            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity">
-            <parameter
-                android:name="podcast.name"
-                android:key="query" />
-            <parameter
-                android:name="podcastEpisode.name"
-                android:key="query" />
-        </intent>
-    </capability>
-
     <capability android:name="actions.intent.OPEN_APP_FEATURE">
         <intent
             android:action="android.intent.action.VIEW"
@@ -83,4 +70,29 @@
             android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
             android:targetClass="io.github.sekademi.spotufi.MainActivity" />
     </capability>
+
+    <shortcut
+        android:shortcutId="play_music"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_play_music"
+        android:shortcutLongLabel="@string/shortcut_play_music_desc">
+        <intent
+            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity" />
+        <capability-binding android:key="actions.intent.PLAY_MEDIA" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="liked_songs"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_liked_songs"
+        android:shortcutLongLabel="@string/shortcut_liked_songs_desc">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="atify://play?query=liked"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity" />
+        <capability-binding android:key="actions.intent.PLAY_MEDIA" />
+    </shortcut>
 </shortcuts>
