@@ -8,6 +8,10 @@ public final class InnerTubeService {
 
     private init() {}
 
+    public func clearCache() {
+        streamCache.removeAll()
+    }
+
     public func resolveStream(for track: Track) async -> URL? {
         // 1. Check in-memory stream URL cache
         let cacheKey = track.spotifyId.isEmpty ? "\(track.artist) \(track.title)" : track.spotifyId

@@ -1,6 +1,5 @@
 import Foundation
 
-@MainActor
 public final class PreferencesService: ObservableObject {
     public static let shared = PreferencesService()
 
@@ -20,7 +19,13 @@ public final class PreferencesService: ObservableObject {
     }
 
     public func saveSpotifyCookie(_ cookie: String) {
-        self.spDc = cookie
+        if Thread.isMainThread {
+            self.spDc = cookie
+        } else {
+            DispatchQueue.main.async {
+                self.spDc = cookie
+            }
+        }
     }
 
     @Published public var likedTracks: [Track] = [] {
@@ -46,10 +51,17 @@ public final class PreferencesService: ObservableObject {
     }
 
     public func toggleLike(track: Track) {
-        if let index = likedTracks.firstIndex(where: { $0.id == track.id || (!track.spotifyId.isEmpty && $0.spotifyId == track.spotifyId) }) {
-            likedTracks.remove(at: index)
+        let action = {
+            if let index = self.likedTracks.firstIndex(where: { $0.id == track.id || (!track.spotifyId.isEmpty && $0.spotifyId == track.spotifyId) }) {
+                self.likedTracks.remove(at: index)
+            } else {
+                self.likedTracks.insert(track, at: 0)
+            }
+        }
+        if Thread.isMainThread {
+            action()
         } else {
-            likedTracks.insert(track, at: 0)
+            DispatchQueue.main.async(execute: action)
         }
     }
 
@@ -68,12 +80,19 @@ public final class PreferencesService: ObservableObject {
 
     // MARK: - Recent Tracks
     public func addRecent(track: Track) {
-        var updated = recentTracks.filter { $0.id != track.id }
-        updated.insert(track, at: 0)
-        if updated.count > 40 {
-            updated = Array(updated.prefix(40))
+        let action = {
+            var updated = self.recentTracks.filter { $0.id != track.id }
+            updated.insert(track, at: 0)
+            if updated.count > 40 {
+                updated = Array(updated.prefix(40))
+            }
+            self.recentTracks = updated
         }
-        self.recentTracks = updated
+        if Thread.isMainThread {
+            action()
+        } else {
+            DispatchQueue.main.async(execute: action)
+        }
     }
 
     private func saveRecentTracks() {
@@ -111,7 +130,7 @@ public final class PreferencesService: ObservableObject {
 
     private func loadVideoMap() {
         if let dict = defaults.dictionary(forKey: keyPermanentVideoMap) as? [String: String] {
-            inMemoryVideoMap = dict
+            self.inMemoryVideoMap = dict
         }
     }
 }
