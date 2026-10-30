@@ -426,9 +426,8 @@ fun DownloadsScreen(navController: NavController) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(20.dp, 8.dp)
                                     .tactileItemPress(
-                                        pressedScale = 0.985f,
+                                        pressedScale = 0.975f,
                                         onLongClick = { menuSong = song },
                                         onClick = {
                                             playerViewModel.updateQueue(displayedSongs)
@@ -439,6 +438,7 @@ fun DownloadsScreen(navController: NavController) {
                                             )
                                         },
                                     )
+                                    .padding(horizontal = 20.dp, vertical = 8.dp)
                             ) {
                                 AsyncImage(
                                     modifier = Modifier

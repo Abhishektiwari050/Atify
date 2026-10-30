@@ -676,7 +676,6 @@ fun SearchSongRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp, 8.dp)
                 .graphicsLayer {
                     scaleX = rowScale
                     scaleY = rowScale
@@ -689,7 +688,8 @@ fun SearchSongRow(
                         onPlayed()
                         searchViewModel.playSongAndStartRadio(song, context)
                     }
-                ),
+                )
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Row(
                 horizontalArrangement = Arrangement.Start,
@@ -791,11 +791,11 @@ fun SearchShowRow(show: io.github.sekademi.spotufi.data.entity.PodcastModel, onC
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp, 8.dp)
             .tactileItemPress(
-                pressedScale = 0.98f,
+                pressedScale = 0.975f,
                 onClick = onClick,
-            ),
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         AsyncImage(
             modifier = Modifier
@@ -824,11 +824,11 @@ fun SearchArtistRow(artist: io.github.sekademi.spotufi.data.entity.ArtistsModel,
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp, 8.dp)
             .tactileItemPress(
-                pressedScale = 0.98f,
+                pressedScale = 0.975f,
                 onClick = onClick,
-            ),
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         AsyncImage(
             modifier = Modifier
@@ -854,11 +854,11 @@ fun SearchAlbumRow(album: io.github.sekademi.spotufi.data.entity.AlbumsModel, on
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp, 8.dp)
             .tactileItemPress(
-                pressedScale = 0.98f,
+                pressedScale = 0.975f,
                 onClick = onClick,
-            ),
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         AsyncImage(
             modifier = Modifier

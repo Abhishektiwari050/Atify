@@ -81,18 +81,20 @@ fun MyNavHost(
         navController = navHostController,
         startDestination = startDestination,
         enterTransition = {
-            slideInHorizontally(initialOffsetX = { (it * 0.30f).toInt() }, animationSpec = tween(280, easing = FastOutSlowInEasing)) +
-                fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing))
+            slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing))
         },
         exitTransition = {
-            fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
+            slideOutHorizontally(targetOffsetX = { -it / 4 }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing))
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing))
+            slideInHorizontally(initialOffsetX = { -it / 4 }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing))
         },
         popExitTransition = {
-            slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(260, easing = FastOutSlowInEasing)) +
-                fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
+            slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing))
         },
     ){
         composable(
@@ -113,28 +115,28 @@ fun MyNavHost(
         }
         composable(
             Routes.Home.route,
-            enterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
-            exitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
-            popEnterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
-            popExitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
+            enterTransition = { fadeIn(tween(140, easing = FastOutSlowInEasing)) },
+            exitTransition = { fadeOut(tween(140, easing = FastOutSlowInEasing)) },
+            popEnterTransition = { fadeIn(tween(140, easing = FastOutSlowInEasing)) },
+            popExitTransition = { fadeOut(tween(140, easing = FastOutSlowInEasing)) },
         ){
             HomeScreen(navHostController)
         }
         composable(
             Routes.Search.route,
-            enterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
-            exitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
-            popEnterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
-            popExitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
+            enterTransition = { fadeIn(tween(140, easing = FastOutSlowInEasing)) },
+            exitTransition = { fadeOut(tween(140, easing = FastOutSlowInEasing)) },
+            popEnterTransition = { fadeIn(tween(140, easing = FastOutSlowInEasing)) },
+            popExitTransition = { fadeOut(tween(140, easing = FastOutSlowInEasing)) },
         ){
             SearchScreen(navHostController)
         }
         composable(
             Routes.Library.route,
-            enterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
-            exitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
-            popEnterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
-            popExitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
+            enterTransition = { fadeIn(tween(140, easing = FastOutSlowInEasing)) },
+            exitTransition = { fadeOut(tween(140, easing = FastOutSlowInEasing)) },
+            popEnterTransition = { fadeIn(tween(140, easing = FastOutSlowInEasing)) },
+            popExitTransition = { fadeOut(tween(140, easing = FastOutSlowInEasing)) },
         ) {
             LibraryScreen(navHostController)
         }

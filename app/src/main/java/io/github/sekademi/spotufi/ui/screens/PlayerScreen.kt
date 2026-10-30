@@ -170,13 +170,23 @@ fun PlayerScreen(navController: NavController) {
     suspend fun slideTo(targetValue: Float, velocity: Float = 0f) {
         try {
             animatable.snapTo(offsetY)
+            val spec: androidx.compose.animation.core.AnimationSpec<Float> = if (targetValue > 0f) {
+                // Snappy, swift dismissal matching iOS/Spotify sheet fling
+                spring<Float>(
+                    dampingRatio = 0.95f,
+                    stiffness = 800f,
+                )
+            } else {
+                // Responsive, tactile snap to open
+                spring<Float>(
+                    dampingRatio = 0.82f,
+                    stiffness = 550f,
+                )
+            }
             animatable.animateTo(
                 targetValue = targetValue,
                 initialVelocity = velocity,
-                animationSpec = spring(
-                    dampingRatio = 0.84f,
-                    stiffness = 380f,
-                )
+                animationSpec = spec
             ) {
                 offsetY = this.value
             }
@@ -324,9 +334,9 @@ fun PlayerScreen(navController: NavController) {
                 // to either 0f (open) or screenHeight (dismiss).
                 if (offsetY > 0f) {
                     val targetValue = when {
-                        available.y < -300f -> 0f
-                        available.y > 300f -> screenHeight
-                        else -> if (offsetY > screenHeight * 0.15f) screenHeight else 0f
+                        available.y < -200f -> 0f
+                        available.y > 200f -> screenHeight
+                        else -> if (offsetY > screenHeight * 0.12f) screenHeight else 0f
                     }
                     val job = coroutineScope.launch {
                         slideTo(targetValue, available.y)
@@ -446,7 +456,10 @@ fun PlayerScreen(navController: NavController) {
             artworkPagerState.currentPage != currentIndex &&
             !artworkPagerState.isScrollInProgress
         ) {
-            artworkPagerState.scrollToPage(currentIndex)
+            artworkPagerState.animateScrollToPage(
+                page = currentIndex,
+                animationSpec = tween(300, easing = FastOutSlowInEasing)
+            )
         }
     }
     // User settled the pager on a different page → play that track. Compare against the
@@ -644,14 +657,14 @@ fun PlayerScreen(navController: NavController) {
                             offsetY = (offsetY + dragAmount).coerceIn(0f, screenHeight)
                         },
                         onDragEnd = {
-                            if (offsetY > screenHeight * 0.15f) {
+                            if (offsetY > screenHeight * 0.12f) {
                                 dismissPlayer()
                             } else {
                                 launchAnimation(0f)
                             }
                         },
                         onDragCancel = {
-                            if (offsetY > screenHeight * 0.15f) {
+                            if (offsetY > screenHeight * 0.12f) {
                                 dismissPlayer()
                             } else {
                                 launchAnimation(0f)

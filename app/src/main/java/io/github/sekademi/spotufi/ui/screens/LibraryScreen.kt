@@ -457,11 +457,11 @@ fun SumUpLibraryScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp, 6.dp)
                     .tactileItemPress(
-                        pressedScale = 0.98f,
+                        pressedScale = 0.975f,
                         onClick = { navController.navigate(Routes.History.route) }
                     )
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -484,11 +484,11 @@ fun SumUpLibraryScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp, 6.dp)
                     .tactileItemPress(
-                        pressedScale = 0.98f,
+                        pressedScale = 0.975f,
                         onClick = { openLibraryEntry(entry, navController) }
                     )
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
             ) {
                 AsyncImage(
                     modifier = Modifier
@@ -520,11 +520,11 @@ fun SumUpLibraryScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp, 6.dp)
                         .tactileItemPress(
-                            pressedScale = 0.98f,
+                            pressedScale = 0.975f,
                             onClick = { navController.navigate(artistRoute(artist.name, artist.id)) }
                         )
+                        .padding(horizontal = 20.dp, vertical = 6.dp)
                 ) {
                     AsyncImage(
                         modifier = Modifier

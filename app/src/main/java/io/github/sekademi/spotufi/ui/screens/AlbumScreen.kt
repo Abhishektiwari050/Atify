@@ -501,9 +501,8 @@ fun SumUpAlbumScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp, 8.dp)
                             .tactileItemPress(
-                                pressedScale = 0.985f,
+                                pressedScale = 0.975f,
                                 onLongClick = { menuSong = albumSongs[song] },
                                 onClick = {
                                     albumViewModel.updateQueue(albumSongs)
@@ -519,6 +518,7 @@ fun SumUpAlbumScreen(
                                     )
                                 },
                             )
+                            .padding(horizontal = 20.dp, vertical = 8.dp)
                     ) {
 
                         Row(

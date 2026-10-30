@@ -119,10 +119,19 @@ fun PlayerArtwork(
                 val trackCover = queueSongs.getOrNull(page)?.coverUri?.takeIf { it.isNotBlank() }
                     ?: currentCoverUri.takeIf { it.isNotBlank() }
                     ?: R.drawable.placeholder
+
+                val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).let { kotlin.math.abs(it) }
+                val pageScale = (1f - (pageOffset * 0.10f)).coerceIn(0.90f, 1f)
+                val pageAlpha = ((1f - (pageOffset * 0.35f)) * artworkAlpha).coerceIn(0f, 1f)
+
                 AsyncImage(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp)
+                        .graphicsLayer {
+                            scaleX = pageScale
+                            scaleY = pageScale
+                        }
                         .shadow(
                             elevation = shadowElevation,
                             shape = RoundedCornerShape(14.dp),
@@ -130,7 +139,7 @@ fun PlayerArtwork(
                             ambientColor = dynamicSpotColor.copy(alpha = 0.25f)
                         )
                         .clip(RoundedCornerShape(14.dp))
-                        .alpha(artworkAlpha),
+                        .alpha(pageAlpha),
                     model = trackCover,
                     placeholder = painterResource(R.drawable.placeholder),
                     error = painterResource(R.drawable.placeholder),

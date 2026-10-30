@@ -294,7 +294,7 @@ fun AnimatedRepeatButton(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.tactileItemPress(
-    pressedScale: Float = 0.982f,
+    pressedScale: Float = 0.975f,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ): Modifier {
