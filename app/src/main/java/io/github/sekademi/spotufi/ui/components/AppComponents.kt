@@ -152,7 +152,7 @@ fun MiniPlayer(navController: NavHostController) {
             songProgress = SongPlayer.getDuration().toFloat().let { dur ->
                 if (dur > 0f) (SongPlayer.getCurrentPosition().toFloat() / dur).coerceIn(0f, 1f) else 0f
             }
-            delay(300L)
+            delay(100L)
         }
     }
 

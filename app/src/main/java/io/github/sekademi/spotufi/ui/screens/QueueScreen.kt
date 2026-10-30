@@ -57,6 +57,7 @@ import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.di.SongPlayer
+import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
 
@@ -101,10 +102,10 @@ fun QueueScreen(navController: NavController) {
                     tint = Color.White,
                     modifier = Modifier
                         .size(28.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { navController.navigateUp() }
+                        .tactileItemPress(
+                            pressedScale = 0.88f,
+                            onClick = { navController.navigateUp() }
+                        )
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text("Queue", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -117,9 +118,12 @@ fun QueueScreen(navController: NavController) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color(0xFF1ED760).copy(alpha = 0.15f))
-                        .clickable(enabled = !isHarmonizing) {
-                            playerViewModel.applyHarmonicDjFlow()
-                        }
+                        .then(
+                            if (!isHarmonizing) Modifier.tactileItemPress(
+                                pressedScale = 0.94f,
+                                onClick = { playerViewModel.applyHarmonicDjFlow() }
+                            ) else Modifier
+                        )
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     if (isHarmonizing) {
@@ -271,10 +275,10 @@ private fun QueueRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF121212))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() }
+            .tactileItemPress(
+                pressedScale = 0.98f,
+                onClick = onClick,
+            )
             .padding(16.dp, 8.dp)
     ) {
         AsyncImage(
@@ -324,10 +328,10 @@ private fun QueueRow(
                         tint = Color(0xFF1ED760),
                         modifier = Modifier
                             .size(24.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { onPlayNext() }
+                            .tactileItemPress(
+                                pressedScale = 0.88f,
+                                onClick = { onPlayNext() }
+                            )
                     )
                     Spacer(modifier = Modifier.width(14.dp))
                 }

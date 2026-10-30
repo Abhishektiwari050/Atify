@@ -587,10 +587,10 @@ fun RecentItemRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() }
+            .tactileItemPress(
+                pressedScale = 0.98f,
+                onClick = onClick,
+            )
             .padding(16.dp, 8.dp),
     ) {
         AsyncImage(
@@ -623,10 +623,10 @@ fun RecentItemRow(
             tint = Color(0xFFB3B3B3),
             modifier = Modifier
                 .size(20.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onRemove() },
+                .tactileItemPress(
+                    pressedScale = 0.88f,
+                    onClick = onRemove,
+                ),
             contentDescription = "Remove",
         )
     }

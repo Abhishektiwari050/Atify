@@ -30,6 +30,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import io.github.sekademi.spotufi.ui.components.BouncyScaleBox
 
 @Composable
 fun PlayerTopBar(
@@ -58,17 +59,16 @@ fun PlayerTopBar(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-        Icon(
-            modifier = Modifier.clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                onBackClick()
-            },
-            painter = painterResource(id = R.drawable.ic_down),
-            tint = Color.White,
-            contentDescription = "Collapse"
-        )
+        BouncyScaleBox(
+            onClick = onBackClick,
+            pressedScale = 0.88f,
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_down),
+                tint = Color.White,
+                contentDescription = "Collapse"
+            )
+        }
 
         // Spotify shows the source context here (album/playlist), not a generic label.
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -89,17 +89,17 @@ fun PlayerTopBar(
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.MoreVert,
-                tint = Color.White,
-                modifier = Modifier
-                    .size(23.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onMenuClick() },
-                contentDescription = "Options"
-            )
+            BouncyScaleBox(
+                onClick = onMenuClick,
+                pressedScale = 0.88f,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    tint = Color.White,
+                    modifier = Modifier.size(23.dp),
+                    contentDescription = "Options"
+                )
+            }
         }
     }
 }

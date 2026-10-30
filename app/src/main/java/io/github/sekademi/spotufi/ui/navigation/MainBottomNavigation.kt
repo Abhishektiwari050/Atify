@@ -1,6 +1,13 @@
 package io.github.sekademi.spotufi.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -29,26 +36,36 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import io.github.sekademi.spotufi.ui.components.MiniPlayer
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 
 @Composable
-fun MainBottomNavigation(navController: NavHostController, bottomBarState: MutableState<Boolean>, bottomBarPlayerState : MutableState<Boolean>) {
-
+fun MainBottomNavigation(
+    navController: NavHostController,
+    bottomBarState: MutableState<Boolean>,
+    bottomBarPlayerState: MutableState<Boolean>
+) {
     val navItems = listOf(
         Routes.Home,
         Routes.Search,
         Routes.Library
     )
+
     AnimatedVisibility(
         visible = bottomBarState.value,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it }),
+        enter = slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = tween(220, easing = FastOutSlowInEasing)
+        ) + fadeIn(tween(180)),
+        exit = slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = tween(180, easing = FastOutSlowInEasing)
+        ) + fadeOut(tween(140)),
         content = {
             Box(
                 contentAlignment = Alignment.BottomCenter,
@@ -59,19 +76,27 @@ fun MainBottomNavigation(navController: NavHostController, bottomBarState: Mutab
                         Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
+                                Color.Black.copy(alpha = 0.92f),
                                 Color.Black
                             ),
                             startY = 0f
                         )
                     )
             ) {
-
                 Column {
-
                     AnimatedVisibility(
                         visible = bottomBarPlayerState.value,
-                        enter = slideInVertically(initialOffsetY = { it }),
-                        exit = slideOutVertically(targetOffsetY = { it }),
+                        enter = slideInVertically(
+                            initialOffsetY = { it },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium,
+                            )
+                        ) + fadeIn(tween(180)),
+                        exit = slideOutVertically(
+                            targetOffsetY = { it },
+                            animationSpec = tween(160, easing = FastOutSlowInEasing)
+                        ) + fadeOut(tween(140)),
                         content = {
                             MiniPlayer(navController)
                         }
@@ -88,16 +113,15 @@ fun MainBottomNavigation(navController: NavHostController, bottomBarState: Mutab
                     ) {
                         val navStack by navController.currentBackStackEntryAsState()
                         val currentRoute = navStack?.destination?.route
-
                         val haptic = LocalHapticFeedback.current
 
                         navItems.forEach { item ->
                             val isSelected = currentRoute == item.route
-                            val iconScale by androidx.compose.animation.core.animateFloatAsState(
+                            val iconScale by animateFloatAsState(
                                 targetValue = if (isSelected) 1.08f else 0.94f,
-                                animationSpec = androidx.compose.animation.core.spring(
-                                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                                    stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
                                 ),
                                 label = "navIconScale"
                             )
@@ -114,43 +138,33 @@ fun MainBottomNavigation(navController: NavHostController, bottomBarState: Mutab
                                     )
                                 },
                                 label = {
-                                    if (currentRoute == item.route) {
-                                        Text(color = Color.White, text = item.label, fontSize = 11.sp)
-                                    } else {
-                                        Text(
-                                            color = Color.Gray,
-                                            text = item.label,
-                                            fontSize = 11.sp
-                                        )
-                                    }
+                                    Text(
+                                        color = if (isSelected) Color.White else Color(0xFFB3B3B3),
+                                        text = item.label,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                    )
                                 },
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                     navController.navigate(item.route) {
-                                        navController.graph.startDestinationRoute?.let {
-                                            popUpTo(item.route)
-                                            launchSingleTop = true
-                                            restoreState = true
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
                                         }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
                                 },
                                 alwaysShowLabel = true,
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = Color.White,
-                                    unselectedIconColor = Color.Gray,
+                                    unselectedIconColor = Color(0xFFB3B3B3),
                                     indicatorColor = Color.Transparent
                                 )
                             )
-
                         }
                     }
-
-
-
                 }
-
-
-
             }
         }
     )

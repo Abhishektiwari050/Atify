@@ -7,7 +7,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -79,20 +81,18 @@ fun MyNavHost(
         navController = navHostController,
         startDestination = startDestination,
         enterTransition = {
-            slideInHorizontally(initialOffsetX = { it / 3 }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
-                fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing))
+            slideInHorizontally(initialOffsetX = { (it * 0.30f).toInt() }, animationSpec = tween(280, easing = FastOutSlowInEasing)) +
+                fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing))
         },
         exitTransition = {
-            slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
-                fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing))
+            fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
         },
         popEnterTransition = {
-            slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
-                fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing))
+            fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing))
         },
         popExitTransition = {
-            slideOutHorizontally(targetOffsetX = { it / 3 }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
-                fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing))
+            slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(260, easing = FastOutSlowInEasing)) +
+                fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
         },
     ){
         composable(
@@ -113,22 +113,28 @@ fun MyNavHost(
         }
         composable(
             Routes.Home.route,
-            enterTransition = { fadeIn(tween(200, easing = FastOutSlowInEasing)) },
-            exitTransition = { fadeOut(tween(200, easing = FastOutSlowInEasing)) },
+            enterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
+            exitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
+            popEnterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
+            popExitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
         ){
             HomeScreen(navHostController)
         }
         composable(
             Routes.Search.route,
-            enterTransition = { fadeIn(tween(200, easing = FastOutSlowInEasing)) },
-            exitTransition = { fadeOut(tween(200, easing = FastOutSlowInEasing)) },
+            enterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
+            exitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
+            popEnterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
+            popExitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
         ){
             SearchScreen(navHostController)
         }
         composable(
             Routes.Library.route,
-            enterTransition = { fadeIn(tween(200, easing = FastOutSlowInEasing)) },
-            exitTransition = { fadeOut(tween(200, easing = FastOutSlowInEasing)) },
+            enterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
+            exitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
+            popEnterTransition = { fadeIn(tween(180, easing = FastOutSlowInEasing)) },
+            popExitTransition = { fadeOut(tween(180, easing = FastOutSlowInEasing)) },
         ) {
             LibraryScreen(navHostController)
         }
@@ -144,7 +150,22 @@ fun MyNavHost(
             PlayerScreen(navHostController)
         }
 
-        composable(Routes.Queue.route){
+        composable(
+            Routes.Queue.route,
+            enterTransition = {
+                slideInVertically(initialOffsetY = { it }, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                    fadeIn(tween(200))
+            },
+            exitTransition = {
+                slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250, easing = FastOutSlowInEasing)) +
+                    fadeOut(tween(200))
+            },
+            popEnterTransition = { fadeIn(tween(200)) },
+            popExitTransition = {
+                slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250, easing = FastOutSlowInEasing)) +
+                    fadeOut(tween(200))
+            },
+        ){
             QueueScreen(navHostController)
         }
 

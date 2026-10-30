@@ -68,6 +68,7 @@ import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.entity.LibraryEntry
 import io.github.sekademi.spotufi.ui.components.EmptyStateView
+import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import io.github.sekademi.spotufi.ui.components.ErrorRetryView
 import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.data.preferences.isLibraryGridView
@@ -426,10 +427,10 @@ fun SumUpLibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp, 6.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { navController.navigate(Routes.History.route) }
+                    .tactileItemPress(
+                        pressedScale = 0.98f,
+                        onClick = { navController.navigate(Routes.History.route) }
+                    )
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -453,10 +454,10 @@ fun SumUpLibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp, 6.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { openLibraryEntry(entry, navController) }
+                    .tactileItemPress(
+                        pressedScale = 0.98f,
+                        onClick = { openLibraryEntry(entry, navController) }
+                    )
             ) {
                 AsyncImage(
                     modifier = Modifier
@@ -489,10 +490,10 @@ fun SumUpLibraryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(20.dp, 6.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { navController.navigate(artistRoute(artist.name, artist.id)) }
+                        .tactileItemPress(
+                            pressedScale = 0.98f,
+                            onClick = { navController.navigate(artistRoute(artist.name, artist.id)) }
+                        )
                 ) {
                     AsyncImage(
                         modifier = Modifier
@@ -554,10 +555,10 @@ fun LibraryGridScreen(
         // Listening history & stats entry, as a tile.
         item {
             Column(
-                modifier = Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { navController.navigate(Routes.History.route) }
+                modifier = Modifier.tactileItemPress(
+                    pressedScale = 0.96f,
+                    onClick = { navController.navigate(Routes.History.route) }
+                )
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -576,10 +577,10 @@ fun LibraryGridScreen(
         }
         items(entries) { entry ->
             Column(
-                modifier = Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { openLibraryEntry(entry, navController) }
+                modifier = Modifier.tactileItemPress(
+                    pressedScale = 0.96f,
+                    onClick = { openLibraryEntry(entry, navController) }
+                )
             ) {
                 AsyncImage(
                     modifier = Modifier
@@ -608,10 +609,10 @@ fun LibraryGridScreen(
             items(followedArtists) { artist ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { navController.navigate(artistRoute(artist.name, artist.id)) }
+                    modifier = Modifier.tactileItemPress(
+                        pressedScale = 0.96f,
+                        onClick = { navController.navigate(artistRoute(artist.name, artist.id)) }
+                    )
                 ) {
                     AsyncImage(
                         modifier = Modifier

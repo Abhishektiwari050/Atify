@@ -188,52 +188,51 @@ fun PlayerConnectRow(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Sing-Along / Karaoke Microphone button
-            Icon(
-                painter = painterResource(id = R.drawable.ic_microphone),
-                tint = if (isKaraokeActive) Color(0xFF1ED760) else Color.White,
-                modifier = Modifier
-                    .size(22.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onKaraokeClick,
-                    ),
-                contentDescription = "Sing Along Karaoke",
-            )
+            BouncyScaleBox(
+                onClick = onKaraokeClick,
+                pressedScale = 0.88f,
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_microphone),
+                    tint = if (isKaraokeActive) Color(0xFF1ED760) else Color.White,
+                    modifier = Modifier.size(22.dp),
+                    contentDescription = "Sing Along Karaoke",
+                )
+            }
             Spacer(modifier = Modifier.width(20.dp))
-            Icon(
-                painter = painterResource(id = R.drawable.ic_share),
-                tint = Color.White,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
-                        val link = currentTrack?.spotifyTrackId
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let { "https://open.spotify.com/track/$it" }
-                            ?: "${currentTrack?.title ?: ""} ${currentTrack?.singer ?: ""}".trim()
-                        val send = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, link)
-                        }
-                        context.startActivity(Intent.createChooser(send, "Share"))
-                    },
-                contentDescription = "Share",
-            )
+            BouncyScaleBox(
+                pressedScale = 0.88f,
+                onClick = {
+                    val link = currentTrack?.spotifyTrackId
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { "https://open.spotify.com/track/$it" }
+                        ?: "${currentTrack?.title ?: ""} ${currentTrack?.singer ?: ""}".trim()
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, link)
+                    }
+                    context.startActivity(Intent.createChooser(send, "Share"))
+                },
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_share),
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                    contentDescription = "Share",
+                )
+            }
             Spacer(modifier = Modifier.width(20.dp))
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.List,
-                tint = Color.White,
-                modifier = Modifier
-                    .size(23.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { navController.navigate(Routes.Queue.route) },
-                contentDescription = "Queue",
-            )
+            BouncyScaleBox(
+                pressedScale = 0.88f,
+                onClick = { navController.navigate(Routes.Queue.route) },
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.List,
+                    tint = Color.White,
+                    modifier = Modifier.size(23.dp),
+                    contentDescription = "Queue",
+                )
+            }
         }
     }
 }

@@ -323,14 +323,17 @@ private fun HomeHeaderRow(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .background(if (isSel) Color(0xFF1ED760) else Color(0xFF2A2A2A))
-                        .clickable {
-                            onFilterChange(label)
-                            if (label == "New Releases") {
-                                onWhatsNewClick()
-                            } else if (label == "Podcasts" || label == "Audiobooks") {
-                                navController.navigate(Routes.Search.route)
+                        .tactileItemPress(
+                            pressedScale = 0.94f,
+                            onClick = {
+                                onFilterChange(label)
+                                if (label == "New Releases") {
+                                    onWhatsNewClick()
+                                } else if (label == "Podcasts" || label == "Audiobooks") {
+                                    navController.navigate(Routes.Search.route)
+                                }
                             }
-                        }
+                        )
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                 ) {
                     Text(
@@ -392,7 +395,10 @@ private fun HomeMoodRadiosRow(navController: NavController) {
                     .clip(RoundedCornerShape(12.dp))
                     .background(tintBg.copy(alpha = 0.45f))
                     .border(1.dp, tintBg.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
-                    .clickable { navController.navigate(route) }
+                    .tactileItemPress(
+                        pressedScale = 0.95f,
+                        onClick = { navController.navigate(route) }
+                    )
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 Text(
@@ -408,42 +414,45 @@ private fun HomeMoodRadiosRow(navController: NavController) {
 
 @Composable
 private fun HomeShortcutGrid(navController: NavController, items: List<HomeItem>) {
-    Column(modifier = Modifier.padding(8.dp, 4.dp)) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
         items.chunked(2).forEach { rowItems ->
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp, 4.dp),
+                    .padding(vertical = 4.dp),
             ) {
                 rowItems.forEach { item ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(GridBackground.toArgb()))
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF282828))
                             .tactileItemPress(
-                                pressedScale = 0.96f,
+                                pressedScale = 0.965f,
                                 onClick = { onHomeItemClick(navController, item) }
                             ),
                     ) {
                         AsyncImage(
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp)),
                             contentScale = ContentScale.Crop,
                             model = item.imageUrl,
                             placeholder = painterResource(R.drawable.placeholder),
                             error = painterResource(R.drawable.placeholder),
-                            contentDescription = "",
+                            contentDescription = item.name,
                         )
                         Text(
                             text = item.name,
                             color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2,
-                            modifier = Modifier.padding(8.dp, 4.dp),
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         )
                     }
                 }
@@ -661,38 +670,42 @@ fun HomePlaylistGrid(navController: NavController, albums: List<AlbumsModel>) {
             )
             {
                 repeat(chunkedAlbums[it].size){ album ->
+                    val albumModel = chunkedAlbums[it][album]
                     Row(
                         horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .padding(2.dp)
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(Color(GridBackground.toArgb()))
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF282828))
                             .width(180.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                val albumModel = chunkedAlbums[it][album]
-                                Log.d("check", albumModel.name)
-                                navController.navigate(albumRoute(albumModel.name, albumModel.artists))
-                            }
+                            .tactileItemPress(
+                                pressedScale = 0.965f,
+                                onClick = {
+                                    navController.navigate(albumRoute(albumModel.name, albumModel.artists))
+                                }
+                            )
                     ) {
-                        AsyncImage(modifier = Modifier
-                            .size(55.dp),
+                        AsyncImage(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp)),
                             contentScale = ContentScale.Crop,
-                            model = chunkedAlbums[it][album].coverUri,
+                            model = albumModel.coverUri,
                             placeholder = painterResource(R.drawable.placeholder),
                             error = painterResource(R.drawable.placeholder),
-                            contentDescription = "Profile")
-                        Text(modifier = Modifier.padding(5.dp),
-                            text = chunkedAlbums[it][album].name,
+                            contentDescription = albumModel.name
+                        )
+                        Text(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            text = albumModel.name,
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
-
                     }
                 }
 
@@ -708,49 +721,55 @@ fun HomeAlbums(
     navController: NavController
 ) {
     val reversedAlbum = album.reversed().dropLast(1)
-    Text(modifier = Modifier
-        .padding(20.dp, 10.dp, 0.dp, 0.dp),
+    Text(
+        modifier = Modifier.padding(20.dp, 10.dp, 0.dp, 0.dp),
         text = "Albums",
         color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold)
-        LazyRow(modifier = Modifier.padding(6.dp)){
-            items(reversedAlbum.size){ album ->
-                Box(modifier = Modifier
-                    .padding(10.dp)
-                    .width(150.dp)
-                    .height(195.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        navController.navigate(albumRoute(reversedAlbum[album].name, reversedAlbum[album].artists))
-                    }
-            ){
-                Column(
-                    horizontalAlignment = Alignment.Start,
-                    ) {
-
-                    AsyncImage(modifier = Modifier
-                        .size(150.dp),
-                        contentScale = ContentScale.Crop,
-                        model = reversedAlbum[album].coverUri,
-                        placeholder = painterResource(R.drawable.placeholder),
-                        error = painterResource(R.drawable.placeholder),
-                        contentDescription = "Albums")
-                    Text(
-                        fontSize = 13.sp,
-                        text = reversedAlbum[album].name,
-                        textAlign = TextAlign.Center,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold)
-                    Text(
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        text = reversedAlbum[album].artists,
-                        color = Color.LightGray)
-                }
-
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold
+    )
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(reversedAlbum.size) { index ->
+            val currentAlbum = reversedAlbum[index]
+            Column(
+                modifier = Modifier
+                    .width(145.dp)
+                    .tactileItemPress(
+                        pressedScale = 0.96f,
+                        onClick = {
+                            navController.navigate(albumRoute(currentAlbum.name, currentAlbum.artists))
+                        }
+                    )
+            ) {
+                AsyncImage(
+                    modifier = Modifier
+                        .size(145.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    model = currentAlbum.coverUri,
+                    placeholder = painterResource(R.drawable.placeholder),
+                    error = painterResource(R.drawable.placeholder),
+                    contentDescription = currentAlbum.name
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    fontSize = 13.sp,
+                    text = currentAlbum.name,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    fontSize = 11.5.sp,
+                    text = currentAlbum.artists,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color(0xFFB3B3B3)
+                )
             }
         }
     }
@@ -761,48 +780,60 @@ fun HomeArtists(
     artists : List<ArtistsModel>,
     navController: NavController
 ) {
-    Text(modifier = Modifier
-        .padding(20.dp, 10.dp, 0.dp, 0.dp),
+    Text(
+        modifier = Modifier.padding(20.dp, 10.dp, 0.dp, 0.dp),
         text = "Best of Artists",
         color = Color.White,
-        fontSize = 23.sp,
-        fontWeight = FontWeight.Bold)
-    LazyRow(modifier = Modifier.padding(6.dp)){
-        items(artists.size){artist ->
-            Box(modifier = Modifier
-                .padding(10.dp)
-                .width(150.dp)
-                .height(200.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    Log.d("check", artists[artist].name)
-                    navController.navigate(artistRoute(artists[artist].name, artists[artist].id))
-                }
-            ){
-                Column(horizontalAlignment = Alignment.Start) {
-
-
-
-                    AsyncImage(modifier = Modifier
-                        .size(150.dp),
-                        contentScale = ContentScale.Crop,
-                        model = artists[artist].coverUri,
-                        placeholder = painterResource(R.drawable.placeholder),
-                        error = painterResource(R.drawable.placeholder),
-                        contentDescription = "Albums")
-                    Text(modifier = Modifier.padding(2.dp),
-                        text = "This is ${artists[artist].name}",
-                        color = Color.LightGray,
-                        fontSize = 11.sp)
-                }
-
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold
+    )
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        items(artists.size) { artist ->
+            val currentArtist = artists[artist]
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(136.dp)
+                    .tactileItemPress(
+                        pressedScale = 0.96f,
+                        onClick = {
+                            navController.navigate(artistRoute(currentArtist.name, currentArtist.id))
+                        }
+                    )
+            ) {
+                AsyncImage(
+                    modifier = Modifier
+                        .size(136.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                    model = currentArtist.coverUri,
+                    placeholder = painterResource(R.drawable.placeholder),
+                    error = painterResource(R.drawable.placeholder),
+                    contentDescription = currentArtist.name
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = currentArtist.name,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Artist",
+                    color = Color(0xFFB3B3B3),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     }
 }
-
 
 @Composable
 fun ImageCard(
@@ -810,42 +841,38 @@ fun ImageCard(
     allAlbums: List<AlbumsModel>,
     modifier: Modifier = Modifier
 ) {
-
     val albums = allAlbums.takeLast(3)
-    Text(modifier = Modifier
-        .padding(20.dp, 10.dp, 0.dp, 0.dp),
+    Text(
+        modifier = Modifier.padding(20.dp, 10.dp, 0.dp, 0.dp),
         text = "Discover",
         color = Color.White,
         fontSize = 22.sp,
-        fontWeight = FontWeight.Bold)
+        fontWeight = FontWeight.Bold
+    )
     Column(
         modifier = Modifier.padding(0.dp, 10.dp, 0.dp, 50.dp)
     ) {
         repeat(albums.size) { album ->
+            val currentAlbum = albums[album]
             Card(
-                shape = RoundedCornerShape(15.dp),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = 5.dp
-                ),
+                shape = RoundedCornerShape(14.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                 modifier = Modifier
-                    .padding(15.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
                     .fillMaxWidth()
-                    .height(380.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                       navController.navigate(albumRoute(albums[album].name, albums[album].artists))
-                    }
+                    .height(360.dp)
+                    .tactileItemPress(
+                        pressedScale = 0.98f,
+                        onClick = {
+                            navController.navigate(albumRoute(currentAlbum.name, currentAlbum.artists))
+                        }
+                    )
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                ) {
+                Box(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
                         modifier = Modifier.fillMaxSize(),
-                        model = albums[album].coverUri,
-                        contentDescription = "artists",
+                        model = currentAlbum.coverUri,
+                        contentDescription = currentAlbum.name,
                         placeholder = painterResource(R.drawable.placeholder),
                         error = painterResource(R.drawable.placeholder),
                         contentScale = ContentScale.Crop
@@ -996,10 +1023,10 @@ private fun QuickPickCard(
     Column(
         modifier = Modifier
             .width(120.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() },
+            .tactileItemPress(
+                pressedScale = 0.955f,
+                onClick = onClick,
+            ),
     ) {
         Box(
             modifier = Modifier
@@ -1130,9 +1157,8 @@ fun NewReleaseCard(
     Column(
         modifier = Modifier
             .width(140.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+            .tactileItemPress(
+                pressedScale = 0.955f,
                 onClick = onClick,
             )
     ) {
