@@ -248,4 +248,41 @@ class MediaAssistantDiscoveryTest {
         val autoRoot = browserService.onGetRoot(autoPackage, 1001, null)
         assertNotNull("MediaBrowserServiceCompat root must be authorized for Android Auto", autoRoot)
     }
+
+    @Test
+    fun verifyVoicePlayDispatchActivityHeadlessExecutionAndBufferingAck() {
+        val session = MediaSessionHolder.getOrCreateSession(context)
+        assertTrue("MediaSessionCompat must be active", session.isActive)
+
+        val intent = Intent(android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
+            putExtra(android.app.SearchManager.QUERY, "Bohemian Rhapsody")
+            putExtra("query", "Bohemian Rhapsody")
+            addCategory(Intent.CATEGORY_VOICE)
+        }
+
+        val controller = org.robolectric.Robolectric.buildActivity(io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity::class.java, intent)
+            .create()
+
+        // 1. Verify activity finished immediately without lingering in foreground
+        assertTrue("VoicePlayDispatchActivity must finish immediately to avoid full-screen driver mode", controller.get().isFinishing)
+
+        // 2. Verify MediaSessionHolder received immediate STATE_BUFFERING acknowledgment
+        val playbackState = session.controller.playbackState
+        assertNotNull("Playback state must be published", playbackState)
+        assertEquals("Session must publish STATE_BUFFERING immediately for Google Assistant ACK", PlaybackStateCompat.STATE_BUFFERING, playbackState.state)
+
+        // 3. Verify PAUSE action handling
+        val pauseIntent = Intent("io.github.sekademi.spotufi.action.PAUSE")
+        val pauseController = org.robolectric.Robolectric.buildActivity(io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity::class.java, pauseIntent)
+            .create()
+        assertTrue("Pause dispatch must finish immediately", pauseController.get().isFinishing)
+        assertEquals("Session must reflect STATE_PAUSED", PlaybackStateCompat.STATE_PAUSED, session.controller.playbackState.state)
+
+        // 4. Verify RESUME action handling
+        val resumeIntent = Intent("io.github.sekademi.spotufi.action.RESUME")
+        val resumeController = org.robolectric.Robolectric.buildActivity(io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity::class.java, resumeIntent)
+            .create()
+        assertTrue("Resume dispatch must finish immediately", resumeController.get().isFinishing)
+        assertEquals("Session must reflect STATE_PLAYING", PlaybackStateCompat.STATE_PLAYING, session.controller.playbackState.state)
+    }
 }

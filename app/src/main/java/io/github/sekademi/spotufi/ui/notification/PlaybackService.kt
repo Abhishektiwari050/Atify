@@ -91,6 +91,7 @@ class PlaybackService : MediaLibraryService() {
         private var lastErrorSongId: Int? = null
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            currentSongState.updatePlayingState(isPlaying)
             updatePlaybackStateCompat(if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
         }
 
@@ -101,6 +102,16 @@ class PlaybackService : MediaLibraryService() {
                 Player.STATE_READY -> {
                     val isPlaying = SongPlayer.exoPlayer?.isPlaying == true
                     updatePlaybackStateCompat(if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
+                    val duration = SongPlayer.exoPlayer?.duration?.takeIf { it > 0 } ?: 0L
+                    if (duration > 0) {
+                        updateMetadataCompat(
+                            currentSongState.title.value,
+                            currentSongState.singer.value,
+                            currentSongState.album.value,
+                            duration,
+                            currentSongState.coverUri.value,
+                        )
+                    }
                     lastErrorSongId = null
                 }
                 Player.STATE_ENDED -> {
@@ -393,6 +404,21 @@ class PlaybackService : MediaLibraryService() {
             MediaButtonReceiver.handleIntent(session, intent)
         }
         val action = intent?.action
+        when (action) {
+            "io.github.sekademi.spotufi.action.PAUSE" -> {
+                SongPlayer.pause()
+                currentSongState.updatePlayingState(false)
+                updatePlaybackStateCompat(PlaybackStateCompat.STATE_PAUSED)
+                return START_NOT_STICKY
+            }
+            "io.github.sekademi.spotufi.action.RESUME" -> {
+                val isWeb = SongPlayer.webPlaybackActive()
+                if (isWeb) SpotifyWebPlayer.resume() else SongPlayer.play()
+                currentSongState.updatePlayingState(true)
+                updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
+                return START_NOT_STICKY
+            }
+        }
         if (action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH ||
             action == "android.intent.action.MEDIA_SEARCH" ||
             action == "com.google.android.gms.actions.SEARCH_ACTION" ||
@@ -428,19 +454,52 @@ class PlaybackService : MediaLibraryService() {
     private fun wrap(base: Player): ForwardingPlayer = object : ForwardingPlayer(base) {
         override fun getAvailableCommands(): Player.Commands =
             super.getAvailableCommands().buildUpon()
+                .add(COMMAND_PLAY_PAUSE)
                 .add(COMMAND_SEEK_TO_NEXT)
                 .add(COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
                 .add(COMMAND_SEEK_TO_PREVIOUS)
                 .add(COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
                 .add(COMMAND_SEEK_BACK)
                 .add(COMMAND_SEEK_FORWARD)
+                .add(COMMAND_STOP)
                 .build()
 
         override fun isCommandAvailable(command: Int): Boolean = when (command) {
+            COMMAND_PLAY_PAUSE,
             COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
             COMMAND_SEEK_TO_PREVIOUS, COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
-            COMMAND_SEEK_BACK, COMMAND_SEEK_FORWARD -> true
+            COMMAND_SEEK_BACK, COMMAND_SEEK_FORWARD,
+            COMMAND_STOP -> true
             else -> super.isCommandAvailable(command)
+        }
+
+        override fun play() {
+            val isWeb = SongPlayer.webPlaybackActive()
+            if (isWeb) {
+                SpotifyWebPlayer.resume()
+            } else {
+                SongPlayer.play()
+            }
+            currentSongState.updatePlayingState(true)
+            updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
+        }
+
+        override fun pause() {
+            val isWeb = SongPlayer.webPlaybackActive()
+            if (isWeb) {
+                SpotifyWebPlayer.pause()
+            } else {
+                SongPlayer.pause()
+            }
+            currentSongState.updatePlayingState(false)
+            updatePlaybackStateCompat(PlaybackStateCompat.STATE_PAUSED)
+        }
+
+        override fun stop() {
+            SongPlayer.pause()
+            currentSongState.updatePlayingState(false)
+            updatePlaybackStateCompat(PlaybackStateCompat.STATE_STOPPED)
+            stopForeground(STOP_FOREGROUND_REMOVE)
         }
 
         override fun hasNextMediaItem() = true
@@ -918,6 +977,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun handleVoiceQuery(query: String) {
+        updatePlaybackStateCompat(PlaybackStateCompat.STATE_BUFFERING)
         lifecycleScope.launch(Dispatchers.IO) {
             val cleanQuery = sanitizeVoiceQuery(query)
             if (cleanQuery.isBlank()) {
@@ -948,6 +1008,7 @@ class PlaybackService : MediaLibraryService() {
                             }
                         }
                     }
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
                 }
                 return@launch
             }
@@ -969,6 +1030,7 @@ class PlaybackService : MediaLibraryService() {
                         episode.id, 0, episode.album,
                     )
                     SongPlayer.playSong(episode.url, applicationContext)
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
                 }
                 return@launch
             }
@@ -982,6 +1044,7 @@ class PlaybackService : MediaLibraryService() {
                         topSong.id, 0, topSong.album,
                     )
                     SongPlayer.playSong(topSong.url, applicationContext)
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
                     triggerAutoplay(topSong)
                 }
                 return@launch
@@ -996,6 +1059,7 @@ class PlaybackService : MediaLibraryService() {
                         episode.id, 0, episode.album,
                     )
                     SongPlayer.playSong(episode.url, applicationContext)
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
                 }
                 return@launch
             }
@@ -1030,7 +1094,21 @@ class PlaybackService : MediaLibraryService() {
                         model.id, 0, model.album,
                     )
                     SongPlayer.playSong(model.url, applicationContext)
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
                     triggerAutoplay(model)
+                }
+                return@launch
+            }
+
+            // 3. Fallback: If query returned no hits anywhere, play top hits so voice playback never drops
+            val fallbackHits = lastSuccess(repository.searchSongs("top hits")) ?: emptyList()
+            if (fallbackHits.isNotEmpty()) {
+                withContext(Dispatchers.Main) {
+                    currentSongState.updateQueue(fallbackHits)
+                    val first = fallbackHits.first()
+                    currentSongState.updateSongState(first.coverUri, first.title, first.singer, true, first.id, 0, first.album)
+                    SongPlayer.playSong(first.url, applicationContext)
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
                 }
             }
         }

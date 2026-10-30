@@ -3,7 +3,8 @@
     <capability android:name="actions.intent.PLAY_MEDIA">
         <intent
             android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity">
             <parameter
                 android:name="media.name"
                 android:key="query" />
@@ -11,7 +12,8 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:data="atify://play?query={query}"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity">
             <parameter
                 android:name="media.name"
                 android:key="query" />
@@ -21,7 +23,8 @@
     <capability android:name="actions.intent.PLAY_MUSIC">
         <intent
             android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity">
             <parameter
                 android:name="music.recording.name"
                 android:key="query" />
@@ -41,7 +44,8 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:data="atify://play?query={query}"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity">
             <parameter
                 android:name="music.recording.name"
                 android:key="query" />
@@ -52,7 +56,8 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:data="atify://play?query={feature}"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity">
             <parameter
                 android:name="feature"
                 android:key="feature" />
@@ -61,14 +66,16 @@
 
     <capability android:name="actions.intent.RESUME_MUSIC">
         <intent
-            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity" />
+            android:action="io.github.sekademi.spotufi.action.RESUME"
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity" />
     </capability>
 
     <capability android:name="actions.intent.PAUSE_MUSIC">
         <intent
-            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity" />
+            android:action="io.github.sekademi.spotufi.action.PAUSE"
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity" />
     </capability>
 
     <shortcut
@@ -79,7 +86,8 @@
         android:shortcutLongLabel="@string/shortcut_play_music_desc">
         <intent
             android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity" />
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity" />
         <capability-binding android:key="actions.intent.PLAY_MEDIA" />
     </shortcut>
 
@@ -92,7 +100,8 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:data="atify://play?query=liked"
-            android:targetClass="io.github.sekademi.spotufi.MainActivity" />
+            android:targetPackage="io.github.sekademi.spotufi"
+            android:targetClass="io.github.sekademi.spotufi.ui.VoicePlayDispatchActivity" />
         <capability-binding android:key="actions.intent.PLAY_MEDIA" />
     </shortcut>
 </shortcuts>

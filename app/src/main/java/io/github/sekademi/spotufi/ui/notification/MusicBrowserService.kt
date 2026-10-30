@@ -268,6 +268,16 @@ class MusicBrowserService : MediaBrowserServiceCompat() {
 
         override fun onPlayFromSearch(query: String?, extras: Bundle?) {
             startPlaybackService()
+            MediaSessionHolder.updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING)
+            val serviceIntent = Intent(applicationContext, PlaybackService::class.java).apply {
+                action = android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH
+                putExtra(android.app.SearchManager.QUERY, query)
+                putExtra("query", query)
+                extras?.let { putExtras(it) }
+            }
+            try {
+                ContextCompat.startForegroundService(applicationContext, serviceIntent)
+            } catch (_: Exception) {}
             handleVoiceQuery(query.orEmpty())
         }
 
@@ -392,6 +402,7 @@ class MusicBrowserService : MediaBrowserServiceCompat() {
     }
 
     private fun handleVoiceQuery(query: String) {
+        MediaSessionHolder.updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING)
         serviceScope.launch(Dispatchers.IO) {
             val cleanQuery = sanitizeVoiceQuery(query)
             if (cleanQuery.isBlank()) {
@@ -430,11 +441,73 @@ class MusicBrowserService : MediaBrowserServiceCompat() {
                 return@launch
             }
 
-            val songs = lastSuccess(repository.searchSongs(cleanQuery)).orEmpty()
-            withContext(Dispatchers.Main) {
-                if (songs.isNotEmpty()) {
-                    currentSongState.updateQueue(songs)
-                    val first = songs.first()
+            // 1. Catalog search
+            val searchResults = runCatching {
+                lastSuccess(repository.searchEverything(cleanQuery))
+            }.getOrNull()
+
+            if (!searchResults?.songs.isNullOrEmpty()) {
+                val topSong = searchResults.songs.first()
+                withContext(Dispatchers.Main) {
+                    currentSongState.updateQueue(searchResults.songs)
+                    currentSongState.updateSongState(
+                        topSong.coverUri, topSong.title, topSong.singer, true,
+                        topSong.id, 0, topSong.album,
+                    )
+                    SongPlayer.playSong(topSong.url, applicationContext)
+                    MediaSessionHolder.updatePlaybackState(
+                        PlaybackStateCompat.STATE_PLAYING,
+                        repeatMode = currentSongState.repeat.value,
+                        isShuffle = currentSongState.shuffle.value
+                    )
+                }
+                return@launch
+            }
+
+            // 2. Direct YouTube fallback search
+            val ytHits = runCatching {
+                com.metrolist.innertube.YouTube.search(cleanQuery, com.metrolist.innertube.YouTube.SearchFilter.FILTER_SONG).getOrNull()?.items
+                    ?.mapNotNull { item ->
+                        when (item) {
+                            is com.metrolist.innertube.models.SongItem -> item
+                            is com.metrolist.innertube.models.EpisodeItem -> item.asSongItem()
+                            else -> null
+                        }
+                    }
+            }.getOrNull()
+            val topYt = ytHits?.firstOrNull()
+            if (topYt != null) {
+                val model = SongsModel(
+                    id = topYt.id.hashCode(),
+                    title = topYt.title,
+                    singer = topYt.artists.joinToString(", ") { it.name }.ifBlank { "Unknown" },
+                    album = topYt.album?.name ?: "Voice Search",
+                    coverUri = topYt.thumbnail,
+                    url = topYt.id,
+                    durationMs = (topYt.duration ?: 0) * 1000
+                )
+                withContext(Dispatchers.Main) {
+                    currentSongState.updateQueue(listOf(model))
+                    currentSongState.updateSongState(
+                        model.coverUri, model.title, model.singer, true,
+                        model.id, 0, model.album,
+                    )
+                    SongPlayer.playSong(model.url, applicationContext)
+                    MediaSessionHolder.updatePlaybackState(
+                        PlaybackStateCompat.STATE_PLAYING,
+                        repeatMode = currentSongState.repeat.value,
+                        isShuffle = currentSongState.shuffle.value
+                    )
+                }
+                return@launch
+            }
+
+            // 3. Fallback to top hits so voice playback never drops
+            val fallbackHits = lastSuccess(repository.searchSongs("top hits")) ?: emptyList()
+            if (fallbackHits.isNotEmpty()) {
+                withContext(Dispatchers.Main) {
+                    currentSongState.updateQueue(fallbackHits)
+                    val first = fallbackHits.first()
                     currentSongState.updateSongState(first.coverUri, first.title, first.singer, true, first.id, 0, first.album)
                     SongPlayer.playSong(first.url, applicationContext)
                     MediaSessionHolder.updatePlaybackState(

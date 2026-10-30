@@ -84,6 +84,9 @@ class MainActivity : ComponentActivity() {
                 intent.extras?.let { putExtras(it) }
             }
             ContextCompat.startForegroundService(this, serviceIntent)
+            if (intent.categories?.contains(android.content.Intent.CATEGORY_VOICE) == true) {
+                moveTaskToBack(true)
+            }
         } else if (action == android.content.Intent.ACTION_VIEW) {
             val query = intent.getStringExtra("query")
                 ?: intent.getStringExtra("media_query")

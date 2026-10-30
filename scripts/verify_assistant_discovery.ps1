@@ -55,6 +55,23 @@ if (-not $hasPlaybackService) {
     Write-Host "  [+] PASS: PlaybackService declared in manifest" -ForegroundColor Green
 }
 
+$hasVoiceDispatcher = $manifestContent -match 'VoicePlayDispatchActivity'
+$hasNoDisplayTheme = $manifestContent -match 'android:theme="@android:style/Theme\.NoDisplay"'
+if (-not $hasVoiceDispatcher -or -not $hasNoDisplayTheme) {
+    Write-Host "  [-] FAIL: VoicePlayDispatchActivity is not declared with Theme.NoDisplay" -ForegroundColor Red
+    exit 1
+} else {
+    Write-Host "  [+] PASS: VoicePlayDispatchActivity declared with Theme.NoDisplay (headless trampoline)" -ForegroundColor Green
+}
+
+$mainActivitySnippet = ($manifestContent -split '<activity') | Where-Object { $_ -match 'MainActivity' } | Select-Object -First 1
+if ($mainActivitySnippet -match 'android\.intent\.category\.VOICE') {
+    Write-Host "  [-] FAIL: MainActivity still declares category.VOICE which triggers Driving Assistant UI" -ForegroundColor Red
+    exit 1
+} else {
+    Write-Host "  [+] PASS: MainActivity free of category.VOICE (preventing Driver Assistance UI hijacking)" -ForegroundColor Green
+}
+
 # Step 2: Automated Unit Test Execution
 if (-not $SkipGradle) {
     Write-Host "`n[2/3] Running MediaAssistantDiscoveryTest suite via Gradle..." -ForegroundColor Yellow

@@ -41,6 +41,7 @@
             <!-- Designates the application as a Music Player for Android system & Assistant -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+                <action android:name="android.intent.action.MUSIC_PLAYER" />
                 <category android:name="android.intent.category.APP_MUSIC" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
@@ -57,19 +58,29 @@
                 <data android:scheme="atify" android:host="play" />
                 <data android:scheme="atify" android:host="search" />
             </intent-filter>
-            <!-- Handles voice search from Google Assistant / Gemini / Android Auto -->
-            <intent-filter>
-                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
-                <action android:name="android.intent.action.MEDIA_SEARCH" />
-                <action android:name="android.intent.action.MUSIC_PLAYER" />
-                <action android:name="com.google.android.gms.actions.SEARCH_ACTION" />
-                <action android:name="com.google.android.gms.actions.MEDIA_PLAY_FROM_SEARCH" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.VOICE" />
-            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!-- Headless trampoline for Google Assistant, Gemini, and App Actions voice playback -->
+        <activity
+            android:name=".ui.VoicePlayDispatchActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <action android:name="android.intent.action.MEDIA_SEARCH" />
+                <action android:name="com.google.android.gms.actions.SEARCH_ACTION" />
+                <action android:name="com.google.android.gms.actions.MEDIA_PLAY_FROM_SEARCH" />
+                <action android:name="io.github.sekademi.spotufi.action.RESUME" />
+                <action android:name="io.github.sekademi.spotufi.action.PAUSE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.VOICE" />
+            </intent-filter>
         </activity>
 
         <!-- Android Auto: declares the app as a media app for the car. -->
@@ -106,6 +117,7 @@
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
+                <action android:name="androidx.media.MediaBrowserService" />
                 <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
                 <action android:name="android.intent.action.MEDIA_SEARCH" />
                 <action android:name="com.google.android.gms.actions.SEARCH_ACTION" />
