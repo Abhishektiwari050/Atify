@@ -96,7 +96,15 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
-                <!-- Legacy action Android Auto uses to discover browsable media apps. -->
+            </intent-filter>
+        </service>
+
+        <!-- MediaBrowserServiceCompat: Allows Google Assistant / Gemini / Android Auto to browse and play catalog -->
+        <service
+            android:name=".ui.notification.MusicBrowserService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
                 <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
                 <action android:name="android.intent.action.MEDIA_SEARCH" />

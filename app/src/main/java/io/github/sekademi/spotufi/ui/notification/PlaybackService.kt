@@ -350,18 +350,7 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val mediaButtonReceiverIntent = Intent(Intent.ACTION_MEDIA_BUTTON, null, this, MediaButtonReceiver::class.java)
-        val mediaButtonPendingIntent = PendingIntent.getBroadcast(
-            this, 0, mediaButtonReceiverIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
-        mediaSessionCompat = MediaSessionCompat(this, "AtifyMediaSession").apply {
-            setMediaButtonReceiver(mediaButtonPendingIntent)
-            setSessionActivity(sessionActivity)
-            setCallback(mediaSessionCompatCallback)
-            isActive = true
-        }
+        mediaSessionCompat = MediaSessionHolder.getOrCreateSession(this, mediaSessionCompatCallback)
 
         webPlayer = WebMediaPlayer(mainLooper, currentSongState) { forward -> advance(forward) }
 
@@ -1336,39 +1325,12 @@ class PlaybackService : MediaLibraryService() {
         state: Int,
         position: Long = SongPlayer.getCurrentPosition()
     ) {
-        val actions = PlaybackStateCompat.ACTION_PLAY or
-                PlaybackStateCompat.ACTION_PAUSE or
-                PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                PlaybackStateCompat.ACTION_FAST_FORWARD or
-                PlaybackStateCompat.ACTION_REWIND or
-                PlaybackStateCompat.ACTION_SEEK_TO or
-                PlaybackStateCompat.ACTION_STOP or
-                PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
-                PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
-                PlaybackStateCompat.ACTION_PLAY_FROM_URI or
-                PlaybackStateCompat.ACTION_SET_REPEAT_MODE or
-                PlaybackStateCompat.ACTION_SET_SHUFFLE_MODE
-
-        val playbackSpeed = if (state == PlaybackStateCompat.STATE_PLAYING) 1.0f else 0.0f
-        val stateBuilder = PlaybackStateCompat.Builder()
-            .setActions(actions)
-            .setState(state, position.coerceAtLeast(0L), playbackSpeed, android.os.SystemClock.elapsedRealtime())
-
-        mediaSessionCompat?.let { session ->
-            session.setPlaybackState(stateBuilder.build())
-            session.setRepeatMode(
-                when (currentSongState.repeat.value) {
-                    RepeatMode.OFF -> PlaybackStateCompat.REPEAT_MODE_NONE
-                    RepeatMode.ONE -> PlaybackStateCompat.REPEAT_MODE_ONE
-                    RepeatMode.ALL -> PlaybackStateCompat.REPEAT_MODE_ALL
-                }
-            )
-            session.setShuffleMode(
-                if (currentSongState.shuffle.value) PlaybackStateCompat.SHUFFLE_MODE_ALL else PlaybackStateCompat.SHUFFLE_MODE_NONE
-            )
-        }
+        MediaSessionHolder.updatePlaybackState(
+            state = state,
+            position = position,
+            repeatMode = currentSongState.repeat.value,
+            isShuffle = currentSongState.shuffle.value
+        )
     }
 
     private fun updateMetadataCompat(
@@ -1378,21 +1340,17 @@ class PlaybackService : MediaLibraryService() {
         durationMs: Long,
         coverUri: String
     ) {
-        val metaBuilder = MediaMetadataCompat.Builder()
-            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
-            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album)
-            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, coverUri)
-            .putString(MediaMetadataCompat.METADATA_KEY_ART_URI, coverUri)
-            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, coverUri)
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMs)
-
-        mediaSessionCompat?.setMetadata(metaBuilder.build())
+        MediaSessionHolder.updateMetadata(
+            title = title,
+            artist = artist,
+            album = album,
+            durationMs = durationMs,
+            coverUri = coverUri
+        )
     }
 
     override fun onDestroy() {
-        mediaSessionCompat?.isActive = false
-        mediaSessionCompat?.release()
+        MediaSessionHolder.release()
         mediaSessionCompat = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionNext = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionPrev = null
