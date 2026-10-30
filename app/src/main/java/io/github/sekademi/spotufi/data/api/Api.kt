@@ -246,9 +246,17 @@ class Api @Inject constructor(
         val hasSpotify = SpotifyTokenProvider.ensureToken(context)
 
         coroutineScope {
+            val playlistUrlMatch = Regex("""(?:spotify:playlist:|open\.spotify\.com/playlist/)([a-zA-Z0-9]+)""").find(trimmed)
+            val directPlaylistId = playlistUrlMatch?.groupValues?.getOrNull(1)
+
             val spDeferred = async(Dispatchers.IO) {
                 if (hasSpotify) {
-                    Spotify.search(trimmed, types = listOf("track", "album", "artist"), limit = 50).getOrNull()
+                    Spotify.search(trimmed, types = listOf("track", "album", "artist", "playlist"), limit = 50).getOrNull()
+                } else null
+            }
+            val spDirectPlaylistDeferred = async(Dispatchers.IO) {
+                if (hasSpotify && directPlaylistId != null) {
+                    Spotify.playlist(directPlaylistId).getOrNull()
                 } else null
             }
             val spPodcastsDeferred = async(Dispatchers.IO) {
@@ -268,14 +276,35 @@ class Api @Inject constructor(
             }
 
             val spRes = spDeferred.await()
+            val spDirectPlaylist = spDirectPlaylistDeferred.await()
             val spPodcasts = spPodcastsDeferred.await()
             val ytSongRes = ytSongsDeferred.await()
             val ytVideoRes = ytVideosDeferred.await()
 
-            // 1. Process Spotify songs, albums, artists
+            // 1. Process Spotify songs, albums, artists, playlists
             val spSongs = spRes?.tracks?.items.orEmpty().map { it.toSongModel() }
             val albums = spRes?.albums?.items.orEmpty().map { it.toAlbumModel() }
             val artists = spRes?.artists?.items.orEmpty().map { it.toArtistModel() }
+            val spPlaylists = spRes?.playlists?.items.orEmpty().mapNotNull { pl ->
+                if (pl.id.isBlank()) null
+                else io.github.sekademi.spotufi.data.entity.LibraryEntry(
+                    spotifyId = pl.id,
+                    name = pl.name,
+                    subtitle = "Playlist • " + (pl.owner?.displayName?.takeIf { it.isNotBlank() } ?: "Spotify"),
+                    coverUri = pl.images.firstOrNull()?.url.orEmpty(),
+                    isPlaylist = true,
+                )
+            }
+            val directPlaylistEntry = spDirectPlaylist?.let { pl ->
+                io.github.sekademi.spotufi.data.entity.LibraryEntry(
+                    spotifyId = pl.id,
+                    name = pl.name,
+                    subtitle = "Playlist • " + (pl.owner?.displayName?.takeIf { it.isNotBlank() } ?: "Spotify"),
+                    coverUri = pl.images.firstOrNull()?.url.orEmpty(),
+                    isPlaylist = true,
+                )
+            }
+            val combinedPlaylists = listOfNotNull(directPlaylistEntry) + spPlaylists.filterNot { it.spotifyId == directPlaylistEntry?.spotifyId }
 
             // 2. Process YouTube songs (both song shelf items and video search items)
             val ytSongsFromMusic = ytSongRes?.items.orEmpty().mapNotNull { item ->
@@ -412,7 +441,7 @@ class Api @Inject constructor(
             val combinedShows = (spShows + ytShows).distinctBy { it.id }
             val combinedEpisodes = (spEpisodes + ytEpisodes + fallbackVideoEpisodes).distinctBy { it.id }
 
-            if (combinedSongs.isEmpty() && albums.isEmpty() && artists.isEmpty() && combinedShows.isEmpty() && combinedEpisodes.isEmpty()) {
+            if (combinedSongs.isEmpty() && albums.isEmpty() && artists.isEmpty() && combinedPlaylists.isEmpty() && combinedShows.isEmpty() && combinedEpisodes.isEmpty()) {
                 if (!hasSpotify) {
                     emit(Response.Error("No results found across Spotify & YouTube"))
                 } else {
@@ -423,6 +452,7 @@ class Api @Inject constructor(
                     songs = combinedSongs,
                     albums = albums,
                     artists = artists,
+                    playlists = combinedPlaylists,
                     shows = combinedShows,
                     episodes = combinedEpisodes,
                 )))

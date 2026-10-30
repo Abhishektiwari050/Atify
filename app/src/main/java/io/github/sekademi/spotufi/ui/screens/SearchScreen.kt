@@ -62,6 +62,7 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.Response
+import io.github.sekademi.spotufi.data.entity.LibraryEntry
 import io.github.sekademi.spotufi.data.entity.SearchResults
 import io.github.sekademi.spotufi.data.entity.SongsModel
 import androidx.compose.animation.core.Spring
@@ -87,6 +88,7 @@ import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.navigation.albumRoute
 import io.github.sekademi.spotufi.ui.navigation.artistRoute
 import io.github.sekademi.spotufi.ui.navigation.categoryRoute
+import io.github.sekademi.spotufi.ui.navigation.playlistRoute
 import io.github.sekademi.spotufi.ui.navigation.showRoute
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
@@ -97,6 +99,7 @@ import io.github.sekademi.spotufi.ui.viewmodel.SearchViewModel
 enum class SearchFilter(val label: String) {
     ALL("All"),
     SONGS("Songs"),
+    PLAYLISTS("Playlists"),
     YOUTUBE("YouTube"),
     ARTISTS("Artists"),
     ALBUMS("Albums"),
@@ -283,6 +286,7 @@ fun SumUpSearchScreen(
                                 "artist" -> navController.navigate(artistRoute(item.name, item.key.takeIf { it != item.name }.orEmpty()))
                                 "album" -> navController.navigate(albumRoute(item.name, item.singer))
                                 "show" -> navController.navigate(showRoute(item.key, item.name))
+                                "playlist" -> navController.navigate(playlistRoute(item.key, item.name))
                             }
                         },
                         onRemove = {
@@ -328,8 +332,9 @@ fun SumUpSearchScreen(
                 }
                 is Response.Success -> {
                     val isEmpty = when (selectedFilter) {
-                        SearchFilter.ALL -> mixed.isEmpty() && results.shows.isEmpty() && results.episodes.isEmpty()
+                        SearchFilter.ALL -> mixed.isEmpty() && results.playlists.isEmpty() && results.shows.isEmpty() && results.episodes.isEmpty()
                         SearchFilter.SONGS -> results.songs.isEmpty()
+                        SearchFilter.PLAYLISTS -> results.playlists.isEmpty()
                         SearchFilter.YOUTUBE -> results.songs.none { it.spotifyTrackId.isBlank() || it.url.startsWith("youtube:") }
                         SearchFilter.ARTISTS -> results.artists.isEmpty()
                         SearchFilter.ALBUMS -> results.albums.isEmpty()
@@ -372,6 +377,16 @@ fun SumUpSearchScreen(
                                             ))
                                             navController.navigate(albumRoute(row.album.name, row.album.artists))
                                         }
+                                        is SearchRow.Playlist -> SearchPlaylistRow(row.playlist) {
+                                            recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                                type = "playlist",
+                                                key = row.playlist.spotifyId,
+                                                name = row.playlist.name,
+                                                singer = row.playlist.subtitle.removePrefix("Playlist • "),
+                                                image = row.playlist.coverUri,
+                                            ))
+                                            navController.navigate(playlistRoute(row.playlist.spotifyId, row.playlist.name))
+                                        }
                                     }
                                 }
                                 if (results.shows.isNotEmpty()) {
@@ -406,6 +421,21 @@ fun SumUpSearchScreen(
                                     SearchSongRow(song, results.songs, searchViewModel, navController = navController, onPlayed = {
                                         recordRecent(song.toRecentItem())
                                     })
+                                }
+                            }
+                            SearchFilter.PLAYLISTS -> {
+                                items(results.playlists.size) { i ->
+                                    val pl = results.playlists[i]
+                                    SearchPlaylistRow(pl) {
+                                        recordRecent(io.github.sekademi.spotufi.data.preferences.RecentItem(
+                                            type = "playlist",
+                                            key = pl.spotifyId,
+                                            name = pl.name,
+                                            singer = pl.subtitle.removePrefix("Playlist • "),
+                                            image = pl.coverUri,
+                                        ))
+                                        navController.navigate(playlistRoute(pl.spotifyId, pl.name))
+                                    }
                                 }
                             }
                             SearchFilter.YOUTUBE -> {
@@ -522,11 +552,12 @@ fun SumUpSearchScreen(
 }
 }
 
-/** A single row in the search results: a track, an artist, or an album. */
+/** A single row in the search results: a track, an artist, an album, or a playlist. */
 sealed class SearchRow {
     data class Song(val song: SongsModel) : SearchRow()
     data class Artist(val artist: io.github.sekademi.spotufi.data.entity.ArtistsModel) : SearchRow()
     data class Album(val album: io.github.sekademi.spotufi.data.entity.AlbumsModel) : SearchRow()
+    data class Playlist(val playlist: io.github.sekademi.spotufi.data.entity.LibraryEntry) : SearchRow()
 }
 
 /**
@@ -547,14 +578,16 @@ private fun mixSearchResults(results: SearchResults, query: String = ""): List<S
     val songs = results.songs.iterator()
     val artists = results.artists.filter { it != matchedArtist }.iterator()
     val albums = results.albums.iterator()
+    val playlists = results.playlists.iterator()
 
     // Place the top 4 songs first so users immediately see their song hits
     repeat(4) {
         if (songs.hasNext()) out += SearchRow.Song(songs.next())
     }
 
-    while (songs.hasNext() || artists.hasNext() || albums.hasNext()) {
+    while (songs.hasNext() || artists.hasNext() || albums.hasNext() || playlists.hasNext()) {
         repeat(3) { if (songs.hasNext()) out += SearchRow.Song(songs.next()) }
+        if (playlists.hasNext()) out += SearchRow.Playlist(playlists.next())
         if (albums.hasNext()) out += SearchRow.Album(albums.next())
         if (artists.hasNext()) out += SearchRow.Artist(artists.next())
     }
@@ -614,6 +647,7 @@ fun RecentItemRow(
                 "artist" -> "Artist"
                 "album" -> "Album • ${item.singer}"
                 "show" -> "Podcast" + (if (item.singer.isNotBlank()) " • ${item.singer}" else "")
+                "playlist" -> "Playlist" + (if (item.singer.isNotBlank()) " • ${item.singer}" else "")
                 else -> ""
             }
             Text(text = subtitle, color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
@@ -874,6 +908,42 @@ fun SearchAlbumRow(album: io.github.sekademi.spotufi.data.entity.AlbumsModel, on
         Column {
             Text(text = album.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             Text(text = "Album • ${album.artists}", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+fun SearchPlaylistRow(playlist: io.github.sekademi.spotufi.data.entity.LibraryEntry, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .tactileItemPress(
+                pressedScale = 0.975f,
+                onClick = onClick,
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        AsyncImage(
+            modifier = Modifier
+                .padding(0.dp, 0.dp, 10.dp, 0.dp)
+                .size(48.dp)
+                .clip(RoundedCornerShape(6.dp)),
+            model = playlist.coverUri,
+            contentScale = ContentScale.Crop,
+            error = painterResource(R.drawable.placeholder),
+            placeholder = painterResource(R.drawable.placeholder),
+            contentDescription = "",
+        )
+        Column {
+            Text(text = playlist.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            Text(
+                text = playlist.subtitle.ifBlank { "Playlist" },
+                color = Color.Gray,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
         }
     }
 }
