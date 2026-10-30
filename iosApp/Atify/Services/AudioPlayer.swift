@@ -168,10 +168,12 @@ public final class AudioPlayer: ObservableObject {
         guard let p = player else { return }
         let interval = CMTime(seconds: 0.25, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserverToken = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard let self = self else { return }
-            self.currentTime = time.seconds
-            if let dur = p.currentItem?.duration.seconds, !dur.isNaN, dur > 0 {
-                self.duration = dur
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.currentTime = time.seconds
+                if let dur = p.currentItem?.duration.seconds, !dur.isNaN, dur > 0 {
+                    self.duration = dur
+                }
             }
         }
     }

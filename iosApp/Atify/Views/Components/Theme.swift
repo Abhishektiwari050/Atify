@@ -3,6 +3,7 @@ import SwiftUI
 public struct AtifyTheme {
     public static let background = Color(hex: 0x121212)
     public static let surface = Color(hex: 0x1E1E1E)
+    public static let card = Color(hex: 0x242424)
     public static let elevatedSurface = Color(hex: 0x282828)
     public static let spotifyGreen = Color(hex: 0x1ED760)
     public static let textPrimary = Color.white

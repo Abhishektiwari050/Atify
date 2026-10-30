@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 public final class PreferencesService: ObservableObject {
     public static let shared = PreferencesService()
 
@@ -11,6 +12,15 @@ public final class PreferencesService: ObservableObject {
 
     @Published public var spDc: String {
         didSet { defaults.set(spDc, forKey: keySpDc) }
+    }
+
+    public var spotifyCookie: String {
+        get { spDc }
+        set { spDc = newValue }
+    }
+
+    public func saveSpotifyCookie(_ cookie: String) {
+        self.spDc = cookie
     }
 
     @Published public var likedTracks: [Track] = [] {
