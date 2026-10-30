@@ -574,12 +574,21 @@ fun PlayerScreen(navController: NavController) {
                     topEnd = (dragProgress * 28f).dp
                 )
             }
+            .clip(
+                RoundedCornerShape(
+                    topStart = (if (screenHeight > 0f) (offsetY / screenHeight).coerceIn(0f, 1f) * 28f else 0f).dp,
+                    topEnd = (if (screenHeight > 0f) (offsetY / screenHeight).coerceIn(0f, 1f) * 28f else 0f).dp
+                )
+            )
+            // Solid base first — prevents underlying screen (Home/Library) text from bleeding through
+            // when no video Canvas is playing and only artwork is shown
+            .background(Color(0xFF121212))
             .background(
                 Brush.verticalGradient(
                     colorStops = arrayOf(
-                        0.0f to animatedDominantColor.copy(alpha = 0.70f),
-                        0.40f to animatedDominantColor.copy(alpha = 0.35f),
-                        0.75f to Color(0xFF101010),
+                        0.0f to animatedDominantColor.copy(alpha = 0.85f),
+                        0.35f to animatedDominantColor.copy(alpha = 0.45f),
+                        0.70f to Color(0xFF101010),
                         1.0f to Color.Black
                     ),
                     startY = 0f
