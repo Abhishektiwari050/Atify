@@ -192,6 +192,8 @@ fun HomeFeedContent(
     val gridSection = sections.firstOrNull()?.takeIf { it.title.isBlank() }
     val carousels = if (gridSection != null) sections.drop(1) else sections
     val quickPicks by homeViewModel.quickPicks.collectAsState()
+    val updateInfo by io.github.sekademi.spotufi.data.update.UpdateChecker.availableUpdate.collectAsState()
+    var isUpdateDismissed by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -203,9 +205,22 @@ fun HomeFeedContent(
                 navController = navController,
                 onWhatsNewClick = { showWhatsNewSheet = true },
                 hasNewReleases = newReleases.isNotEmpty(),
+                hasUpdate = updateInfo != null,
                 selectedFilter = selectedFilter,
                 onFilterChange = { selectedFilter = it },
             )
+        }
+        val currentUpdate = updateInfo
+        if (currentUpdate != null && !isUpdateDismissed) {
+            item {
+                HomeUpdateBanner(
+                    updateInfo = currentUpdate,
+                    onDismiss = {
+                        isUpdateDismissed = true
+                        io.github.sekademi.spotufi.data.update.UpdateChecker.dismissCurrentUpdate()
+                    }
+                )
+            }
         }
         item {
             HomeMoodRadiosRow(navController)
@@ -256,6 +271,102 @@ fun HomeFeedContent(
     }
 }
 
+/** Non-intrusive update trigger banner displayed on the Home feed when an update is available. */
+@Composable
+private fun HomeUpdateBanner(
+    updateInfo: io.github.sekademi.spotufi.data.update.UpdateChecker.UpdateInfo,
+    onDismiss: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF18251F)
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1ED760).copy(alpha = 0.4f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1ED760).copy(alpha = 0.16f))
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_download),
+                    contentDescription = "Update",
+                    tint = Color(0xFF1ED760),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Atify v${updateInfo.version} is out",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "Tap to update for enhanced performance",
+                    color = Color(0xFFB3B3B3),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF1ED760))
+                    .tactileItemPress(
+                        pressedScale = 0.94f,
+                        onClick = {
+                            val intent = android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(updateInfo.downloadUrl)
+                            )
+                            context.startActivity(intent)
+                        }
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Update",
+                    color = Color.Black,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_close),
+                    contentDescription = "Dismiss",
+                    tint = Color(0xFF888888),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
 /** Spotify-style top row: profile avatar on the left (opens Settings, like the
  *  official app's profile drawer), filter pills in the middle, and the What's New
  *  notification bell on the right. */
@@ -264,6 +375,7 @@ private fun HomeHeaderRow(
     navController: NavController,
     onWhatsNewClick: () -> Unit = {},
     hasNewReleases: Boolean = false,
+    hasUpdate: Boolean = false,
     selectedFilter: String = "All",
     onFilterChange: (String) -> Unit = {},
 ) {
@@ -282,30 +394,43 @@ private fun HomeHeaderRow(
         val initial = io.github.sekademi.spotufi.data.api.ProfileCache.name
             ?.trim()?.firstOrNull()?.uppercase() ?: "•"
         Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .padding(start = 16.dp)
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFE8622C))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { navController.navigate(Routes.Settings.route) },
+            modifier = Modifier.padding(start = 16.dp),
+            contentAlignment = Alignment.TopEnd
         ) {
-            if (avatarUrl != null) {
-                AsyncImage(
-                    model = avatarUrl,
-                    contentScale = ContentScale.Crop,
-                    contentDescription = "Profile",
-                    modifier = Modifier.size(34.dp),
-                )
-            } else {
-                Text(
-                    text = initial,
-                    color = Color.Black,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE8622C))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { navController.navigate(Routes.Settings.route) },
+            ) {
+                if (avatarUrl != null) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentScale = ContentScale.Crop,
+                        contentDescription = "Profile",
+                        modifier = Modifier.size(34.dp),
+                    )
+                } else {
+                    Text(
+                        text = initial,
+                        color = Color.Black,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            if (hasUpdate) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1ED760))
+                        .border(1.5.dp, Color.Black, CircleShape)
                 )
             }
         }

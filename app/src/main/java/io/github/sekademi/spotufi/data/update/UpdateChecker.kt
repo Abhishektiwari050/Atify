@@ -28,6 +28,19 @@ object UpdateChecker {
         .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
+    private val _availableUpdate = kotlinx.coroutines.flow.MutableStateFlow<UpdateInfo?>(null)
+    val availableUpdate: kotlinx.coroutines.flow.StateFlow<UpdateInfo?> = _availableUpdate
+
+    suspend fun checkForUpdates(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
+        val info = check(context)
+        _availableUpdate.value = info
+        info
+    }
+
+    fun dismissCurrentUpdate() {
+        _availableUpdate.value = null
+    }
+
     suspend fun check(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
         val result = runCatching { fetchLatestRelease(context) }
             .onFailure { Log.d(TAG, "update check failed: ${it.message}") }

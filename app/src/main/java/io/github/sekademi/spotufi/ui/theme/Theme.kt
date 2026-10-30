@@ -19,40 +19,40 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = AtifySage,
-    onPrimary = Color.White,
-    secondary = AtifyTaupe,
-    onSecondary = Color.White,
-    tertiary = AtifyRust,
-    onTertiary = Color.White,
+    primary = SpotifyGreen,
+    onPrimary = Color.Black,
+    secondary = Color(0xFFB3B3B3),
+    onSecondary = Color.Black,
+    tertiary = SpotifyGreen,
+    onTertiary = Color.Black,
     background = AppBackground,
-    onBackground = AtifyCream,
+    onBackground = Color.White,
     surface = AppBackground,
-    onSurface = AtifyCream,
-    surfaceVariant = GridBackground,
-    onSurfaceVariant = AtifyTaupe,
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF1F1F1F),
+    onSurfaceVariant = Color(0xFFB3B3B3),
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = AtifySage,
-    onPrimary = Color.White,
-    secondary = AtifyTaupe,
-    onSecondary = Color.White,
-    tertiary = AtifyRust,
-    onTertiary = Color.White,
+    primary = SpotifyGreen,
+    onPrimary = Color.Black,
+    secondary = Color(0xFFB3B3B3),
+    onSecondary = Color.Black,
+    tertiary = SpotifyGreen,
+    onTertiary = Color.Black,
     background = AppBackground,
-    onBackground = AtifyCream,
+    onBackground = Color.White,
     surface = AppBackground,
-    onSurface = AtifyCream,
-    surfaceVariant = GridBackground,
-    onSurfaceVariant = AtifyTaupe,
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF1F1F1F),
+    onSurfaceVariant = Color(0xFFB3B3B3),
 )
 
 @Composable
 fun SpotuiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Keep dynamicColor false by default to preserve Atify's signature high-contrast dark aesthetic
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

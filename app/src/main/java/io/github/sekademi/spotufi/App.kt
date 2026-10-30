@@ -31,6 +31,11 @@ fun App() {
     val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
     val playerState by playerViewModel.currentSongTitle
     var lastRoute by remember { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(Unit) {
+        io.github.sekademi.spotufi.data.update.UpdateChecker.checkForUpdates(context)
+    }
 
     LaunchedEffect(currentRoute, playerState) {
         if (currentRoute != Routes.Player.route) {
