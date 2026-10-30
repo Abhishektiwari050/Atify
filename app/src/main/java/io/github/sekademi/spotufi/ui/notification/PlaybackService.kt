@@ -232,6 +232,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
         SongPlayer.ensureCreated(this)
+        mediaSessionCompat = MediaSessionHolder.getOrCreateSession(this, mediaSessionCompatCallback)
 
         val noisyFilter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
         ContextCompat.registerReceiver(
