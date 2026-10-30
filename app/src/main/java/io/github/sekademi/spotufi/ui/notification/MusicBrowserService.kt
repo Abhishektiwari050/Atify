@@ -100,7 +100,7 @@ class MusicBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    private suspend fun loadChildrenForParent(parentId: String): List<MediaItem> = when {
+    internal suspend fun loadChildrenForParent(parentId: String): List<MediaItem> = when {
         parentId == MEDIA_ROOT_ID -> listOf(
             createFolderItem(NODE_LIKED, "Liked Songs", "Saved songs in your library"),
             createFolderItem(NODE_DOWNLOADS, "Downloads", "Offline downloaded songs"),
@@ -295,6 +295,37 @@ class MusicBrowserService : MediaBrowserServiceCompat() {
         }
 
         override fun onMediaButtonEvent(mediaButtonEvent: Intent?): Boolean {
+            val event = mediaButtonEvent?.let { androidx.core.content.IntentCompat.getParcelableExtra(it, Intent.EXTRA_KEY_EVENT, android.view.KeyEvent::class.java) }
+            if (event != null && event.action == android.view.KeyEvent.ACTION_DOWN) {
+                when (event.keyCode) {
+                    android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                        onPlay()
+                        return true
+                    }
+                    android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                        onPause()
+                        return true
+                    }
+                    android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    android.view.KeyEvent.KEYCODE_HEADSETHOOK -> {
+                        val isPlaying = SongPlayer.exoPlayer?.isPlaying == true || SongPlayer.webPlaybackActive()
+                        if (isPlaying) onPause() else onPlay()
+                        return true
+                    }
+                    android.view.KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                        onSkipToNext()
+                        return true
+                    }
+                    android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                        onSkipToPrevious()
+                        return true
+                    }
+                    android.view.KeyEvent.KEYCODE_MEDIA_STOP -> {
+                        onStop()
+                        return true
+                    }
+                }
+            }
             return super.onMediaButtonEvent(mediaButtonEvent)
         }
     }
