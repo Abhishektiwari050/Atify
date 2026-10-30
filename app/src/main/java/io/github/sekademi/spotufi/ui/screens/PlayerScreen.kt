@@ -424,8 +424,10 @@ fun PlayerScreen(navController: NavController) {
     )
     var showAudioDetails by remember { mutableStateOf(false) }
     LaunchedEffect(songCoverUri) {
-        PaletteExtractor.extractSecondColorFromCoverUrl(context = context, imageUrl = songCoverUri) { color ->
-            dominentColor = color
+        if (songCoverUri.isNotBlank()) {
+            PaletteExtractor.extractSecondColorFromCoverUrl(context = context, imageUrl = songCoverUri) { color ->
+                dominentColor = color
+            }
         }
     }
 
@@ -582,14 +584,14 @@ fun PlayerScreen(navController: NavController) {
             )
             // Solid base first — prevents underlying screen (Home/Library) text from bleeding through
             // when no video Canvas is playing and only artwork is shown
-            .background(Color(0xFF121212))
+            .background(Color(0xFF0F0F0F))
             .background(
                 Brush.verticalGradient(
                     colorStops = arrayOf(
                         0.0f to animatedDominantColor.copy(alpha = 0.85f),
-                        0.35f to animatedDominantColor.copy(alpha = 0.45f),
-                        0.70f to Color(0xFF101010),
-                        1.0f to Color.Black
+                        0.40f to animatedDominantColor.copy(alpha = 0.40f),
+                        0.72f to Color(0xFF121212).copy(alpha = 0.95f),
+                        1.0f to Color(0xFF080808)
                     ),
                     startY = 0f
                 )
@@ -604,14 +606,15 @@ fun PlayerScreen(navController: NavController) {
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            animatedDominantColor.copy(alpha = 0.40f),
+                            animatedDominantColor.copy(alpha = 0.55f),
+                            animatedDominantColor.copy(alpha = 0.15f),
                             Color.Transparent
                         ),
                         center = androidx.compose.ui.geometry.Offset(
                             x = with(density) { (screenWidthDp / 2).toPx() },
                             y = with(density) { (screenHeightDp * 0.32f).toPx() }
                         ),
-                        radius = with(density) { (screenWidthDp * 0.90f).toPx() }
+                        radius = with(density) { (screenWidthDp * 0.95f).toPx() }
                     )
                 )
         )
