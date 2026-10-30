@@ -7,7 +7,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Bundle
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.content.ContextCompat
+import androidx.media.session.MediaButtonReceiver
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
@@ -64,6 +68,7 @@ class PlaybackService : MediaLibraryService() {
     @Inject lateinit var repository: AppRepository
 
     private var mediaSession: MediaLibrarySession? = null
+    private var mediaSessionCompat: MediaSessionCompat? = null
 
     // Android Auto browse cache: mediaId → track, and mediaId → the list it was
     // browsed from (so playing a track queues its whole playlist/album).
@@ -85,8 +90,23 @@ class PlaybackService : MediaLibraryService() {
     private val playerListener = object : Player.Listener {
         private var lastErrorSongId: Int? = null
 
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updatePlaybackStateCompat(if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
+        }
+
         override fun onPlaybackStateChanged(playbackState: Int) {
             currentSongState.updateBufferingState(playbackState == Player.STATE_BUFFERING)
+            when (playbackState) {
+                Player.STATE_BUFFERING -> updatePlaybackStateCompat(PlaybackStateCompat.STATE_BUFFERING)
+                Player.STATE_READY -> {
+                    val isPlaying = SongPlayer.exoPlayer?.isPlaying == true
+                    updatePlaybackStateCompat(if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
+                    lastErrorSongId = null
+                }
+                Player.STATE_ENDED -> {
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_PAUSED)
+                }
+            }
             if (playbackState == Player.STATE_READY) {
                 lastErrorSongId = null
             }
@@ -245,6 +265,17 @@ class PlaybackService : MediaLibraryService() {
         lifecycleScope.launch {
             snapshotFlow { currentSongState.songId.value }.collect {
                 lastReportedTrackId = null
+                val duration = SongPlayer.exoPlayer?.duration?.takeIf { it > 0 } ?: 0L
+                updateMetadataCompat(
+                    currentSongState.title.value,
+                    currentSongState.singer.value,
+                    currentSongState.album.value,
+                    duration,
+                    currentSongState.coverUri.value,
+                )
+                updatePlaybackStateCompat(
+                    if (currentSongState.playingState.value) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+                )
                 mediaSession?.let { session -> updateSessionCustomLayout(session) }
                 io.github.sekademi.spotufi.ui.widget.NowPlayingWidgetProvider.updateAllWidgets(
                     this@PlaybackService,
@@ -264,6 +295,9 @@ class PlaybackService : MediaLibraryService() {
 
         lifecycleScope.launch {
             snapshotFlow { currentSongState.playingState.value }.collect { isPlaying ->
+                updatePlaybackStateCompat(
+                    if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+                )
                 io.github.sekademi.spotufi.ui.widget.NowPlayingWidgetProvider.updateAllWidgets(
                     this@PlaybackService,
                     currentSongState.title.value,
@@ -316,6 +350,19 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val mediaButtonReceiverIntent = Intent(Intent.ACTION_MEDIA_BUTTON, null, this, MediaButtonReceiver::class.java)
+        val mediaButtonPendingIntent = PendingIntent.getBroadcast(
+            this, 0, mediaButtonReceiverIntent,
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
+        mediaSessionCompat = MediaSessionCompat(this, "AtifyMediaSession").apply {
+            setMediaButtonReceiver(mediaButtonPendingIntent)
+            setSessionActivity(sessionActivity)
+            setCallback(mediaSessionCompatCallback)
+            isActive = true
+        }
+
         webPlayer = WebMediaPlayer(mainLooper, currentSongState) { forward -> advance(forward) }
 
         mediaSession = MediaLibrarySession.Builder(this, wrap(base), LibraryCallback())
@@ -337,7 +384,9 @@ class PlaybackService : MediaLibraryService() {
                 webPlayer?.refresh()
                 // Reflect the web player's real play/pause state into the in-app UI
                 // so the on-screen icon matches after the notification's pause.
-                currentSongState.updatePlayingState(SpotifyWebPlayer.isPlaying)
+                val isWebPlaying = SpotifyWebPlayer.isPlaying
+                currentSongState.updatePlayingState(isWebPlaying)
+                updatePlaybackStateCompat(if (isWebPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
             }
         }
 
@@ -350,6 +399,9 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        mediaSessionCompat?.let { session ->
+            MediaButtonReceiver.handleIntent(session, intent)
+        }
         val action = intent?.action
         if (action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH ||
             action == "android.intent.action.MEDIA_SEARCH" ||
@@ -1152,7 +1204,196 @@ class PlaybackService : MediaLibraryService() {
         } catch (_: Exception) {}
     }
 
+    private val mediaSessionCompatCallback = object : MediaSessionCompat.Callback() {
+        override fun onPlay() {
+            val isWeb = SongPlayer.webPlaybackActive()
+            if (isWeb) {
+                SpotifyWebPlayer.resume()
+                currentSongState.updatePlayingState(true)
+            } else {
+                SongPlayer.play()
+                currentSongState.updatePlayingState(true)
+            }
+            updatePlaybackStateCompat(PlaybackStateCompat.STATE_PLAYING)
+        }
+
+        override fun onPause() {
+            SongPlayer.pause()
+            currentSongState.updatePlayingState(false)
+            updatePlaybackStateCompat(PlaybackStateCompat.STATE_PAUSED)
+        }
+
+        override fun onSkipToNext() {
+            advance(forward = true)
+        }
+
+        override fun onSkipToPrevious() {
+            advance(forward = false)
+        }
+
+        override fun onFastForward() {
+            val cur = SongPlayer.getCurrentPosition()
+            SongPlayer.seekTo(cur + 10000L)
+        }
+
+        override fun onRewind() {
+            val cur = SongPlayer.getCurrentPosition()
+            SongPlayer.seekTo((cur - 10000L).coerceAtLeast(0L))
+        }
+
+        override fun onSeekTo(pos: Long) {
+            SongPlayer.seekTo(pos)
+            val isPlaying = SongPlayer.exoPlayer?.isPlaying == true || SongPlayer.webPlaybackActive()
+            updatePlaybackStateCompat(
+                if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED,
+                position = pos
+            )
+        }
+
+        override fun onStop() {
+            SongPlayer.pause()
+            currentSongState.updatePlayingState(false)
+            updatePlaybackStateCompat(PlaybackStateCompat.STATE_STOPPED)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        }
+
+        override fun onSetRepeatMode(repeatMode: Int) {
+            when (repeatMode) {
+                PlaybackStateCompat.REPEAT_MODE_NONE -> currentSongState.updateRepeatState(RepeatMode.OFF)
+                PlaybackStateCompat.REPEAT_MODE_ONE -> currentSongState.updateRepeatState(RepeatMode.ONE)
+                PlaybackStateCompat.REPEAT_MODE_ALL,
+                PlaybackStateCompat.REPEAT_MODE_GROUP -> currentSongState.updateRepeatState(RepeatMode.ALL)
+            }
+        }
+
+        override fun onSetShuffleMode(shuffleMode: Int) {
+            val enabled = shuffleMode != PlaybackStateCompat.SHUFFLE_MODE_NONE
+            currentSongState.updateShuffleState(enabled)
+        }
+
+        override fun onPlayFromSearch(query: String?, extras: Bundle?) {
+            handleVoiceQuery(query.orEmpty())
+        }
+
+        override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+            if (mediaId.isNullOrBlank()) return
+            val track = trackById[mediaId] ?: currentSongState.queue.value.find { it.id.toString() == mediaId || it.spotifyTrackId == mediaId }
+            if (track != null) {
+                val customQueue = queueByTrackId[mediaId]
+                if (!customQueue.isNullOrEmpty()) {
+                    currentSongState.updateQueue(customQueue)
+                    val idx = customQueue.indexOf(track).coerceAtLeast(0)
+                    currentSongState.updateSongState(track.coverUri, track.title, track.singer, true, track.id, idx, track.album)
+                } else {
+                    val q = currentSongState.queue.value
+                    val idx = q.indexOf(track).let { if (it >= 0) it else 0 }
+                    currentSongState.updateSongState(track.coverUri, track.title, track.singer, true, track.id, idx, track.album)
+                }
+                SongPlayer.playSong(track.url, applicationContext)
+            } else {
+                handleVoiceQuery(mediaId)
+            }
+        }
+
+        override fun onPlayFromUri(uri: android.net.Uri?, extras: Bundle?) {
+            uri?.toString()?.let { handleVoiceQuery(it) }
+        }
+
+        override fun onCustomAction(action: String?, extras: Bundle?) {
+            when (action) {
+                "ACTION_TOGGLE_LIKE" -> {
+                    val curId = currentSongState.songId.value
+                    val curSong = currentSongState.queue.value.find { it.id == curId }
+                    if (curSong != null) {
+                        val wasLiked = io.github.sekademi.spotufi.data.preferences.isSongLiked(this@PlaybackService, curId.toString())
+                        if (wasLiked) {
+                            io.github.sekademi.spotufi.data.preferences.removeLikedSong(this@PlaybackService, curId.toString())
+                        } else {
+                            io.github.sekademi.spotufi.data.preferences.addLikedSong(this@PlaybackService, curSong)
+                        }
+                        if (curSong.spotifyTrackId.isNotBlank()) {
+                            SpotifySync.setTrackSaved(this@PlaybackService, curSong.spotifyTrackId, !wasLiked)
+                        }
+                        mediaSession?.let { session -> updateSessionCustomLayout(session) }
+                    }
+                }
+                "ACTION_CLOSE" -> {
+                    SongPlayer.pause()
+                    currentSongState.updatePlayingState(false)
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_STOPPED)
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
+            }
+        }
+
+        override fun onMediaButtonEvent(mediaButtonEvent: Intent?): Boolean {
+            return super.onMediaButtonEvent(mediaButtonEvent)
+        }
+    }
+
+    private fun updatePlaybackStateCompat(
+        state: Int,
+        position: Long = SongPlayer.getCurrentPosition()
+    ) {
+        val actions = PlaybackStateCompat.ACTION_PLAY or
+                PlaybackStateCompat.ACTION_PAUSE or
+                PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackStateCompat.ACTION_FAST_FORWARD or
+                PlaybackStateCompat.ACTION_REWIND or
+                PlaybackStateCompat.ACTION_SEEK_TO or
+                PlaybackStateCompat.ACTION_STOP or
+                PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
+                PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
+                PlaybackStateCompat.ACTION_PLAY_FROM_URI or
+                PlaybackStateCompat.ACTION_SET_REPEAT_MODE or
+                PlaybackStateCompat.ACTION_SET_SHUFFLE_MODE
+
+        val playbackSpeed = if (state == PlaybackStateCompat.STATE_PLAYING) 1.0f else 0.0f
+        val stateBuilder = PlaybackStateCompat.Builder()
+            .setActions(actions)
+            .setState(state, position.coerceAtLeast(0L), playbackSpeed, android.os.SystemClock.elapsedRealtime())
+
+        mediaSessionCompat?.let { session ->
+            session.setPlaybackState(stateBuilder.build())
+            session.setRepeatMode(
+                when (currentSongState.repeat.value) {
+                    RepeatMode.OFF -> PlaybackStateCompat.REPEAT_MODE_NONE
+                    RepeatMode.ONE -> PlaybackStateCompat.REPEAT_MODE_ONE
+                    RepeatMode.ALL -> PlaybackStateCompat.REPEAT_MODE_ALL
+                }
+            )
+            session.setShuffleMode(
+                if (currentSongState.shuffle.value) PlaybackStateCompat.SHUFFLE_MODE_ALL else PlaybackStateCompat.SHUFFLE_MODE_NONE
+            )
+        }
+    }
+
+    private fun updateMetadataCompat(
+        title: String,
+        artist: String,
+        album: String,
+        durationMs: Long,
+        coverUri: String
+    ) {
+        val metaBuilder = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album)
+            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, coverUri)
+            .putString(MediaMetadataCompat.METADATA_KEY_ART_URI, coverUri)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, coverUri)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMs)
+
+        mediaSessionCompat?.setMetadata(metaBuilder.build())
+    }
+
     override fun onDestroy() {
+        mediaSessionCompat?.isActive = false
+        mediaSessionCompat?.release()
+        mediaSessionCompat = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionNext = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionPrev = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.stop()

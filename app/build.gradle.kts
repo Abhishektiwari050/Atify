@@ -170,10 +170,13 @@ dependencies {
     //webkit (WebViewAssetLoader for secure local content loading)
     implementation(libs.webkit)
 
-    //browser (Chrome Custom Tabs for external Spotify authentication)
+    // browser (Chrome Custom Tabs for external Spotify authentication)
     implementation(libs.androidx.browser)
 
-    //exoplayer
+    // Legacy MediaSessionCompat and MediaButtonReceiver support
+    implementation(libs.androidx.media)
+
+    // exoplayer
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.dash)
     // PlayerView for the Spotify Canvas looping video on the now-playing screen.
