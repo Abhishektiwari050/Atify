@@ -204,7 +204,7 @@ fun SettingsScreen(navController: NavController) {
                 // (account / log out) isn't hidden under the bar.
                 .padding(bottom = 200.dp)
         ) {
-            // ── 1. Playback & audio ──
+            // â”€â”€ 1. Playback & audio â”€â”€
             SectionTitle("Playback & audio")
             QualityPicker(
                 title = "Streaming over Wi-Fi",
@@ -224,7 +224,7 @@ fun SettingsScreen(navController: NavController) {
             var autoplayEnabled by remember { mutableStateOf(io.github.sekademi.spotufi.data.preferences.isAutoplayEnabled(context)) }
             SettingsSwitchRow(
                 title = "Autoplay (Infinite Radio)",
-                subtitle = "Keep listening — similar tracks are dynamically queued when your music ends",
+                subtitle = "Keep listening â€” similar tracks are dynamically queued when your music ends",
                 checked = autoplayEnabled,
             ) {
                 autoplayEnabled = it
@@ -443,7 +443,7 @@ fun SettingsScreen(navController: NavController) {
                     Text("AutoEQ Headphone Studio", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Text(
                         if (autoEqEnabled && activeAutoEq != null) "${activeAutoEq.name} (${activeAutoEq.type})"
-                        else "Off • 4,000+ calibration curves",
+                        else "Off â€¢ 4,000+ calibration curves",
                         color = if (autoEqEnabled && activeAutoEq != null) Color(AppPalette.toArgb()) else Color(0xFFB3B3B3),
                         fontSize = 12.sp,
                     )
@@ -560,7 +560,7 @@ fun SettingsScreen(navController: NavController) {
 
             Spacer(Modifier.height(12.dp))
 
-            // ── 2. Storage & downloads ──
+            // â”€â”€ 2. Storage & downloads â”€â”€
             SectionTitle("Storage & downloads")
             QualityPicker(
                 title = "Download quality",
@@ -628,7 +628,7 @@ fun SettingsScreen(navController: NavController) {
                     val audioMb = String.format(java.util.Locale.US, "%.1f", cacheBreakdown.audioBytes / (1024f * 1024f))
                     val imageMb = String.format(java.util.Locale.US, "%.1f", cacheBreakdown.imageBytes / (1024f * 1024f))
                     Text(
-                        "$totalMb MB cached (Audio: $audioMb MB • Images: $imageMb MB)",
+                        "$totalMb MB cached (Audio: $audioMb MB â€¢ Images: $imageMb MB)",
                         color = Color(0xFFB3B3B3),
                         fontSize = 12.sp,
                     )
@@ -648,7 +648,7 @@ fun SettingsScreen(navController: NavController) {
 
             Spacer(Modifier.height(12.dp))
 
-            // ── 3. Power & background ──
+            // â”€â”€ 3. Power & background â”€â”€
             SectionTitle("Power & background")
             Row(
                 modifier = Modifier
@@ -664,7 +664,7 @@ fun SettingsScreen(navController: NavController) {
                 Column(Modifier.weight(1f)) {
                     Text("Battery optimization", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Text(
-                        if (batteryOptExempt) "Exempt — app won't be killed" else "Not exempt — tap to change",
+                        if (batteryOptExempt) "Exempt â€” app won't be killed" else "Not exempt â€” tap to change",
                         color = if (batteryOptExempt) Color(0xFF81C784) else Color(0xFFB3B3B3),
                         fontSize = 12.sp,
                     )
@@ -700,7 +700,7 @@ fun SettingsScreen(navController: NavController) {
 
             Spacer(Modifier.height(12.dp))
 
-            // ── 4. Updates ──
+            // â”€â”€ 4. Updates â”€â”€
             SectionTitle("Updates")
             Text(
                 "Update source repository",
@@ -799,6 +799,33 @@ fun SettingsScreen(navController: NavController) {
                 }
             }
 
+            // Maintainer row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Abhishektiwari050"))
+                        context.startActivity(intent)
+                    }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Maintainer",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "Maintained with ❤️ by Antishake",
+                        color = Color(0xFFB3B3B3),
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+
             // Check for updates row
             Row(
                 modifier = Modifier
@@ -828,8 +855,8 @@ fun SettingsScreen(navController: NavController) {
                     Text(
                         when (val s = updateCheckState) {
                             is UpdateCheckState.Idle             -> "Tap to check for a new version"
-                            is UpdateCheckState.Checking         -> "Checking…"
-                            is UpdateCheckState.UpToDate         -> "You're up to date ✓"
+                            is UpdateCheckState.Checking         -> "Checkingâ€¦"
+                            is UpdateCheckState.UpToDate         -> "You're up to date âœ“"
                             is UpdateCheckState.UpdateAvailable  -> "Atify ${s.info.version} is available!"
                         },
                         color = when (updateCheckState) {
@@ -869,9 +896,9 @@ fun SettingsScreen(navController: NavController) {
     }
 }
 
-// ─────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // State machine for the manual update-check button
-// ─────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 private sealed interface UpdateCheckState {
     object Idle   : UpdateCheckState
     object Checking : UpdateCheckState

@@ -48,7 +48,7 @@ fun CustomSlider(
     var isDragging by remember { mutableStateOf(false) }
 
     val trackHeight by animateDpAsState(
-        targetValue = if (isDragging) 5.5.dp else 3.5.dp,
+        targetValue = if (isDragging) 6.dp else 4.dp,
         animationSpec = androidx.compose.animation.core.spring(
             dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
             stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
@@ -56,7 +56,7 @@ fun CustomSlider(
         label = "trackHeight"
     )
     val thumbRadius by animateDpAsState(
-        targetValue = if (isDragging) 7.5.dp else 4.5.dp,
+        targetValue = if (isDragging) 8.dp else 5.dp,
         animationSpec = androidx.compose.animation.core.spring(
             dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
             stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
@@ -178,13 +178,13 @@ fun PlayerProgress(
             steps = 0,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp, 20.dp, 16.dp, 0.dp),
+                .padding(horizontal = 24.dp),
         )
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(25.dp, 0.dp),
+                .padding(horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {

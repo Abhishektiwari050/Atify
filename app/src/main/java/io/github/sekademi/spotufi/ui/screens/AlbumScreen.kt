@@ -52,6 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -270,32 +271,49 @@ fun SumUpAlbumScreen(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        modifier = Modifier.size(230.dp),
-                        model = album[0].coverUri,
-                        error = painterResource(R.drawable.placeholder),
-                        contentDescription = "",
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(230.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF282828))
+                    ) {
+                        AsyncImage(
+                            modifier = Modifier.fillMaxSize(),
+                            model = album[0].coverUri,
+                            contentScale = ContentScale.Crop,
+                            placeholder = painterResource(R.drawable.placeholder),
+                            error = painterResource(R.drawable.placeholder),
+                            contentDescription = albumName,
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.padding(5.dp))
-                Text(modifier = Modifier
-                    .padding(20.dp, 5.dp, 0.dp, 0.dp),
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    modifier = Modifier.padding(horizontal = 20.dp),
                     text = albumName,
                     color = Color.White,
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.Bold)
-                Text(modifier = Modifier
-                    .padding(20.dp, 0.dp, 0.dp, 0.dp),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    modifier = Modifier.padding(horizontal = 20.dp),
                     text = album[0].artists.ifBlank { albumSongs.firstOrNull()?.singer ?: "" },
                     color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val releaseInfo = if (album[0].time.isNotBlank()) "Album • ${album[0].time}" else "Album"
+                Text(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+                    text = releaseInfo,
+                    color = Color(0xFFB3B3B3),
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium)
-                Text(modifier = Modifier
-                    .padding(20.dp, 0.dp, 0.dp, 0.dp),
-                    text = "Album : ${album[0].time}",
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Normal
                 )
 
                 Box(
@@ -315,17 +333,6 @@ fun SumUpAlbumScreen(
                             horizontalArrangement = Arrangement.spacedBy(18.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            AsyncImage(
-                                modifier = Modifier
-                                    .height(60.dp)
-                                    .width(32.dp)
-                                    .padding(0.dp, 5.dp)
-                                    .clip(RoundedCornerShape(5.dp)),
-                                model = album[0].coverUri,
-                                error = painterResource(R.drawable.placeholder),
-                                contentScale = ContentScale.Crop,
-                                contentDescription = "",
-                            )
                             Icon(
                                 modifier = Modifier
                                     .size(23.dp)

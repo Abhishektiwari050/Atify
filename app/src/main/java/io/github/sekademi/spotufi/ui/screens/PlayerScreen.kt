@@ -687,11 +687,10 @@ fun PlayerScreen(navController: NavController) {
             )
 
             Column(
-                verticalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
-                    .height(300.dp)
-                    .padding(0.dp, 0.dp, 0.dp, 50.dp)
-            ){
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp)
+            ) {
                 // Reads each 300ms tick (songProgress recomposition) so it reflects
                 // the current engine — Spotify vs Lossless (SpotiFLAC) vs YouTube.
                 PlayerInfo(
@@ -713,6 +712,8 @@ fun PlayerScreen(navController: NavController) {
                     currentSong = queueSongs.firstOrNull { it.id == songId },
                 )
 
+                Spacer(modifier = Modifier.height(16.dp))
+
                 PlayerProgress(
                     songDurationText = songDurationText,
                     songProgressText = songProgressText,
@@ -720,7 +721,7 @@ fun PlayerScreen(navController: NavController) {
                     playerViewModel = playerViewModel,
                 )
 
-                Spacer(modifier = Modifier.padding(5.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 PlayerFull(songPlayingState, playerViewModel, context, isLiked, shuffle, repeat, queueSongs)
             }
 
@@ -733,7 +734,7 @@ fun PlayerScreen(navController: NavController) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 25.dp, vertical = 2.dp)
+                        .padding(horizontal = 24.dp, vertical = 4.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color.White.copy(alpha = 0.08f))
                         .clickable { navController.navigate(Routes.Queue.route) }

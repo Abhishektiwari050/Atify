@@ -64,6 +64,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -354,37 +355,51 @@ fun PlaylistScreen(navController: NavController, playlistId: String, playlistNam
                         Spacer(modifier = Modifier.padding(25.dp))
 
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            AsyncImage(
-                                modifier = Modifier.size(230.dp),
-                                model = playlist.coverUri,
-                                error = painterResource(R.drawable.placeholder),
-                                contentDescription = "",
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(230.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF282828))
+                            ) {
+                                AsyncImage(
+                                    modifier = Modifier.fillMaxSize(),
+                                    model = playlist.coverUri,
+                                    contentScale = ContentScale.Crop,
+                                    placeholder = painterResource(R.drawable.placeholder),
+                                    error = painterResource(R.drawable.placeholder),
+                                    contentDescription = playlist.name.ifBlank { playlistName },
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.padding(5.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            modifier = Modifier.padding(20.dp, 5.dp, 0.dp, 0.dp),
+                            modifier = Modifier.padding(horizontal = 20.dp),
                             text = playlist.name.ifBlank { playlistName },
                             color = Color.White,
-                            fontSize = 23.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        if (playlist.time.isNotBlank()) {
+                        if (playlist.artists.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                modifier = Modifier.padding(20.dp, 4.dp, 20.dp, 0.dp),
-                                text = playlist.time,
-                                color = Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                                text = "By ${playlist.artists}",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                        if (playlist.artists.isNotBlank()) {
+                        if (playlist.time.isNotBlank()) {
                             Text(
-                                modifier = Modifier.padding(20.dp, 4.dp, 0.dp, 0.dp),
-                                text = "Playlist • ${playlist.artists}",
-                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+                                text = playlist.time,
+                                color = Color(0xFFB3B3B3),
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Normal
                             )
                         }
 

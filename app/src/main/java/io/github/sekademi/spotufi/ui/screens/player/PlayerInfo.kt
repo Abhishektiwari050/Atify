@@ -87,7 +87,7 @@ fun PlayerInfo(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(20.dp, 0.dp)
+            .padding(horizontal = 24.dp)
     ) {
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -77,7 +78,7 @@ fun PlayerFull(
         horizontalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 24.dp, vertical = 6.dp)
     ) {
         AnimatedShuffleButton(
             shuffle = shuffle,
@@ -164,7 +165,8 @@ fun PlayerConnectRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 25.dp, vertical = 4.dp),
+            .padding(horizontal = 24.dp, vertical = 6.dp)
+            .navigationBarsPadding(),
     ) {
         // Device / Spotify Connect indicator (green).
         Row(verticalAlignment = Alignment.CenterVertically) {

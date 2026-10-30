@@ -103,7 +103,6 @@ fun HomeScreen(navController: NavController){
         modifier = Modifier
             .fillMaxSize()
             .background(Color(AppBackground.toArgb()))
-            .statusBarsPadding()
     ) {
         val feed = (home as? Response.Success)?.data
         // Each feed resolves independently — albums (new releases) often succeeds
@@ -276,7 +275,8 @@ private fun HomeHeaderRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 26.dp, bottom = 8.dp),
+            .statusBarsPadding()
+            .padding(top = 10.dp, bottom = 8.dp),
     ) {
         val avatarUrl = io.github.sekademi.spotufi.data.api.ProfileCache.imageUrl
         val initial = io.github.sekademi.spotufi.data.api.ProfileCache.name
@@ -590,33 +590,27 @@ fun SumUpHomeScreen(
 fun GreetingSection(name : String = "User") {
     val currentHour = LocalTime.now().hour
     val greeting = when {
-        currentHour < 12 -> "Good Morning"
-        currentHour < 17 -> "Good Afternoon"
-        else -> "Good Evening"
+        currentHour < 12 -> "Good morning"
+        currentHour < 17 -> "Good afternoon"
+        else -> "Good evening"
     }
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Column(verticalArrangement = Arrangement.Center) {
             Text(
                 text = greeting,
-                style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-                )
-            Text(
-                text = "Have a Nice Day",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
-                fontSize = 13.sp
-                )
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp,
+            )
         }
-//        Icon(imageVector = Icons.Outlined.Person, contentDescription = "Profile", tint = Color.White)
     }
 }
 
@@ -890,18 +884,38 @@ fun ImageCard(
                                 )
                             )
                     )
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(0.dp, 0.dp, 0.dp, 30.dp),
-                        contentAlignment = Alignment.BottomCenter
+                            .padding(horizontal = 20.dp, vertical = 24.dp),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.Start
                     ) {
                         Text(
-                            text = "Album : ${albums[album].name}",
-                            style = TextStyle(color = Color.White, fontSize = 20.sp),
-                            textAlign = TextAlign.Center
+                            text = "FEATURED ALBUM",
+                            color = Color(0xFF1ED760),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp
                         )
-
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = currentAlbum.name,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (currentAlbum.artists.isNotBlank()) {
+                            Text(
+                                text = currentAlbum.artists,
+                                color = Color(0xFFB3B3B3),
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }

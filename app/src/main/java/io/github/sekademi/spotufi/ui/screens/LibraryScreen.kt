@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -326,35 +327,49 @@ fun LibraryScreen(navController: NavController) {
             }
         }
 
-        // Grid/list switch, like the icon at the top-right of Spotify's library.
+        var selectedFilter by remember { mutableStateOf("All") }
+        val filters = listOf("All", "Playlists", "Albums", "Artists", "Downloaded")
+
+        // Filter chips and Grid/List view toggle
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp, 0.dp, 16.dp, 8.dp)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Maintained with ❤️ by ",
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                Text(
-                    text = "Antishake",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable {
-                        uriHandler.openUri("https://github.com/Abhishektiwari050")
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(filters.size) { i ->
+                    val label = filters[i]
+                    val isSel = label == selectedFilter
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (isSel) Color(0xFF1ED760) else Color(0xFF2A2A2A))
+                            .clickable {
+                                if (label == "Downloaded") {
+                                    navController.navigate(Routes.Downloads.route)
+                                } else {
+                                    selectedFilter = label
+                                }
+                            }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSel) Color.Black else Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
                     }
-                )
+                }
             }
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(8.dp))
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
                     .background(Color(0xFF2A2A2A))
                     .clickable {
@@ -367,7 +382,7 @@ fun LibraryScreen(navController: NavController) {
                     painter = painterResource(if (gridView) R.drawable.ic_view_list else R.drawable.ic_view_grid),
                     contentDescription = if (gridView) "Show as list" else "Show as grid",
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -375,9 +390,25 @@ fun LibraryScreen(navController: NavController) {
         val followedArtists by libraryViewModel.followedArtists.collectAsState()
         when (entries) {
             is Response.Loading -> TrackListShimmer(count = 7)
-            is Response.Success ->
-                if (gridView) LibraryGridScreen(PaddingValues(0.dp), (entries as Response.Success).data, followedArtists, navController)
-                else SumUpLibraryScreen(PaddingValues(0.dp), (entries as Response.Success).data, followedArtists, navController)
+            is Response.Success -> {
+                val allData = (entries as Response.Success).data
+                val filteredData = when (selectedFilter) {
+                    "Playlists" -> allData.filter { it.isPlaylist }
+                    "Albums" -> allData.filter { !it.isPlaylist }
+                    "Artists" -> emptyList()
+                    else -> allData
+                }
+                val filteredArtists = when (selectedFilter) {
+                    "Playlists", "Albums" -> emptyList()
+                    else -> followedArtists
+                }
+
+                if (gridView) {
+                    LibraryGridScreen(PaddingValues(0.dp), filteredData, filteredArtists, navController)
+                } else {
+                    SumUpLibraryScreen(PaddingValues(0.dp), filteredData, filteredArtists, navController)
+                }
+            }
             else -> ErrorRetryView(
                 title = "Couldn't load your library",
                 subtitle = "Please check your network connection and try again",
