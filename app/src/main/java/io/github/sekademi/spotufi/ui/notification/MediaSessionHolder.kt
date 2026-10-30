@@ -48,6 +48,11 @@ object MediaSessionHolder {
         )
 
         val session = MediaSessionCompat(context.applicationContext, "AtifyMediaSession").apply {
+            setFlags(
+                (1 shl 0) or // FLAG_HANDLES_MEDIA_BUTTONS
+                (1 shl 1) or // FLAG_HANDLES_TRANSPORT_CONTROLS
+                (1 shl 2)    // FLAG_HANDLES_QUEUE_COMMANDS
+            )
             setMediaButtonReceiver(mediaButtonPendingIntent)
             setSessionActivity(sessionActivity)
             callback?.let { setCallback(it) }
