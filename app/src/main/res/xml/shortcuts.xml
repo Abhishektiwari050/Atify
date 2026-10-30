@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <capability android:name="actions.intent.PLAY_MEDIA">
+        <intent
+            android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            <parameter
+                android:name="media.name"
+                android:key="query" />
+        </intent>
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="atify://play?query={query}"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            <parameter
+                android:name="media.name"
+                android:key="query" />
+        </intent>
+    </capability>
+
     <capability android:name="actions.intent.PLAY_MUSIC">
         <intent
             android:action="android.media.action.MEDIA_PLAY_FROM_SEARCH"
@@ -20,6 +38,14 @@
                 android:name="music.playlist.name"
                 android:key="query" />
         </intent>
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="atify://play?query={query}"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            <parameter
+                android:name="music.recording.name"
+                android:key="query" />
+        </intent>
     </capability>
 
     <capability android:name="actions.intent.PLAY_PODCAST">
@@ -32,6 +58,17 @@
             <parameter
                 android:name="podcastEpisode.name"
                 android:key="query" />
+        </intent>
+    </capability>
+
+    <capability android:name="actions.intent.OPEN_APP_FEATURE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="atify://play?query={feature}"
+            android:targetClass="io.github.sekademi.spotufi.MainActivity">
+            <parameter
+                android:name="feature"
+                android:key="feature" />
         </intent>
     </capability>
 

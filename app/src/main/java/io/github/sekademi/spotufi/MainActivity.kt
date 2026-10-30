@@ -82,11 +82,40 @@ class MainActivity : ComponentActivity() {
                 intent.extras?.let { putExtras(it) }
             }
             ContextCompat.startForegroundService(this, serviceIntent)
+        } else if (action == android.content.Intent.ACTION_VIEW) {
+            val query = intent.getStringExtra("query")
+                ?: intent.getStringExtra("media_query")
+                ?: intent.getStringExtra("feature")
+                ?: intent.getStringExtra(android.app.SearchManager.QUERY)
+            if (!query.isNullOrBlank()) {
+                val serviceIntent = android.content.Intent(this, PlaybackService::class.java).apply {
+                    this.action = android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH
+                    putExtra(android.app.SearchManager.QUERY, query)
+                    putExtra("query", query)
+                }
+                ContextCompat.startForegroundService(this, serviceIntent)
+            }
         }
     }
 
     private fun handleDeepLink(intent: android.content.Intent?) {
         val data = intent?.data ?: return
+        val host = data.host.orEmpty()
+        if (host == "play" || host == "search") {
+            val query = data.getQueryParameter("query")
+                ?: data.getQueryParameter("q")
+                ?: data.getQueryParameter("name")
+                ?: data.getQueryParameter("feature")
+                ?: ""
+            val serviceIntent = android.content.Intent(this, PlaybackService::class.java).apply {
+                action = android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH
+                putExtra(android.app.SearchManager.QUERY, query)
+                putExtra("query", query)
+            }
+            ContextCompat.startForegroundService(this, serviceIntent)
+            return
+        }
+
         val rawSpDc = data.getQueryParameter("sp_dc") ?: data.getQueryParameter("cookie")
         if (!rawSpDc.isNullOrBlank()) {
             val spDc = com.metrolist.spotify.CookieSanitizer.sanitizeSpDc(rawSpDc) ?: rawSpDc.trim()

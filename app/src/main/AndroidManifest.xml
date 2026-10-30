@@ -50,8 +50,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="spotufi" android:host="callback" />
                 <data android:scheme="spotufi" android:host="login" />
+                <data android:scheme="spotufi" android:host="play" />
+                <data android:scheme="spotufi" android:host="search" />
                 <data android:scheme="atify" android:host="callback" />
                 <data android:scheme="atify" android:host="login" />
+                <data android:scheme="atify" android:host="play" />
+                <data android:scheme="atify" android:host="search" />
             </intent-filter>
             <!-- Handles voice search from Google Assistant / Gemini / Android Auto -->
             <intent-filter>
