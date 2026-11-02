@@ -659,6 +659,25 @@ fun SwipeToQueueBox(
 }
 
 @Composable
+fun ExplicitBadge(modifier: Modifier = Modifier) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .clip(RoundedCornerShape(3.dp))
+            .background(Color(0xFF8A8A8E))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+    ) {
+        Text(
+            text = "E",
+            color = Color.Black,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = 9.sp,
+        )
+    }
+}
+
+@Composable
 fun Snackbar(showMessage : String) {
     Box(
         modifier = Modifier

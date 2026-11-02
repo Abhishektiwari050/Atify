@@ -70,7 +70,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
+import io.github.sekademi.spotufi.ui.components.AnimatedEqualizer
 import io.github.sekademi.spotufi.ui.components.AnimatedHeartButton
+import io.github.sekademi.spotufi.ui.components.ExplicitBadge
 import io.github.sekademi.spotufi.ui.components.BouncyScaleBox
 import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import androidx.compose.material.icons.filled.Info
@@ -679,9 +681,11 @@ fun SearchSongRow(
     var isLiked by remember { mutableStateOf(isSongLiked(context, song.id.toString())) }
     val likeState = searchViewModel.likeState.value
     LaunchedEffect(likeState) { isLiked = isSongLiked(context, song.id.toString()) }
-    val currentPlayingIndicatorColor =
-        if (song.id == searchViewModel.currentSongId.value) Color(AppPalette.toArgb()) else Color.White
     val playerViewModel = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel()
+    val isCurrentSong = song.id == searchViewModel.currentSongId.value
+    val isCurrentAudioPlaying = isCurrentSong && playerViewModel.currentSongPlayingState.value
+    val currentPlayingIndicatorColor =
+        if (isCurrentSong) Color(0xFF1ED760) else Color.White
     var showSongOptions by remember { mutableStateOf(false) }
 
     if (showSongOptions) {
@@ -742,9 +746,29 @@ fun SearchSongRow(
                     contentDescription = "",
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = song.title, color = currentPlayingIndicatorColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isCurrentSong) {
+                            AnimatedEqualizer(
+                                isPlaying = isCurrentAudioPlaying,
+                                color = Color(0xFF1ED760),
+                                size = 14.dp,
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                        }
+                        Text(
+                            text = song.title,
+                            color = currentPlayingIndicatorColor,
+                            fontSize = 14.sp,
+                            fontWeight = if (isCurrentSong) FontWeight.SemiBold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
                     val isYouTube = song.spotifyTrackId.isBlank() || song.url.startsWith("youtube:")
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (song.explicit) {
+                            ExplicitBadge(modifier = Modifier.padding(end = 5.dp))
+                        }
                         if (isYouTube) {
                             Box(
                                 modifier = Modifier
@@ -761,12 +785,23 @@ fun SearchSongRow(
                                 )
                             }
                         }
+                        val subtitleText = buildString {
+                            if (!isYouTube) append("Song • ")
+                            append(song.singer)
+                            if (song.durationMs > 0) {
+                                val totalSec = song.durationMs / 1000
+                                val min = totalSec / 60
+                                val sec = totalSec % 60
+                                append(" • %d:%02d".format(min, sec))
+                            }
+                        }
                         Text(
-                            text = if (isYouTube) song.singer else "Song • ${song.singer}",
+                            text = subtitleText,
                             color = Color.Gray,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
                     }
                 }

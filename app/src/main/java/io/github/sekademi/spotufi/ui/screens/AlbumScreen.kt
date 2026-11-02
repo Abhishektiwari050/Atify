@@ -72,7 +72,9 @@ import io.github.sekademi.spotufi.data.preferences.removeLikedSong
 import io.github.sekademi.spotufi.data.preferences.removeLikedSongId
 import io.github.sekademi.spotufi.di.PaletteExtractor
 import io.github.sekademi.spotufi.di.SongPlayer
+import io.github.sekademi.spotufi.ui.components.AnimatedEqualizer
 import io.github.sekademi.spotufi.ui.components.EmptyStateView
+import io.github.sekademi.spotufi.ui.components.ExplicitBadge
 import io.github.sekademi.spotufi.ui.components.ErrorRetryView
 import io.github.sekademi.spotufi.ui.components.TrackListShimmer
 import io.github.sekademi.spotufi.ui.components.LikedSongsScreen
@@ -493,7 +495,9 @@ fun SumUpAlbumScreen(
                     }
                     val songId = albumSongs[song].id
 
-                    val currentPlayingIndicatorColor = if(songId == albumViewModel.currentSongId.value) Color(AppPalette.toArgb()) else Color.White
+                    val isCurrentPlaying = songId == albumViewModel.currentSongId.value
+                    val isCurrentlyPlayingAudio = isCurrentPlaying && albumViewModel.currentSongPlayingState.value
+                    val currentPlayingIndicatorColor = if (isCurrentPlaying) Color(0xFF1ED760) else Color.White
 
                     SwipeToQueueBox(song = albumSongs[song], onAddToQueue = { playerViewModel.addToQueue(it) }) {
                     Row(
@@ -526,29 +530,36 @@ fun SumUpAlbumScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.weight(1f)
                         ) {
-//                        AsyncImage(
-//                            modifier = Modifier.size(60.dp),
-//                            model = albumSongs[song].coverUri,
-//                            contentScale = ContentScale.Crop,
-//                            contentDescription = ""
-//                        )
+                            if (isCurrentPlaying) {
+                                AnimatedEqualizer(
+                                    isPlaying = isCurrentlyPlayingAudio,
+                                    color = Color(0xFF1ED760),
+                                    size = 15.dp,
+                                    modifier = Modifier.padding(end = 12.dp)
+                                )
+                            }
                             Column {
                                 Text(
                                     text = albumSongs[song].title,
                                     color = currentPlayingIndicatorColor,
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
+                                    fontWeight = if (isCurrentPlaying) FontWeight.SemiBold else FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = albumSongs[song].singer,
-                                    color = Color.Gray,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (albumSongs[song].explicit) {
+                                        ExplicitBadge(modifier = Modifier.padding(end = 5.dp))
+                                    }
+                                    Text(
+                                        text = albumSongs[song].singer,
+                                        color = Color.Gray,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
 
@@ -612,7 +623,7 @@ fun SumUpAlbumScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.padding(80.dp))
+            Spacer(modifier = Modifier.height(130.dp))
         }
 
     }

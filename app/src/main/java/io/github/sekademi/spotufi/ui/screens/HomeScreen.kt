@@ -71,6 +71,7 @@ import io.github.sekademi.spotufi.data.entity.ArtistsModel
 import io.github.sekademi.spotufi.data.entity.HomeFeedModel
 import io.github.sekademi.spotufi.data.entity.HomeItem
 import io.github.sekademi.spotufi.data.entity.HomeSection
+import io.github.sekademi.spotufi.ui.components.HomeFeedShimmer
 import io.github.sekademi.spotufi.ui.components.Loader
 import io.github.sekademi.spotufi.ui.navigation.Routes
 import io.github.sekademi.spotufi.ui.navigation.albumRoute
@@ -122,7 +123,7 @@ fun HomeScreen(navController: NavController){
             // otherwise the old "Sum up" layout flashes for a beat before the real
             // Spotify-style feed swaps in.
             home is Response.Loading -> {
-                Loader()
+                HomeFeedShimmer()
             }
 
             // Fallback: home feed errored but new-releases / artists came through.

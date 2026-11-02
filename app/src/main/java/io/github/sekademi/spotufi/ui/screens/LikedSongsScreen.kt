@@ -74,6 +74,8 @@ import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.di.SongPlayer
+import io.github.sekademi.spotufi.ui.components.AnimatedEqualizer
+import io.github.sekademi.spotufi.ui.components.ExplicitBadge
 import io.github.sekademi.spotufi.ui.components.Loader
 import io.github.sekademi.spotufi.ui.theme.AppBackground
 import io.github.sekademi.spotufi.ui.theme.AppPalette
@@ -523,8 +525,9 @@ fun LikedSongsScreen(navController: NavController) {
                 }
 
                 itemsIndexed(filteredSongs, key = { _, song -> song.id }) { index, song ->
-                    val currentColor = if (song.id == likedSongsViewModel.currentSongId.value)
-                        Color(AppPalette.toArgb()) else Color.White
+                    val isCurrentPlaying = song.id == likedSongsViewModel.currentSongId.value
+                    val isCurrentlyPlayingAudio = isCurrentPlaying && likedSongsViewModel.currentSongPlayingState.value
+                    val currentColor = if (isCurrentPlaying) Color(0xFF1ED760) else Color.White
 
                     SwipeToQueueBox(song = song, onAddToQueue = { playerViewModel.addToQueue(it) }) {
                     Row(
@@ -561,20 +564,37 @@ fun LikedSongsScreen(navController: NavController) {
                             contentDescription = ""
                         )
                         Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
-                            Text(
-                                text = song.title,
-                                color = currentColor,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = song.singer,
-                                color = Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isCurrentPlaying) {
+                                    AnimatedEqualizer(
+                                        isPlaying = isCurrentlyPlayingAudio,
+                                        color = Color(0xFF1ED760),
+                                        size = 14.dp,
+                                        modifier = Modifier.padding(end = 6.dp)
+                                    )
+                                }
+                                Text(
+                                    text = song.title,
+                                    color = currentColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isCurrentPlaying) FontWeight.SemiBold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (song.explicit) {
+                                    ExplicitBadge(modifier = Modifier.padding(end = 5.dp))
+                                }
+                                Text(
+                                    text = song.singer,
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
                         }
 
                         val isTrackDownloaded = remember<Boolean>(song.id, dlVersion) {
@@ -604,7 +624,7 @@ fun LikedSongsScreen(navController: NavController) {
                     }
                 }
 
-                item { Spacer(modifier = Modifier.padding(80.dp)) }
+                item { Spacer(modifier = Modifier.height(130.dp)) }
             }
         }
 

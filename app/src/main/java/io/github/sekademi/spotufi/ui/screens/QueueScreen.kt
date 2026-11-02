@@ -57,6 +57,8 @@ import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.di.SongPlayer
+import io.github.sekademi.spotufi.ui.components.AnimatedEqualizer
+import io.github.sekademi.spotufi.ui.components.ExplicitBadge
 import io.github.sekademi.spotufi.ui.components.tactileItemPress
 import io.github.sekademi.spotufi.ui.theme.AppPalette
 import io.github.sekademi.spotufi.ui.viewmodel.PlayerViewModel
@@ -292,16 +294,28 @@ private fun QueueRow(
             contentDescription = ""
         )
         Spacer(modifier = Modifier.width(12.dp))
+        if (highlight) {
+            val isPlaying = io.github.sekademi.spotufi.ui.viewmodel.sharedPlayerViewModel().currentSongPlayingState.value
+            AnimatedEqualizer(
+                isPlaying = isPlaying,
+                color = Color(0xFF1ED760),
+                size = 15.dp,
+                modifier = Modifier.padding(end = 10.dp),
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
-                color = if (highlight) Color(AppPalette.toArgb()) else Color.White,
+                color = if (highlight) Color(0xFF1ED760) else Color.White,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (song.explicit) {
+                    ExplicitBadge(modifier = Modifier.padding(end = 5.dp))
+                }
                 if (isFirstUpcoming) {
                     Text(
                         text = "PLAYING NEXT • ",

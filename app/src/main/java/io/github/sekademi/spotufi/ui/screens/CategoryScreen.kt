@@ -43,6 +43,7 @@ import coil3.compose.AsyncImage
 import io.github.sekademi.spotufi.R
 import io.github.sekademi.spotufi.data.api.Response
 import io.github.sekademi.spotufi.data.entity.LibraryEntry
+import io.github.sekademi.spotufi.ui.components.CategoryGridShimmer
 import io.github.sekademi.spotufi.ui.components.Loader
 import io.github.sekademi.spotufi.ui.components.Snackbar
 import io.github.sekademi.spotufi.ui.navigation.playlistRoute
@@ -88,7 +89,7 @@ fun CategoryScreen(navController: NavController, genre: String, title: String) {
         }
 
         when (playlists) {
-            is Response.Loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Loader() }
+            is Response.Loading -> CategoryGridShimmer()
             is Response.Success -> CategoryGrid((playlists as Response.Success).data, navController)
             else -> Box(modifier = Modifier.padding(20.dp, 60.dp)) { Snackbar(showMessage = "Couldn't load $title") }
         }

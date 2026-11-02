@@ -311,6 +311,8 @@ fun AtifyConnectScreen(navController: NavController) {
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(130.dp))
         }
     }
 }
