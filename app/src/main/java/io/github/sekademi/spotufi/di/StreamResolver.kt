@@ -25,7 +25,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 object StreamResolver {
     private const val TAG = "StreamResolver"
     private const val SPOTIFY_TRACK_PREFIX = "spotify:track:"
-    private const val PRELOAD_BYTES = 1L * 1024 * 1024
+    private const val PRELOAD_BYTES = 3L * 1024 * 1024
 
     private val streamCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val sourceCache = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -438,19 +438,28 @@ object StreamResolver {
                 .map { it.item }
             if (accepted.isEmpty()) {
                 val best = transferScored.maxByOrNull { it.score }
-                Log.w(
-                    TAG,
-                    "resolveVideoId: rejecting weak YouTube match for '$searchText' " +
-                        "(best='${best?.item?.title}' score=${"%.2f".format(best?.score ?: 0.0)} " +
-                        "title=${"%.2f".format(best?.titleScore ?: 0.0)} " +
-                        "artist=${"%.2f".format(best?.artistEvidenceScore ?: 0.0)} " +
-                        "duration=${"%.2f".format(best?.durationScore ?: 0.0)} " +
-                        "album=${"%.2f".format(best?.albumScore ?: 0.0)} " +
-                        "alt=${best?.unexpectedAlternates.orEmpty().joinToString("/")})",
-                )
-                return emptyList()
+                if (best != null && best.titleScore >= 0.35 && best.score >= 1.0) {
+                    Log.w(
+                        TAG,
+                        "resolveVideoId: strict match empty for '$searchText'; falling back to best candidate '${best.item.title}' (score=${"%.2f".format(best.score)})",
+                    )
+                    listOf(best.item)
+                } else {
+                    Log.w(
+                        TAG,
+                        "resolveVideoId: rejecting weak YouTube match for '$searchText' " +
+                            "(best='${best?.item?.title}' score=${"%.2f".format(best?.score ?: 0.0)} " +
+                            "title=${"%.2f".format(best?.titleScore ?: 0.0)} " +
+                            "artist=${"%.2f".format(best?.artistEvidenceScore ?: 0.0)} " +
+                            "duration=${"%.2f".format(best?.durationScore ?: 0.0)} " +
+                            "album=${"%.2f".format(best?.albumScore ?: 0.0)} " +
+                            "alt=${best?.unexpectedAlternates.orEmpty().joinToString("/")})",
+                    )
+                    return emptyList()
+                }
+            } else {
+                accepted.distinctBy { it.id }
             }
-            accepted.distinctBy { it.id }
         } else {
             val verifiedRanked = scored
                 .filter { verified(it.first) }
@@ -570,7 +579,10 @@ object StreamResolver {
                 "Mozilla/5.0 (Linux; Android 14; Pixel) AppleWebKit/537.36 " +
                     "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
             )
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(20_000)
             .setAllowCrossProtocolRedirects(true)
+            .setKeepPostFor302Redirects(true)
         val upstream = androidx.media3.datasource.DefaultDataSource.Factory(context, http)
         val cacheKeyFactory = androidx.media3.datasource.cache.CacheKeyFactory { dataSpec ->
             if (dataSpec.key != null) return@CacheKeyFactory dataSpec.key!!

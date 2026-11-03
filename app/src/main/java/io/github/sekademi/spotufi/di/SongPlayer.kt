@@ -345,10 +345,14 @@ object SongPlayer {
         }
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 2_500,
-                /* maxBufferMs = */ 30_000,
-                /* bufferForPlaybackMs = */ 500,
-                /* bufferForPlaybackAfterRebufferMs = */ 1_000,
+                /* minBufferMs = */ 30_000,
+                /* maxBufferMs = */ 120_000,
+                /* bufferForPlaybackMs = */ 1_000,
+                /* bufferForPlaybackAfterRebufferMs = */ 2_500,
+            )
+            .setBackBuffer(
+                /* backBufferDurationMs = */ 20_000,
+                /* retainBackBufferFromKeyframe = */ true,
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()

@@ -24,29 +24,69 @@ object SmartMusicRanker {
     ): List<SongsModel> {
         if (results.size <= 2 || query.isBlank()) return results
 
-        val normalizedQuery = query.trim().lowercase()
+        fun cleanForMatching(text: String): String =
+            text.lowercase()
+                .replace(Regex("[^a-z0-9\\s]"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+
+        val cleanQuery = cleanForMatching(query)
+        if (cleanQuery.isBlank()) return results
+
+        val queryTokens = cleanQuery.split(" ").filter { it.length > 1 }
+        val unspacedQuery = cleanQuery.replace(" ", "")
 
         return results.mapIndexed { index, song ->
-            val titleLower = song.title.lowercase()
-            val singerLower = song.singer.lowercase()
+            val cleanTitle = cleanForMatching(song.title)
+            val cleanSinger = cleanForMatching(song.singer)
+            val cleanAlbum = cleanForMatching(song.album)
+            val combinedText = "$cleanTitle $cleanSinger $cleanAlbum"
+            val unspacedTitle = cleanTitle.replace(" ", "")
 
-            // Textual relevance score (0.0 to 1.0)
-            val exactTitle = if (titleLower == normalizedQuery) 1.0f else 0.0f
-            val startsWithTitle = if (titleLower.startsWith(normalizedQuery)) 0.8f else 0.0f
-            val containsTitle = if (titleLower.contains(normalizedQuery)) 0.6f else 0.0f
-            val containsSinger = if (singerLower.contains(normalizedQuery)) 0.7f else 0.0f
-            val textRelevance = maxOf(exactTitle, startsWithTitle, containsTitle, containsSinger, 0.2f)
+            // 1. Exact & direct phrase matches
+            val exactTitle = if (cleanTitle == cleanQuery) 1.0f else 0.0f
+            val startsWithTitle = if (cleanTitle.startsWith(cleanQuery)) 0.90f else 0.0f
+            val exactSinger = if (cleanSinger == cleanQuery) 0.88f else 0.0f
+            val startsWithSinger = if (cleanSinger.startsWith(cleanQuery)) 0.82f else 0.0f
+            val directPhrase = if (combinedText.contains(cleanQuery)) 0.80f else 0.0f
+            val unspacedMatch = if (unspacedTitle.contains(unspacedQuery)) 0.85f else 0.0f
+
+            // 2. Token-level coverage (handles "artist song", "song artist", words out of order)
+            val tokenMatchRatio = if (queryTokens.isNotEmpty()) {
+                val matchedCount = queryTokens.count { token ->
+                    combinedText.contains(token) || unspacedTitle.contains(token)
+                }
+                matchedCount.toFloat() / queryTokens.size.toFloat()
+            } else 0f
+            val tokenScore = when {
+                tokenMatchRatio >= 0.99f -> 0.86f
+                tokenMatchRatio >= 0.75f -> 0.70f
+                tokenMatchRatio >= 0.50f -> 0.50f
+                else -> 0.15f
+            }
+
+            // High text relevance is dominant
+            val textRelevance = maxOf(
+                exactTitle,
+                startsWithTitle,
+                unspacedMatch,
+                tokenScore,
+                exactSinger,
+                startsWithSinger,
+                directPhrase,
+                0.15f,
+            )
 
             // ML Taste affinity score (0.0 to 1.0)
             val artistIds = song.artistIds.split(",").map { it.trim() }.filter { it.isNotBlank() }
                 .ifEmpty { song.singer.split(",", "&", "/").map { it.trim() }.filter { it.isNotBlank() } }
             val tasteScore = TasteProfileEngine.scoreCandidate(context, artistIds)
 
-            // Original search rank position decay (top results from Spotify get a position prior)
+            // Original search rank position prior
             val positionPrior = 1.0f - (index.toFloat() / results.size.toFloat()) * 0.3f
 
-            // Final composite rank score
-            val compositeScore = (textRelevance * 0.45f) + (tasteScore * 0.40f) + (positionPrior * 0.15f)
+            // Final composite rank: text relevance is strongly weighted (0.70) so users find their song
+            val compositeScore = (textRelevance * 0.70f) + (tasteScore * 0.18f) + (positionPrior * 0.12f)
             Pair(song, compositeScore)
         }.sortedByDescending { it.second }.map { it.first }
     }

@@ -43,6 +43,7 @@ import io.github.sekademi.spotufi.di.SpotifyWebPlayer
 import io.github.sekademi.spotufi.ui.repository.AppRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -89,17 +90,37 @@ class PlaybackService : MediaLibraryService() {
 
     private val playerListener = object : Player.Listener {
         private var lastErrorSongId: Int? = null
+        private var stallWatchdogJob: Job? = null
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             currentSongState.updatePlayingState(isPlaying)
             updatePlaybackStateCompat(if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
+            io.github.sekademi.spotufi.connect.AtifyPartyManager.broadcastCurrentState()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             currentSongState.updateBufferingState(playbackState == Player.STATE_BUFFERING)
             when (playbackState) {
-                Player.STATE_BUFFERING -> updatePlaybackStateCompat(PlaybackStateCompat.STATE_BUFFERING)
+                Player.STATE_BUFFERING -> {
+                    updatePlaybackStateCompat(PlaybackStateCompat.STATE_BUFFERING)
+                    val p = SongPlayer.exoPlayer
+                    if (p != null && p.playWhenReady) {
+                        stallWatchdogJob?.cancel()
+                        stallWatchdogJob = lifecycleScope.launch {
+                            kotlinx.coroutines.delay(3500)
+                            val player = SongPlayer.exoPlayer
+                            if (player != null && player.playbackState == Player.STATE_BUFFERING && player.playWhenReady) {
+                                val curPos = player.currentPosition
+                                android.util.Log.w("PlaybackService", "Buffering stalled at ${curPos}ms for 3.5s. Triggering auto-recovery micro-seek.")
+                                player.seekTo(curPos)
+                                player.play()
+                            }
+                        }
+                    }
+                }
                 Player.STATE_READY -> {
+                    stallWatchdogJob?.cancel()
+                    stallWatchdogJob = null
                     val isPlaying = SongPlayer.exoPlayer?.isPlaying == true
                     updatePlaybackStateCompat(if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
                     val duration = SongPlayer.exoPlayer?.duration?.takeIf { it > 0 } ?: 0L
@@ -115,6 +136,8 @@ class PlaybackService : MediaLibraryService() {
                     lastErrorSongId = null
                 }
                 Player.STATE_ENDED -> {
+                    stallWatchdogJob?.cancel()
+                    stallWatchdogJob = null
                     updatePlaybackStateCompat(PlaybackStateCompat.STATE_PAUSED)
                 }
             }
@@ -235,6 +258,7 @@ class PlaybackService : MediaLibraryService() {
                         SongPlayer.queueNextMediaItem(subsequent, applicationContext)
                     }
                     maybeExtendRadio(queue, nextIdx)
+                    io.github.sekademi.spotufi.connect.AtifyPartyManager.broadcastCurrentState()
                 }
             }
         }
@@ -394,6 +418,7 @@ class PlaybackService : MediaLibraryService() {
         io.github.sekademi.spotufi.connect.AtifyConnectServer.currentSongState = currentSongState
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionNext = { advance(forward = true) }
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionPrev = { advance(forward = false) }
+        io.github.sekademi.spotufi.connect.AtifyPartyManager.currentSongState = currentSongState
         if (io.github.sekademi.spotufi.data.preferences.isWebRemoteEnabled(this)) {
             io.github.sekademi.spotufi.connect.AtifyConnectServer.start(this)
         }
@@ -1481,6 +1506,8 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         MediaSessionHolder.release()
         mediaSessionCompat = null
+        io.github.sekademi.spotufi.connect.AtifyPartyManager.leaveOrEndParty()
+        io.github.sekademi.spotufi.connect.AtifyPartyManager.currentSongState = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionNext = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.onActionPrev = null
         io.github.sekademi.spotufi.connect.AtifyConnectServer.stop()

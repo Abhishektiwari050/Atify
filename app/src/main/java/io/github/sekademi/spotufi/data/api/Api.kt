@@ -266,12 +266,24 @@ class Api @Inject constructor(
             }
             val ytSongsDeferred = async(Dispatchers.IO) {
                 runCatching {
-                    YouTube.search(trimmed, YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    val primary = YouTube.search(trimmed, YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    if (primary?.items.isNullOrEmpty()) {
+                        val cleaned = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(trimmed)
+                        if (cleaned != trimmed && cleaned.isNotBlank()) {
+                            YouTube.search(cleaned, YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                        } else primary
+                    } else primary
                 }.getOrNull()
             }
             val ytVideosDeferred = async(Dispatchers.IO) {
                 runCatching {
-                    YouTube.search(trimmed, YouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+                    val primary = YouTube.search(trimmed, YouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+                    if (primary?.items.isNullOrEmpty()) {
+                        val cleaned = io.github.sekademi.spotufi.di.StreamResolver.cleanSpotifySearchTitle(trimmed)
+                        if (cleaned != trimmed && cleaned.isNotBlank()) {
+                            YouTube.search(cleaned, YouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+                        } else primary
+                    } else primary
                 }.getOrNull()
             }
 
